@@ -1,50 +1,99 @@
+ngxgeoipmemtweak() {
+	# on low memory systems <=768MB or when NGINX_GEOIPMEM=n
+	# optimise nginx memory usage when nginx geoip module is 
+	# enabled (by default) by changing from in memory caching
+	# of geoip country, city databases to on disk caching 
+	if [[ "$TOTALMEM" -le '759000' || "$NGINX_GEOIPMEM" = [nN] ]]; then
+		sed -i "s|_MEMORY_CACHE|_STANDARD|g" src/http/modules/ngx_http_geoip_module.c
+		grep -n _STANDARD src/http/modules/ngx_http_geoip_module.c
+	elif [[ "$NGINX_GEOIPMEM" = [yY] ]]; then
+		sed -i "s|_STANDARD|_MEMORY_CACHE|g" src/http/modules/ngx_http_geoip_module.c
+		grep -n _MEMORY_CACHE src/http/modules/ngx_http_geoip_module.c
+	fi
+}
+
 geoipphpext() {
+    if [[ "$PHP_INSTALL" = [yY] ]]; then
 if [[ -d /usr/share/GeoIP ]]; then
 	if [ ! -f /usr/bin/svn ]; then
 		echo "installing subversion..."
 		yum -y -q install subversion
+		sar_call
 	fi
 	
 	echo "compiling geoip PHP extension..."
 	cd $DIR_TMP
-	if [[ ! -d ${DIR_TMP}/geoip ]]; then
-		svn checkout http://svn.php.net/repository/pecl/geoip/trunk geoip
-	fi
-	cd geoip
-	if [[ "$INITIALINSTALL" != [yY] ]]; then
-		make clean
-	fi
-	/usr/local/bin/phpize
-	./configure --with-php-config=/usr/local/bin/php-config
-	make$MAKETHREADS
-	make install
+	# fallback mirror if official php svn repo is down, use local centmin mod mirror
+	# each php recompile will check again so if php svn repo is backup, the source
+	# code will switch back to official php svn repo again
+  curl -4Is --connect-timeout 5 --max-time 5 http://svn.php.net/repository/pecl/geoip/trunk/ | grep 'HTTP\/' | egrep '200' >/dev/null 2>&1
+  SVNGEOIP_CURLCHECK=$?
+  if [[ "$SVNGEOIP_CURLCHECK" != '0' ]]; then
+  	if [ -d geoip ]; then
+  		\cp -Rpf geoip geoip-backup
+  		rm -rf geoip
+  	fi
+  	git clone https://github.com/centminmod/geoip geoip
+  	sar_call
+  else
+  	if [ -d geoip ]; then
+  		\cp -Rpf geoip geoip-backup
+  		rm -rf geoip
+  	fi
+		svn checkout http://svn.php.net/repository/pecl/geoip/trunk/ geoip
+		sar_call
+  fi
+		cd geoip
+		if [[ "$INITIALINSTALL" != [yY] ]]; then
+			make clean
+		fi
+		/usr/local/bin/phpize
+		./configure --with-php-config=/usr/local/bin/php-config
+		sar_call
+		make$MAKETHREADS
+		sar_call
+		make install
+		sar_call
 
 cat > "${CONFIGSCANDIR}/geoip.ini" <<EOF
 extension=geoip.so
 geoip.custom_directory=/usr/share/GeoIP
 EOF
+	else
+		echo "Error: geoip php extension not installed. Could not find ${DIR_TMP}/geoip directory" > ${CENTMINLOGDIR}/centminmod_errors_install_${DT}.log
 fi
+    fi # PHP_INSTALL=y
 }
 
 geoipinstall() {
 
 cecho "GeoIP database and library install..." $boldyellow
-
 if [ -f /etc/yum.repos.d/rpmforge.repo ]; then
-	yum -y -q install GeoIP GeoIP-devel --disablerepo=rpmforge
+    # GEOIPYUMCHECK=$(rpm -qa GeoIP)
+    # GEOIPYUMCHECKB=$(rpm -qa GeoIP-devel)
+    if [[ $(rpm -q GeoIP >/dev/null 2>&1; echo $?) != '0' ]] || [[ $(rpm -q GeoIP-devel >/dev/null 2>&1; echo $?) != '0' ]]; then
+        yum -y -q install GeoIP GeoIP-devel --disablerepo=rpmforge
+        sar_call
+        rpm -ql GeoIP-devel GeoIP
+    fi
 else
-	yum -y -q install GeoIP GeoIP-devel
+		# GEOIPYUMCHECK=$(rpm -qa GeoIP)
+		# GEOIPYUMCHECKB=$(rpm -qa GeoIP-devel)
+    if [[ $(rpm -q GeoIP >/dev/null 2>&1; echo $?) != '0' ]] || [[ $(rpm -q GeoIP-devel >/dev/null 2>&1; echo $?) != '0' ]]; then
+        yum -y -q install GeoIP GeoIP-devel
+        sar_call
+        rpm -ql GeoIP-devel GeoIP
+    fi
 fi
-rpm -ql GeoIP-devel GeoIP
 
 	cd $DIR_TMP
 
 cecho "GeoLiteCity database download ..." $boldyellow
-	wget -cnv http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz -O /usr/share/GeoIP/GeoLiteCity.dat.gz
+	wget -4 -cnv http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz -O /usr/share/GeoIP/GeoLiteCity.dat.gz
 	gzip -d -f /usr/share/GeoIP/GeoLiteCity.dat.gz
 	cp -a /usr/share/GeoIP/GeoLiteCity.dat /usr/share/GeoIP/GeoIPCity.dat
 	
-	# wget -cnv http://geolite.maxmind.com/download/geoip/database/GeoLiteCountry/GeoIP.dat.gz -O /usr/share/GeoIP/GeoIP.dat.gz
+	# wget -4 -cnv http://geolite.maxmind.com/download/geoip/database/GeoLiteCountry/GeoIP.dat.gz -O /usr/share/GeoIP/GeoIP.dat.gz
 	# gzip -df /usr/share/GeoIP/GeoIP.dat.gz
 }
 

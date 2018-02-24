@@ -1,5 +1,13 @@
 csfinstalls() {
 
+    # centos 6.6 minimal bug
+    # https://bugzilla.redhat.com/show_bug.cgi?id=1161682
+    # if [[ "$CENTOS_SIX" = '6' && ! -f /etc/sysconfig/iptables ]]; then
+    #     yum -y install system-config-firewall-base
+    #     lokkit --default=server
+    #     service iptables restart
+    # fi
+
 # CSF is compulsory
 CSFINSTALLOK='y'
 
@@ -15,15 +23,24 @@ if [[ "$CSFINSTALLOK" = [yY] ]]; then
 
 #download csf tarball
 
-    if [[ -z "$(rpm -qa perl-Crypt-SSLeay)" || -z "$(rpm -qa perl-Net-SSLeay)" || -z "$(rpm -qa perl-LWP-Protocol-https)" ]]; then
-        yum${CACHESKIP} -y install perl-libwww-perl perl-Crypt-SSLeay perl-Net-SSLeay perl-LWP-Protocol-https
+    if [[ $(rpm -q perl-Crypt-SSLeay >/dev/null 2>&1; echo $?) != '0' ]] || [[ $(rpm -q perl-Net-SSLeay >/dev/null 2>&1; echo $?) != '0' ]]; then
+        yum${CACHESKIP} -y install perl-libwww-perl perl-Crypt-SSLeay perl-Net-SSLeay
+        sar_call
     elif [[ -z "$(rpm -qa perl-libwww-perl)" ]]; then
         yum${CACHESKIP} -y install perl-libwww-perl
+        sar_call
+    fi
+    if [[ "$CENTOS_SEVEN" = '7' ]]; then
+        if [[ $(rpm -q perl-LWP-Protocol-https >/dev/null 2>&1; echo $?) != '0' ]]; then
+            yum${CACHESKIP} -y install perl-LWP-Protocol-https
+            sar_call
+        fi
     fi
 
     #tar xzf csf.tgz
-    cd csf
+    cd "$DIR_TMP/csf"
     sh install.sh
+    sar_call
 
     # echo "Test IP Tables Modules..."
 
@@ -31,7 +48,7 @@ if [[ "$CSFINSTALLOK" = [yY] ]]; then
     cp -a /etc/csf/csf.conf /etc/csf/csf.conf-bak
 
     echo "CSF adding memcached, varnish ports to csf.allow list..."
-    sed -i 's/20,21,22,25,53,80,110,143,443,465,587,993,995/20,21,22,25,53,80,110,111,143,161,443,465,587,993,995,1110,1186,1194,2049,2112,22000,22001,2222,3000,3334,8080,8888,81,9312,9418,6081,6082,30865,3000:3050/g' /etc/csf/csf.conf
+    sed -i 's/20,21,22,25,53,80,110,143,443,465,587,993,995/20,21,22,25,53,80,110,111,143,161,443,465,587,993,995,1110,1186,1194,2049,81,9418,30001:50011/g' /etc/csf/csf.conf
 
 sed -i "s/TCP_OUT = \"/TCP_OUT = \"993,995,465,587,111,2049,1110,1194,9418,/g" /etc/csf/csf.conf
 sed -i "s/TCP6_OUT = \"/TCP6_OUT = \"993,995,465,587,/g" /etc/csf/csf.conf
@@ -59,6 +76,8 @@ pexe:/usr/local/lsws/bin/lshttpd.*
 pexe:/usr/local/lsws/fcgi-bin/lsphp.*
 exe:/usr/local/bin/memcached
 cmd:/usr/local/bin/memcached
+exe:/usr/libexec/openssh/sftp-server
+cmd:/usr/libexec/openssh/sftp-server
 user:mysql
 exe:/usr/sbin/mysqld 
 cmd:/usr/sbin/mysqld
@@ -84,6 +103,8 @@ user:postfix
 user:dovecot
 user:www-data
 user:spamfilter
+exe:/sbin/rpcbind
+exe:/usr/sbin/rpcbind
 exe:/usr/libexec/dovecot/imap
 exe:/usr/libexec/dovecot/pop3
 exe:/usr/libexec/dovecot/anvil
@@ -109,6 +130,16 @@ exe:/usr/libexec/postfix/scache
 exe:/usr/libexec/postfix/cleanup
 exe:/usr/libexec/postfix/trivial-rewrite
 exe:/usr/libexec/postfix/master
+exe:/home/virtfs/reviews/opt/cpanel/ea-php56/root/usr/bin/php-cgi
+cmd:/opt/cpanel/ea-php56/root/usr/bin/php-cgi
+exe:/home/virtfs/reviews/opt/cpanel/ea-php55/root/usr/bin/php-cgi
+cmd:/opt/cpanel/ea-php55/root/usr/bin/php-cgi
+exe:/home/virtfs/reviews/opt/cpanel/ea-php70/root/usr/bin/php-cgi
+cmd:/opt/cpanel/ea-php70/root/usr/bin/php-cgi
+exe:/home/virtfs/reviews/opt/cpanel/ea-php71/root/usr/bin/php-cgi
+cmd:/opt/cpanel/ea-php71/root/usr/bin/php-cgi
+exe:/home/virtfs/reviews/opt/cpanel/ea-php72/root/usr/bin/php-cgi
+cmd:/opt/cpanel/ea-php72/root/usr/bin/php-cgi
 EOF
 
 fi # check to see if csf.pignore already has custom apps added
@@ -130,7 +161,10 @@ if [[ "$CENTOS_SEVEN" = '7' ]]; then
         systemctl stop firewalld
     
         # install iptables-services package
-        yum -y install iptables-services
+        if [ ! -f /usr/lib/systemd/system/iptables.service ]; then
+            yum -y install iptables-services
+            sar_call
+        fi
     
         # start iptables and ip6tables services
         systemctl start iptables
@@ -157,14 +191,20 @@ if [[ "$CENTOS_SEVEN" = '7' ]]; then
         firewall-cmd --permanent --zone=public --add-service=pop3s
         firewall-cmd --permanent --zone=public --add-service=smtp
         firewall-cmd --permanent --zone=public --add-service=openvpn
-        firewall-cmd --permanent --zone=public --add-service=nfs
+        # firewall-cmd --permanent --zone=public --add-service=nfs
 
         # firewall-cmd --reload
         systemctl restart firewalld
         firewall-cmd --zone=public --list-services
 
-        # custom ports allowed
-        FIREWALLD_PORTS='1186 1194 11211 11212 11213 11214 2049 2112 3000 3334 8080 8888 81 9000 9001 9312 9418 10000 10500 10501 6081 6082 30865 3000-3050'
+        # custom ports allowed if detected SSHD default port is not 22, ensure the custom SSHD port
+        # number is whitelisted by firewalld
+        FWDDETECTED_PORT=$(awk '/^Port / {print $2}' /etc/ssh/sshd_config)
+        if [[ "$FWDDETECTED_PORT" = '22' ]]; then
+          FIREWALLD_PORTS='8080 8888 81 9312 9418 30001-50011'
+        else
+          FIREWALLD_PORTS="$FWDDETECTED_PORT 8080 8888 81 9312 9418 30001-50011"
+        fi
 
         for fp in $FIREWALLD_PORTS
           do
@@ -175,6 +215,10 @@ if [[ "$CENTOS_SEVEN" = '7' ]]; then
         firewall-cmd --zone=public --list-ports
     fi
 fi
+
+    if [ -f /usr/local/src/centminmod/tools/csfcf.sh ]; then
+        /usr/local/src/centminmod/tools/csfcf.sh auto
+    fi
 
     echo "*************************************************"
     cecho "* CSF firewall installed " $boldgreen

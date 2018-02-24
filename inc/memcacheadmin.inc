@@ -21,8 +21,7 @@ cd memcache-${MEMCACHE_VERSION}
     echo "*************************************************"
 
 # Randomize memcache_${N}.php filename
-N=$(od -vAn -N4 -tx < /dev/urandom)
-N=$(echo ${N} | sed -e 's/\s//')
+N=$(od -vAn -N8 -tx < /dev/urandom | sed -e 's/\s//g')
 \cp -a memcache.php /usr/local/nginx/html/memcache_${N}.php
 chown -R nginx:nginx /usr/local/nginx/html
 chmod 644 /usr/local/nginx/html/memcache_${N}.php
@@ -46,9 +45,9 @@ sed -i "s/mymemcache-server2:11211/localhost:11212/g" /usr/local/nginx/html/memc
 
 fi
 
-CSALT=$(openssl rand -hex 5)
+CSALT=$(openssl rand 8 -base64 | tr -dc 'a-zA-Z0-9')
 memcacheduser=$(echo "memadmin${CSALT}")
-memcachedpassword=$(openssl rand -hex 12)
+memcachedpassword=$(openssl rand 19 -base64 | tr -dc 'a-zA-Z0-9')
 echo ""
 
 cecho "Setup Memcached Server Admin Login Details for /usr/local/nginx/html/memcache_${N}.php" $boldgreen
@@ -63,7 +62,8 @@ sed -i "s/'ADMIN_USERNAME','memcacheuser'/'ADMIN_USERNAME','${memcacheduser}'/g"
 sed -i "s/'ADMIN_PASSWORD','memcachepass'/'ADMIN_PASSWORD','${memcachedpassword}'/g" /usr/local/nginx/html/memcache_${N}.php 2>&1>/dev/null
 
 echo "*************************************************"
-cecho "Memcached Server Admin Login: /usr/local/nginx/html/memcache_${N}.php" $boldgreen
+cecho "Memcached Server Admin Login File: /usr/local/nginx/html/memcache_${N}.php" $boldgreen
+cecho "Memcached Server Admin Login: ${hname}/memcache_${N}.php" $boldgreen
 cecho "new memcached username: ${memcacheduser}" $boldgreen
 cecho "new memcached password: ${memcachedpassword}" $boldgreen
 echo "*************************************************"

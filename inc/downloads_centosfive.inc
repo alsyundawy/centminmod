@@ -1,7 +1,7 @@
 ###############################################
 yumcentosfivedownload() {
 
-if [[ "$CENTOSVER" = '5.3' || "$CENTOSVER" = '5.4' || "$CENTOSVER" = '5.5' || "$CENTOSVER" = '5.6' || "$CENTOSVER" = '5.7' || "$CENTOSVER" == '5.8' || "$CENTOSVER" == '5.9' || "$CENTOSVER" == '5.10' || "$CENTOSVER" == '5.11' || "$CENTOSVER" == '5.12' || "$CENTOSVER" == '5.13' || "$CENTOSVER" == '5.14' ]]; then
+if [[ "$CENTOSVER" > 5 && "$CENTOSVER" < 6 ]]; then
 {
     cd $DIR_TMP
 
@@ -22,7 +22,7 @@ elif [ ! -f /etc/yum.repos.d/epel.repo ]; then
 	else 
 		cecho "Download done." $boldyellow
 		rpm --import http://epel.mirror.constant.com/RPM-GPG-KEY-EPEL-5
-		rpm -i ${CENTOSFIVEEPELFILE}
+		rpm -Uvh ${CENTOSFIVEEPELFILE}
 		#yum${CACHESKIP} -q list ccache 2>&1 >/dev/null
 		ERR=$?
 		CCEPELCHECK="$ERR"
@@ -61,7 +61,7 @@ if [[ "$RPMFORGEREPO_DISABLE" = [nN] ]]; then
 	else 
          	cecho "Download done." $boldyellow
 	rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt
-	rpm -i ${CENTOSFIVERPMFORGEFILE}
+	rpm -Uvh ${CENTOSFIVERPMFORGEFILE}
 		yum${CACHESKIP} -q list axel 2>&1 >/dev/null
 		ERR=$?
 		CCRPMFORGECHECK="$ERR"
@@ -93,7 +93,7 @@ checklogdetails
 else 
          cecho "Download done." $boldyellow
 rpm --import http://centos.alt.ru/pub/repository/centos/RPM-GPG-KEY-CentALT
-rpm -i ${CENTOSFIVECENTALTFILE}
+rpm -Uvh ${CENTOSFIVECENTALTFILE}
 yumpriorcentalt
 echo ""
 	fi
@@ -115,7 +115,7 @@ checklogdetails
 else 
          cecho "Download done." $boldyellow
 rpm --import http://www.percona.com/downloads/RPM-GPG-KEY-percona
-rpm -i ${CENTOSFIVEPERCONARELEASEFILE}
+rpm -Uvh ${CENTOSFIVEPERCONARELEASEFILE}
 	#yum -q list axel 2>&1 >/dev/null
 	ERR=$?
 	CCPERCONACHECK="$ERR"

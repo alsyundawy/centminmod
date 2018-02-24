@@ -27,11 +27,20 @@ then
     #tar -xzf siege-${SIEGE_VERSION}.tar.gz
     cd siege-${SIEGE_VERSION}
     ./configure --with-ssl=/usr
+    sar_call
     make$MAKETHREADS
+    sar_call
     make install
+    sar_call
     mkdir -p /usr/local/var/
 
-    sed -i 's/# failures =/failures = 2048/g' /usr/local/etc/siegerc
+    siege -q -b -c1 -r1 localhost >/dev/null 2>&1
+    # sed -i 's/# failures =/failures = 2048/g' /usr/local/etc/siegerc
+    sed -i 's/# failures =/failures = 2048/g' /root/.siege/siege.conf
+    sed -i 's|limit = 255|limit = 4095|' /root/.siege/siege.conf
+    \cp -af /root/.siege/siege.conf /root/.siege/siege-csv.conf
+    sed -i 's|# csv = true|csv = true|' /root/.siege/siege-csv.conf
+    sed -i 's|# logfile = |logfile = /usr/local/var/log/siege-csv.log|' /root/.siege/siege-csv.conf
 ) &
 
 if [[ "$UALL" != 'y' ]]; then 
@@ -42,8 +51,11 @@ if [[ "$UALL" != 'y' ]]; then
     #tar -xzf sproxy-latest.tar.gz
     cd sproxy-1.02
     ./configure
+    sar_call
     make$MAKETHREADS
+    sar_call
     make install
+    sar_call
 ) &
 fi # UALL
 wait

@@ -4,7 +4,7 @@
 # latest version at http://linfo.sourceforge.net/
 #################################################
 DIR_TMP='/svr-setup'
-LINFO_VER='2.0.2'
+LINFO_VER='2.0.3'
 LINFOBASE='/usr/local/nginx/html'	# DO NOT CHANGE
 LINFODIR='cinfo'
 LINFOPATH="${LINFOBASE}/${LINFODIR}"
@@ -42,6 +42,18 @@ return
 }
 
 ###########################################
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+
+shopt -s expand_aliases
+for g in "" e f; do
+    alias ${g}grep="LC_ALL=C ${g}grep"  # speed-up grep, egrep, fgrep
+done
+
 updatever() {
 	read -ep "Enter linfo version number: " LINFO_VER
 }
@@ -101,10 +113,15 @@ rm -rf ${LINFOPATH}/config.inc.php
 ###########################################
 passp() {
 
-CSALT=$(openssl rand 5 -base64)
+CSALT=$(openssl rand 6 -base64 | tr -dc 'a-zA-Z0-9')
 CUSER=$(echo "admin${CSALT}")
-CPASS=$(openssl rand 10 -base64)
-hname=$(hostname)
+CPASS=$(openssl rand 19 -base64 | tr -dc 'a-zA-Z0-9')
+
+    if [[ "$(hostname -f 2>&1 | grep -w 'Unknown host')" ]]; then
+      hname=$(hostname)
+    else
+      hname=$(hostname -f)
+    fi
 
 echo ""
 cecho "Creating cinfo_htpasswd user/pass..." $boldyellow

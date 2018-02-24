@@ -7,10 +7,14 @@ opprotect() {
 ## grab newer custom written htpasswd.sh as well
 gethtpasswdsh
 
-hname=$(hostname)
-OPSALT=$(openssl rand 3 -base64)
-OPUSER=$(echo "opadmin${CSALT}")
-OPPASS=$(openssl rand 16 -base64)
+  if [[ "$(hostname -f 2>&1 | grep -w 'Unknown host')" ]]; then
+    hname=$(hostname)
+  else
+    hname=$(hostname -f)
+  fi
+OPSALT=$(openssl rand 10 -base64 | tr -dc 'a-zA-Z0-9')
+OPUSER=$(echo "opadmin${OPSALT}")
+OPPASS=$(openssl rand 22 -base64 | tr -dc 'a-zA-Z0-9')
 
 	echo ""
 	cecho "Creating htpasswd_opcache user/pass..." $boldyellow
@@ -61,28 +65,29 @@ fi
 echo ""
 cmservice nginx reload
 
-	echo "" > ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "Password protected ${hname}/${N}_opcache.php" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "Username: $OPUSER" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "Password: $OPPASS" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	echo "" >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  echo "" > ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "File Location: /usr/local/nginx/html/${N}_opcache.php" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "Password protected ${hname}/${N}_opcache.php" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "Username: $OPUSER" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "Password: $OPPASS" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  echo "" >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
 }
 ###############
 
 #################
 zopcacheupgrade() {
-
-if [[ "$PHPMUVER" = '5.5' || "$PHPMUVER" = '5.6' || "$PHPMUVER" = '5.7' || "$PHPMUVER" = '7.0' || "$PHPMUVER" = 'NGDEBUG' ]]; then
+	if [[ "$PHP_INSTALL" = [yY] ]]; then
+if [[ "$PHPMUVER" > 5.5 ]]; then
 	echo ""
 	echo "-----------------------------------------------------------------------------------------"
 	cecho "Detected PHP $PHPMUVER branch." $boldyellow
 	echo "You can compile Zend OPcache (Zend Optimizer Plus+) support"
 	echo "as an alternative to using APC Cache or Xcache cache."
 	echo "But Zend OPcache only provides PHP opcode cache and"
-	echo "DOESN'T do data caching, so if you web apps such as Wordpress,"
+	echo "DOESN'T do data caching, so if your web apps such as Wordpress,"
 	echo "Drupal or vBulletin require data caching to APC or Xcache,"
 	echo "it won't work with Zend OPcache."
 	echo ""
@@ -92,6 +97,12 @@ if [[ "$PHPMUVER" = '5.5' || "$PHPMUVER" = '5.6' || "$PHPMUVER" = '5.7' || "$PHP
 	echo "-----------------------------------------------------------------------------------------"
 	read -ep "Do you want to use Zend OPcache [y/n] ? " zendopcacheon
 	echo ""
+
+if [[ "$zendopcacheon" = [nN] ]]; then
+	if [ -f ${CONFIGSCANDIR}/zendopcache.ini ]; then
+		rm -rf ${CONFIGSCANDIR}/zendopcache.ini
+	fi
+fi
 
 if [[ "$zendopcacheon" = [yY] ]]; then
 
@@ -139,8 +150,8 @@ if [[ "$zendopcacheon" = [yY] ]]; then
 		fi
 	
 
-	DETECTXCACHE=n
-    DETECTAPC=n
+  DETECTXCACHE=n
+  DETECTAPC=n
     
 
 ######################################################
@@ -149,13 +160,16 @@ if [[ "$zendopcacheon" = [yY] ]]; then
 ## grab newer custom written htpasswd.sh as well
 gethtpasswdsh
 
-hname=$(hostname)
-OPSALT=$(openssl rand 3 -base64)
-OPUSER=$(echo "opadmin${CSALT}")
-OPPASS=$(openssl rand 16 -base64)
+  if [[ "$(hostname -f 2>&1 | grep -w 'Unknown host')" ]]; then
+    hname=$(hostname)
+  else
+    hname=$(hostname -f)
+  fi
+OPSALT=$(openssl rand 10 -base64 | tr -dc 'a-zA-Z0-9')
+OPUSER=$(echo "opadmin${OPSALT}")
+OPPASS=$(openssl rand 22 -base64 | tr -dc 'a-zA-Z0-9')
 
-N=$(od -vAn -N4 -tx < /dev/urandom)
-N=$(echo ${N} | sed -e 's/\s//')
+N=$(od -vAn -N8 -tx < /dev/urandom | sed -e 's/\s//g')
 if [[ -f /usr/local/nginx/html/opcache.php ]]; then
 	mv /usr/local/nginx/html/opcache.php /usr/local/nginx/html/${N}_opcache.php
 	chown nginx:nginx /usr/local/nginx/html/${N}_opcache.php
@@ -235,11 +249,11 @@ fi # zendopcacheon
 
     # cmservice php-fpm restart
     echo "*************************************************"
-    cecho "* Zend Optimizer Plus OPcache installed" $boldgreen
+    cecho "* Zend Optimizer Plus OPcache configured" $boldgreen
     echo "*************************************************"
 
 fi # $PHPMUVER = 5.5
-
+	fi # PHP_INSTALL=y
 }
 
 

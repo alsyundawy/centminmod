@@ -7,10 +7,14 @@ opprotectinstall() {
 ## grab newer custom written htpasswd.sh as well
 gethtpasswdsh
 
-hname=$(hostname)
-OPSALT=$(openssl rand 3 -base64)
-OPUSER=$(echo "opadmin${CSALT}")
-OPPASS=$(openssl rand 16 -base64)
+  if [[ "$(hostname -f 2>&1 | grep -w 'Unknown host')" ]]; then
+    hname=$(hostname)
+  else
+    hname=$(hostname -f)
+  fi
+OPSALT=$(openssl rand 10 -base64 | tr -dc 'a-zA-Z0-9')
+OPUSER=$(echo "opadmin${OPSALT}")
+OPPASS=$(openssl rand 22 -base64 | tr -dc 'a-zA-Z0-9')
 
 	echo ""
 	cecho "Creating htpasswd_opcache user/pass..." $boldyellow
@@ -61,19 +65,20 @@ fi
 echo ""
 cmservice nginx reload
 
-	echo "" > ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "Password protected ${hname}/${N}_opcache.php" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "Username: $OPUSER" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "Password: $OPPASS" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
-	echo "" >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  echo "" > ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "File Location: /usr/local/nginx/html/${N}_opcache.php" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "Password protected ${hname}/${N}_opcache.php" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "Username: $OPUSER" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "Password: $OPPASS" $boldgreen >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  cecho "-------------------------------------------------------" $boldyellow >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
+  echo "" >> ${CENTMINLOGDIR}/zendopcache_passfile.txt
 }
 ###############
 
 zopcacheinstall() {
-
+	if [[ "$PHP_INSTALL" = [yY] ]]; then
     echo "*************************************************"
     cecho "* Installing Zend Optimizer Plus OPcache" $boldgreen
     echo "*************************************************"
@@ -90,13 +95,13 @@ echo "Current centmin.sh set PHP_VERSION: $PHPMVER"
 echo "Current PHP upgrade version set: $PHPMUVER"
 echo "-------------------------------------------------------------------"
 
-if [[ "$ZOPCACHE_OVERRIDE" = [yY] || "$PHPMVER" != '7.0' || "$PHPCURRENTVER" != '7.0' || "$PHPMVER" != '5.7' || "$PHPCURRENTVER" != '5.7' || "$PHPMVER" != '5.6' || "$PHPCURRENTVER" != '5.6' || "$PHPMVER" != '5.5' || "$PHPCURRENTVER" != '5.5' || "$PHPMVER" = '5.4' ||"$PHPMVER" = '5.3' ||"$PHPMVER" = '5.2' ]]; then
+if [[ "$PHPCURRENTVER" == 5.[2-4] || "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
 
 	if [[ ! -d "${DIR_TMP}/zendopcache-${ZOPCACHECACHE_VERSION}" || ! -f "${DIR_TMP}/${ZENDOPCACHE_LINKFILE}" ]]; then
 		zopcachetarball
 	fi
 
-#wget http://pecl.php.net/get/zendopcache-7.0.5.tgz
+#wget -4 http://pecl.php.net/get/zendopcache-7.0.5.tgz
 #tar xvzf zendopcache-7.0.5.tgz
 #cd zendopcache-7.0.5
 cd zendopcache-${ZOPCACHECACHE_VERSION}
@@ -126,12 +131,16 @@ fi
 
 ######################################################
 # Randomize ${N}_opcache.php filename
-N=$(od -vAn -N4 -tx < /dev/urandom)
-N=$(echo ${N} | sed -e 's/\s//')
+N=$(od -vAn -N8 -tx < /dev/urandom | sed -e 's/\s//g')
 echo
 echo "setup initial /usr/local/nginx/html/opcache.php"
 echo
 if [[ ! -f /usr/local/nginx/html/opcache.php ]]; then
+	echo "cp $CUR_DIR/config/zendopcache/opcache.php /usr/local/nginx/html/${N}_opcache.php"
+	cp $CUR_DIR/config/zendopcache/opcache.php /usr/local/nginx/html/${N}_opcache.php
+	chown nginx:nginx /usr/local/nginx/html/${N}_opcache.php
+	opprotectinstall
+elif [[ "$(ls /usr/local/nginx/html | grep opcache >/dev/null 2>&1; echo $?)" != '0' ]]; then
 	echo "cp $CUR_DIR/config/zendopcache/opcache.php /usr/local/nginx/html/${N}_opcache.php"
 	cp $CUR_DIR/config/zendopcache/opcache.php /usr/local/nginx/html/${N}_opcache.php
 	chown nginx:nginx /usr/local/nginx/html/${N}_opcache.php
@@ -189,13 +198,11 @@ fi # check if opcache.so exists in zendopcache.ini
     echo "*************************************************"
 
 else
-
-PHPNATIVEOPCACHE='y'
-
+	PHPNATIVEOPCACHE='y'
 	echo ""
-	echo "Detected PHP branch: 5.5 which has native support for Zend OPcache"
+	echo "Detected PHP branch: 5.5+ which has native support for Zend OPcache"
 	echo "To enable Zend OPcache run menu option #5 and specify PHP 5.5.0 or higher"
 
-fi # check for PHPMVER !=5.5
-
+fi # check for PHPCURRENTVER
+	fi # PHP_INSTALL=y
 }

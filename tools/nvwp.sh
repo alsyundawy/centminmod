@@ -4,17 +4,22 @@
 # .09 beta01 and higher written by George Liu
 # modified for wordpress setup
 ################################################################
-branchname='123.08stable'
+branchname='123.09beta01'
 #CUR_DIR="/usr/local/src/centminmod-${branchname}"
 CUR_DIR="/usr/local/src/centminmod"
 
 DEBUG='n'
+CENTMINLOGDIR='/root/centminlogs'
+DT=$(date +"%d%m%y-%H%M%S")
+CURL_TIMEOUTS=' --max-time 5 --connect-timeout 5'
 DIR_TMP=/svr-setup
 OPENSSL_VERSION=$(awk -F "'" /'^OPENSSL_VERSION/ {print $2}' $CUR_DIR/centmin.sh)
 # CURRENTIP=$(echo $SSH_CLIENT | awk '{print $1}')
-# CURRENTCOUNTRY=$(curl -s ipinfo.io/$CURRENTIP/country)
-CENTMINLOGDIR='/root/centminlogs'
-DT=`date +"%d%m%y-%H%M%S"`
+# CURRENTCOUNTRY=$(curl -4s${CURL_TIMEOUTS} ipinfo.io/$CURRENTIP/country)
+SCRIPT_DIR=$(readlink -f $(dirname ${BASH_SOURCE[0]}))
+LOGPATH="${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nvwp.log"
+USE_NGINXMAINEXTLOGFORMAT='n'
+CLOUDFLARE_AUTHORIGINPULLCERT='https://support.cloudflare.com/hc/en-us/article_attachments/201243967/origin-pull-ca.pem'
 ################################################################
 # Setup Colours
 black='\E[30;40m'
@@ -48,16 +53,52 @@ echo -e "$color$message" ; $Reset
 return
 }
 ###############################################################
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+
+shopt -s expand_aliases
+for g in "" e f; do
+    alias ${g}grep="LC_ALL=C ${g}grep"  # speed-up grep, egrep, fgrep
+done
+
+if [ ! -d "$CENTMINLOGDIR" ]; then
+  mkdir -p "$CENTMINLOGDIR"
+fi
 
 if [ ! -d /root/tools ]; then
   mkdir -p /root/tools
 fi
 
-if [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]]; then
+  # extended custom nginx log format = main_ext for nginx amplify metric support
+  # https://github.com/nginxinc/nginx-amplify-doc/blob/master/amplify-guide.md#additional-nginx-metrics
+  if [ -f /usr/local/nginx/conf/nginx.conf ]; then
+    if [[ "$USE_NGINXMAINEXTLOGFORMAT" = [yY] && "$(grep 'main_ext' /usr/local/nginx/conf/nginx.conf)" ]]; then
+      NGX_LOGFORMAT='main_ext'
+    else
+      NGX_LOGFORMAT='combined'
+    fi
+  else
+    NGX_LOGFORMAT='combined'
+  fi
+
+if [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]] && [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_spdy_module')" = 'with-http_spdy_module' ]]; then
+  HTTPTWO=y
+  LISTENOPT='ssl spdy http2'
+  COMP_HEADER='spdy_headers_comp 5'
+  SPDY_HEADER='add_header Alternate-Protocol  443:npn-spdy/3;'
+  HTTPTWO_MAXFIELDSIZE='http2_max_field_size 16k;'
+  HTTPTWO_MAXHEADERSIZE='http2_max_header_size 32k;'  
+elif [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]]; then
   HTTPTWO=y
   LISTENOPT='ssl http2'
   COMP_HEADER='#spdy_headers_comp 5'
   SPDY_HEADER='#add_header Alternate-Protocol  443:npn-spdy/3;'
+  HTTPTWO_MAXFIELDSIZE='http2_max_field_size 16k;'
+  HTTPTWO_MAXHEADERSIZE='http2_max_header_size 32k;'
 else
   HTTPTWO=n
   LISTENOPT='ssl spdy'
@@ -154,9 +195,17 @@ if [[ "$(cat /etc/redhat-release | awk '{ print $3 }' | cut -d . -f1)" = '6' ]];
     CENTOS_SIX='6'
 fi
 
+# Check for Redhat Enterprise Linux 7.x
 if [ "$CENTOSVER" == 'Enterprise' ]; then
-    CENTOSVER=$(cat /etc/redhat-release | awk '{ print $7 }')
-    OLS='y'
+    CENTOSVER=$(awk '{ print $7 }' /etc/redhat-release)
+    if [[ "$(awk '{ print $1,$2 }' /etc/redhat-release)" = 'Red Hat' && "$(awk '{ print $7 }' /etc/redhat-release | cut -d . -f1)" = '7' ]]; then
+        CENTOS_SEVEN='7'
+        REDHAT_SEVEN='y'
+    fi
+fi
+
+if [[ -f /etc/system-release && "$(awk '{print $1,$2,$3}' /etc/system-release)" = 'Amazon Linux AMI' ]]; then
+    CENTOS_SIX='6'
 fi
 
 cmservice() {
@@ -176,12 +225,13 @@ cmservice() {
 }
 
 dbsetup() {
-  SALT=$(openssl rand -base64 12 | cut -c1-12 | sed -e s'|/||')
+  SALT=$(openssl rand 12 -base64 | tr -dc 'a-zA-Z0-9')
   DBN=$RANDOM
   DBNB=$RANDOM
   DBNC=$RANDOM
   DBND=$RANDOM
-  DB="wp${DBN}db_${DBND}"
+  DBNE=$RANDOM
+  DB="wp${DBNE}${DBN}db_${DBND}"
   DBUSER="wpdb${DBND}u${DBNB}"
   DBPASS="wpdb${SALT}p${DBNC}"
   mysqladmin create $DB
@@ -193,7 +243,11 @@ pureftpinstall() {
 	if [ ! -f /usr/bin/pure-pw ]; then
 		echo "pure-ftpd not installed"
 		echo "installing pure-ftpd"
-		CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+    if [ "$SECOND_IP" ]; then
+      CNIP="$SECOND_IP"
+    else
+      CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+    fi
 
 		yum -q -y install pure-ftpd
 		cmchkconfig pure-ftpd on
@@ -280,8 +334,15 @@ if [ ! -f /usr/local/nginx/conf/ssl ]; then
   mkdir -p /usr/local/nginx/conf/ssl
 fi
 
-if [ ! -f /usr/local/nginx/conf/ssl/${vhostname} ]; then
+if [ ! -d /usr/local/nginx/conf/ssl/${vhostname} ]; then
   mkdir -p /usr/local/nginx/conf/ssl/${vhostname}
+fi
+
+# cloudflare authenticated origin pull cert
+# setup https://community.centminmod.com/threads/13847/
+if [ ! -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
+  mkdir -p /usr/local/nginx/conf/ssl/cloudflare/${vhostname}
+  wget $CLOUDFLARE_AUTHORIGINPULLCERT -O origin.crt
 fi
 
 if [ ! -f /usr/local/nginx/conf/ssl_include.conf ]; then
@@ -318,57 +379,57 @@ fi
 openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
 openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt
 
-# echo
-# cecho "---------------------------------------------------------------" $boldyellow
-# cecho "Generating backup CSR and private key for HTTP Public Key Pinning..." $boldgreen
-# cecho "creating CSR File: ${vhostname}-backup.csr" $boldgreen
-# cecho "creating private key: ${vhostname}-backup.key" $boldgreen
-# sleep 5
+echo
+cecho "---------------------------------------------------------------" $boldyellow
+cecho "Generating backup CSR and private key for HTTP Public Key Pinning..." $boldgreen
+cecho "creating CSR File: ${vhostname}-backup.csr" $boldgreen
+cecho "creating private key: ${vhostname}-backup.key" $boldgreen
+sleep 5
 
-# openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}-backup.csr -keyout ${vhostname}-backup.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
+openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}-backup.csr -keyout ${vhostname}-backup.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
 
-# echo
-# cecho "---------------------------------------------------------------" $boldyellow
-# cecho "Extracting Base64 encoded information for primary and secondary" $boldgreen
-# cecho "private key's SPKI - Subject Public Key Information" $boldgreen
-# cecho "Primary private key - ${vhostname}.key" $boldgreen
-# cecho "Backup private key - ${vhostname}-backup.key" $boldgreen
-# cecho "For HPKP - HTTP Public Key Pinning hash generation..." $boldgreen
-# sleep 5
+echo
+cecho "---------------------------------------------------------------" $boldyellow
+cecho "Extracting Base64 encoded information for primary and secondary" $boldgreen
+cecho "private key's SPKI - Subject Public Key Information" $boldgreen
+cecho "Primary private key - ${vhostname}.key" $boldgreen
+cecho "Backup private key - ${vhostname}-backup.key" $boldgreen
+cecho "For HPKP - HTTP Public Key Pinning hash generation..." $boldgreen
+sleep 5
 
-# echo
-# cecho "extracting SPKI Base64 encoded hash for primary private key = ${vhostname}.key ..." $boldgreen
+echo
+cecho "extracting SPKI Base64 encoded hash for primary private key = ${vhostname}.key ..." $boldgreen
 
-# openssl rsa -in ${vhostname}.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt
+openssl rsa -in ${vhostname}.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt
 
-# echo
-# cecho "extracting SPKI Base64 encoded hash for backup private key = ${vhostname}-backup.key ..." $boldgreen
+echo
+cecho "extracting SPKI Base64 encoded hash for backup private key = ${vhostname}-backup.key ..." $boldgreen
 
-# openssl rsa -in ${vhostname}-backup.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt
+openssl rsa -in ${vhostname}-backup.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt
 
-# echo
-# cecho "HTTP Public Key Pinning Header for Nginx" $boldgreen
+echo
+cecho "HTTP Public Key Pinning Header for Nginx" $boldgreen
 
-# echo
-# cecho "for 7 days max-age including subdomains" $boldgreen
-# echo
-# echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=604800; includeSubDomains';"
+echo
+cecho "for 7 days max-age including subdomains" $boldgreen
+echo
+echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=86400; includeSubDomains';"
 
-# echo
-# cecho "for 7 days max-age excluding subdomains" $boldgreen
-# echo
-# echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=604800';"
+echo
+cecho "for 7 days max-age excluding subdomains" $boldgreen
+echo
+echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=86400';"
 
 
 echo
 cecho "---------------------------------------------------------------" $boldyellow
 cecho "Generating dhparam.pem file - can take a few minutes..." $boldgreen
 
-dhparamstarttime=$(date +%s.%N)
+dhparamstarttime=$(TZ=UTC date +%s.%N)
 
 openssl dhparam -out dhparam.pem 2048
 
-dhparamendtime=$(date +%s.%N)
+dhparamendtime=$(TZ=UTC date +%s.%N)
 DHPARAMTIME=$(echo "$dhparamendtime-$dhparamstarttime"|bc)
 cecho "dhparam file generation time: $DHPARAMTIME" $boldyellow
 
@@ -377,9 +438,33 @@ cecho "dhparam file generation time: $DHPARAMTIME" $boldyellow
 funct_nginxaddvhost() {
 PUREUSER=nginx
 PUREGROUP=nginx
-CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+    if [ "$SECOND_IP" ]; then
+      CNIP="$SECOND_IP"
+    else
+      CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+    fi
 if [[ "$PUREFTPD_INSTALLED" = [nN] ]]; then
   pureftpinstall
+fi
+
+# Support secondary dedicated IP configuration for centmin mod
+# nginx vhost generator, so out of the box, new nginx vhosts 
+# generated will use the defined SECOND_IP=111.222.333.444 where
+# the IP is a secondary IP addressed added to the server.
+# You define SECOND_IP variable is centmin mod persistent config
+# file outlined at http://centminmod.com/upgrade.html#persistent
+# you manually creat the file at /etc/centminmod/custom_config.inc
+# and add SECOND_IP=yoursecondary_IPaddress variable to it which
+# will be registered with nginx vhost generator routine so that 
+# any new nginx vhosts created via centmin.sh menu option 2 or
+# /usr/bin/nv or centmin.sh menu option 22, will have pre-defined
+# SECOND_IP ip address set in the nginx vhost's listen directive
+if [[ -z "$SECOND_IP" ]]; then
+  DEDI_IP=""
+  DEDI_LISTEN=""
+elif [[ "$SECOND_IP" ]]; then
+  DEDI_IP=$(echo $(echo ${SECOND_IP}:))
+  DEDI_LISTEN="listen   ${DEDI_IP}80;"
 fi
 
 cecho "---------------------------------------------------------------" $boldyellow
@@ -388,7 +473,28 @@ cecho "---------------------------------------------------------------" $boldyel
 
 # read -ep "Enter vhost domain name you want to add (without www. prefix): " vhostname
 
-if [[ "$sslconfig" = [yY] ]]; then
+# check to make sure you don't add a domain name vhost that matches
+# your server main hostname setup in server_name within main hostname
+# nginx vhost at /usr/local/nginx/conf/conf.d/virtual.conf
+if [ -f /usr/local/nginx/conf/conf.d/virtual.conf ]; then
+  CHECK_MAINHOSTNAME=$(awk '/server_name/ {print $2}' /usr/local/nginx/conf/conf.d/virtual.conf | sed -e 's|;||')
+  if [[ "${CHECK_MAINHOSTNAME}" = "${vhostname}" ]]; then
+    echo
+    echo " Error: $vhostname is already setup for server main hostname"
+    echo " at /usr/local/nginx/conf/conf.d/virtual.conf"
+    echo " It is important that main server hostname be setup correctly"
+    echo
+    echo " As per Getting Started Guide Step 1 centminmod.com/getstarted.html"
+    echo " The server main hostname needs to be unique. So please setup"
+    echo " the main server name vhost properly first as per Step 1 of guide."
+    echo
+    echo " Aborting nginx vhost creation..."
+    echo
+    exit 1
+  fi
+fi
+
+if [[ "$sslconfig" = [yY] ]] || [[ "$sslconfig" = 'le' ]]; then
   echo
   vhostssl=y
   # read -ep "Create a self-signed SSL certificate Nginx vhost? [y/n]: " vhostssl
@@ -422,8 +528,16 @@ dbsetup
 umask 027
 mkdir -p /home/nginx/domains/$vhostname/{public,private,log,backup}
 
+if [ ! -f /usr/local/nginx/conf/wpincludes ]; then
+  mkdir -p /usr/local/nginx/conf/wpincludes
+fi
+
+if [ ! -f "/usr/local/nginx/conf/wpincludes/$vhostname" ]; then
+  mkdir -p "/usr/local/nginx/conf/wpincludes/$vhostname"
+fi
+
 if [[ "$PUREFTPD_DISABLED" = [nN] ]]; then
-  ( echo ${ftppass} ; echo ${ftppass} ) | pure-pw useradd $ftpuser -u $PUREUSER -g $PUREGROUP -d /home/nginx/domains/$vhostname
+  ( echo "${ftppass}" ; echo "${ftppass}" ) | pure-pw useradd "$ftpuser" -u $PUREUSER -g $PUREGROUP -d "/home/nginx/domains/$vhostname"
   pure-pw mkdb
 fi
 
@@ -461,8 +575,8 @@ find "/home/nginx/domains/$vhostname" -type d -exec chmod g+s {} \;
 
 # wp-login.php password protection
 if [[ -f /usr/local/nginx/conf/htpasswd.sh && ! -f /home/nginx/domains/$vhostname/htpasswd_wplogin ]]; then
-  HTWPLOGINSALT=$(openssl rand -base64 13 | cut -c1-13)
-  HTWPLOGINSALTB=$(openssl rand -base64 19 | cut -c1-19)
+  HTWPLOGINSALT=$(openssl rand 14 -base64 | tr -dc 'a-zA-Z0-9')
+  HTWPLOGINSALTB=$(openssl rand 20 -base64 | tr -dc 'a-zA-Z0-9')
   HTWPLOGIN=$RANDOM
   HTWPLOGINB=$RANDOM
   HTUSER="u${HTWPLOGINSALT}x${HTWPLOGIN}"
@@ -497,10 +611,19 @@ if [[ "$vhostssl" = [yY] ]]; then
   if [ -f "${DIR_TMP}/openssl-${OPENSSL_VERSION}/crypto/chacha20poly1305/chacha20.c" ]; then
       # check /svr-setup/openssl-1.0.2f/crypto/chacha20poly1305/chacha20.c exists
       OPEENSSL_CFPATCHED='y'
+  elif [ -f "${DIR_TMP}/openssl-${OPENSSL_VERSION}/crypto/chacha/chacha_enc.c" ]; then
+      # for openssl 1.1.0 native chacha20 support
+      OPEENSSL_CFPATCHED='y'
   fi
-  
+
 if [[ "$(nginx -V 2>&1 | grep LibreSSL | head -n1)" ]] || [[ "$OPEENSSL_CFPATCHED" = [yY] ]]; then
-  CHACHACIPHERS='ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:'
+  if [[ -f "${DIR_TMP}/openssl-${OPENSSL_VERSION}/crypto/chacha20poly1305/chacha20.c" ]]; then
+    CHACHACIPHERS='ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:'
+  elif [[ -f "${DIR_TMP}/openssl-${OPENSSL_VERSION}/crypto/chacha/chacha_enc.c" ]]; then
+    CHACHACIPHERS='ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:'
+  else
+    CHACHACIPHERS='ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:'
+  fi
 else
   CHACHACIPHERS=""
 fi
@@ -514,12 +637,13 @@ cat > "/usr/local/nginx/conf/conf.d/$vhostname.conf"<<ENSS
 # uncomment, save file and restart Nginx to enable
 # if unsure use return 302 before using return 301
 #server {
-#            listen   80;
+#            listen   ${DEDI_IP}80;
 #            server_name $vhostname;
 #            return 301 \$scheme://www.${vhostname}\$request_uri;
 #       }
 
 server {
+  $DEDI_LISTEN
   server_name $vhostname www.$vhostname;
 
 # ngx_pagespeed & ngx_pagespeed handler
@@ -527,22 +651,33 @@ server {
 #include /usr/local/nginx/conf/pagespeedhandler.conf;
 #include /usr/local/nginx/conf/pagespeedstatslog.conf;
 
+  #add_header X-Frame-Options SAMEORIGIN;
+  #add_header X-Xss-Protection "1; mode=block" always;
+  #add_header X-Content-Type-Options "nosniff" always;
+  #add_header Referrer-Policy "strict-origin-when-cross-origin";
+
   # limit_conn limit_per_ip 16;
   # ssi  on;
 
-  access_log /home/nginx/domains/$vhostname/log/access.log combined buffer=256k flush=60m;
+  access_log /home/nginx/domains/$vhostname/log/access.log $NGX_LOGFORMAT buffer=256k flush=5m;
   error_log /home/nginx/domains/$vhostname/log/error.log;
 
+  include /usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf;
   root /home/nginx/domains/$vhostname/public;
+  # uncomment cloudflare.conf include if using cloudflare for
+  # server and/or vhost site
+  #include /usr/local/nginx/conf/cloudflare.conf;
+  include /usr/local/nginx/conf/503include-main.conf;
 
   # prevent access to ./directories and files
-  location ~ (?:^|/)\. {
-   deny all;
-  }
+  # location ~ (?:^|/)\. {
+  #  deny all;
+  # }
 
-include /usr/local/nginx/conf/wpsupercache_${vhostname}.conf;  
+include /usr/local/nginx/conf/wpincludes/${vhostname}/wpsupercache_${vhostname}.conf;  
 
   location / {
+  include /usr/local/nginx/conf/503include-only.conf;
 
   # Enables directory listings when index file not found
   #autoindex  on;
@@ -569,7 +704,7 @@ location ~* /(xmlrpc\.php) {
     include /usr/local/nginx/conf/php-wpsc.conf;
 }
 
-  include /usr/local/nginx/conf/wpsecure_${vhostname}.conf;
+  include /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf;
   include /usr/local/nginx/conf/php-wpsc.conf;
   include /usr/local/nginx/conf/staticfiles.conf;
   include /usr/local/nginx/conf/drop.conf;
@@ -582,7 +717,7 @@ ENSS
 cat > "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"<<ESS
 # Centmin Mod Getting Started Guide
 # must read http://centminmod.com/getstarted.html
-# For SPDY SSL Setup
+# For HTTP/2 SSL Setup
 # read http://centminmod.com/nginx_configure_https_ssl_spdy.html
 
 # redirect from www to non-www  forced SSL
@@ -594,7 +729,7 @@ cat > "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"<<ESS
 # }
 
 server {
-  listen 443 $LISTENOPT;
+  listen ${DEDI_IP}443 $LISTENOPT;
   server_name $vhostname www.$vhostname;
 
   ssl_dhparam /usr/local/nginx/conf/ssl/${vhostname}/dhparam.pem;
@@ -602,15 +737,22 @@ server {
   ssl_certificate_key  /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.key;
   include /usr/local/nginx/conf/ssl_include.conf;
 
+  $CFAUTHORIGINPULL_INCLUDES
+  $HTTPTWO_MAXFIELDSIZE
+  $HTTPTWO_MAXHEADERSIZE
   # mozilla recommended
-  ssl_ciphers ${CHACHACIPHERS}ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA:!CAMELLIA:!DES-CBC3-SHA;
+  ssl_ciphers ${CHACHACIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
   ssl_prefer_server_ciphers   on;
   $SPDY_HEADER
+
+  # before enabling HSTS line below read centminmod.com/nginx_domain_dns_setup.html#hsts
   #add_header Strict-Transport-Security "max-age=31536000; includeSubdomains;";
-  #add_header  X-Content-Type-Options "nosniff";
-  #add_header X-Frame-Options DENY;
+  #add_header X-Frame-Options SAMEORIGIN;
+  #add_header X-Xss-Protection "1; mode=block" always;
+  #add_header X-Content-Type-Options "nosniff" always;
+  #add_header Referrer-Policy "strict-origin-when-cross-origin";
   $COMP_HEADER;
-  ssl_buffer_size 1400;
+  ssl_buffer_size 1369;
   ssl_session_tickets on;
   
   # enable ocsp stapling
@@ -628,19 +770,25 @@ server {
   # limit_conn limit_per_ip 16;
   # ssi  on;
 
-  access_log /home/nginx/domains/$vhostname/log/access.log combined buffer=256k flush=60m;
+  access_log /home/nginx/domains/$vhostname/log/access.log $NGX_LOGFORMAT buffer=256k flush=5m;
   error_log /home/nginx/domains/$vhostname/log/error.log;
 
+  include /usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf;
   root /home/nginx/domains/$vhostname/public;
+  # uncomment cloudflare.conf include if using cloudflare for
+  # server and/or vhost site
+  #include /usr/local/nginx/conf/cloudflare.conf;
+  include /usr/local/nginx/conf/503include-main.conf;
 
   # prevent access to ./directories and files
-  location ~ (?:^|/)\. {
-   deny all;
-  }
+  # location ~ (?:^|/)\. {
+  #  deny all;
+  # }
 
-include /usr/local/nginx/conf/wpsupercache_${vhostname}.conf;  
+include /usr/local/nginx/conf/wpincludes/${vhostname}/wpsupercache_${vhostname}.conf;  
 
   location / {
+  include /usr/local/nginx/conf/503include-only.conf;
 
   # Enables directory listings when index file not found
   #autoindex  on;
@@ -667,7 +815,7 @@ location ~* /(xmlrpc\.php) {
     include /usr/local/nginx/conf/php-wpsc.conf;
 }
 
-  include /usr/local/nginx/conf/wpsecure_${vhostname}.conf;
+  include /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf;
   include /usr/local/nginx/conf/php-wpsc.conf;
   include /usr/local/nginx/conf/staticfiles.conf;
   include /usr/local/nginx/conf/drop.conf;
@@ -686,12 +834,13 @@ cat > "/usr/local/nginx/conf/conf.d/$vhostname.conf"<<END
 # uncomment, save file and restart Nginx to enable
 # if unsure use return 302 before using return 301
 #server {
-#            listen   80;
+#            listen   ${DEDI_IP}80;
 #            server_name $vhostname;
 #            return 301 \$scheme://www.${vhostname}\$request_uri;
 #       }
 
 server {
+  $DEDI_LISTEN
   server_name $vhostname www.$vhostname;
 
 # ngx_pagespeed & ngx_pagespeed handler
@@ -699,15 +848,26 @@ server {
 #include /usr/local/nginx/conf/pagespeedhandler.conf;
 #include /usr/local/nginx/conf/pagespeedstatslog.conf;
 
+  #add_header X-Frame-Options SAMEORIGIN;
+  #add_header X-Xss-Protection "1; mode=block" always;
+  #add_header X-Content-Type-Options "nosniff" always;
+  #add_header Referrer-Policy "strict-origin-when-cross-origin";
+
   # limit_conn limit_per_ip 16;
   # ssi  on;
 
-  access_log /home/nginx/domains/$vhostname/log/access.log combined buffer=256k flush=60m;
+  access_log /home/nginx/domains/$vhostname/log/access.log $NGX_LOGFORMAT buffer=256k flush=5m;
   error_log /home/nginx/domains/$vhostname/log/error.log;
 
+  include /usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf;
   root /home/nginx/domains/$vhostname/public;
+  # uncomment cloudflare.conf include if using cloudflare for
+  # server and/or vhost site
+  #include /usr/local/nginx/conf/cloudflare.conf;
+  include /usr/local/nginx/conf/503include-main.conf;
 
   location / {
+  include /usr/local/nginx/conf/503include-only.conf;
 
   # Enables directory listings when index file not found
   #autoindex  on;
@@ -734,7 +894,7 @@ location ~* /(xmlrpc\.php) {
     include /usr/local/nginx/conf/php-wpsc.conf;
 }
 
-  include /usr/local/nginx/conf/wpsecure_${vhostname}.conf;
+  include /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf;
   include /usr/local/nginx/conf/php-wpsc.conf;
   include /usr/local/nginx/conf/staticfiles.conf;
   include /usr/local/nginx/conf/drop.conf;
@@ -745,25 +905,474 @@ END
 
 fi
 
-cat > "/usr/local/nginx/conf/wpsecure_${vhostname}.conf" <<EEF
+cat > "/usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf" <<EEF
+# prevent .zip, .gz, .tar, .bzip2 files from being accessed by default
+# impossible for centmin mod to know which wp backup plugins they installed
+# which may save backups to directories in wp-content/
+# such plugins may deploy .htaccess protection but that isn't supported in
+# nginx, so blocking access to these extensions is a workaround to cover all bases
+
+# prepare for letsencrypt 
+# https://community.centminmod.com/posts/17774/
+location ~ /.well-known {
+  location ~ /.well-known/acme-challenge/(.*) {
+    more_set_headers    "Content-Type: text/plain";
+    }
+}
+
+# allow AJAX requests in themes and plugins
+location ~ ^${WPSUBDIR}/wp-admin/admin-ajax.php$ { allow all; include /usr/local/nginx/conf/php.conf; }
+
+location ~* ^${WPSUBDIR}/(wp-content)/(.*?)\.(zip|gz|tar|bzip2|7z)\$ { deny all; }
+
+location ~ ^${WPSUBDIR}/wp-content/uploads/sucuri { deny all; }
+
+location ~ ^${WPSUBDIR}/wp-content/updraft { deny all; }
+
+# Block nginx-help log from public viewing
+location ~* ${WPSUBDIR}/wp-content/uploads/nginx-helper/ { deny all; }
+
+location ~ ^${WPSUBDIR}/(wp-includes/js/tinymce/wp-tinymce.php) {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
 # Deny access to any files with a .php extension in the uploads directory
 # Works in sub-directory installs and also in multisite network
-location ~* /(?:uploads|files)/.*\.php\$ {
-deny all;
+location ~* ${WPSUBDIR}/(?:uploads|files)/.*\.php\$ { deny all; }
+
+# Whitelist Exception for https://wordpress.org/plugins/onesignal-free-web-push-notifications//
+location ~ ^${WPSUBDIR}/wp-content/plugins/onesignal-free-web-push-notifications/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/sparkpost/
+location ~ ^${WPSUBDIR}/wp-content/plugins/sparkpost/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/sendgrid-email-delivery-simplified/
+location ~ ^${WPSUBDIR}/wp-content/plugins/sendgrid-email-delivery-simplified/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/mailgun/
+location ~ ^${WPSUBDIR}/wp-content/plugins/mailgun/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/mailjet-for-wordpress/
+location ~ ^${WPSUBDIR}/wp-content/plugins/mailjet-for-wordpress/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/easy-wp-smtp/
+location ~ ^${WPSUBDIR}/wp-content/plugins/easy-wp-smtp/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/postman-smtp/
+location ~ ^${WPSUBDIR}/wp-content/plugins/postman-smtp/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/sendpress/
+location ~ ^${WPSUBDIR}/wp-content/plugins/sendpress/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/wp-mail-bank/
+location ~ ^${WPSUBDIR}/wp-content/plugins/wp-mail-bank/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/theme-check/
+location ~ ^${WPSUBDIR}/wp-content/plugins/theme-check/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/woocommerce/
+location ~ ^${WPSUBDIR}/wp-content/plugins/woocommerce/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/woocommerce-csvimport/
+location ~ ^${WPSUBDIR}/wp-content/plugins/woocommerce-csvimport/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/advanced-custom-fields/
+location ~ ^${WPSUBDIR}/wp-content/plugins/advanced-custom-fields/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/contact-form-7/
+location ~ ^${WPSUBDIR}/wp-content/plugins/contact-form-7/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/duplicator/
+location ~ ^${WPSUBDIR}/wp-content/plugins/duplicator/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/jetpack/
+location ~ ^${WPSUBDIR}/wp-content/plugins/jetpack/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/nextgen-gallery/
+location ~ ^${WPSUBDIR}/wp-content/plugins/nextgen-gallery/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/tinymce-advanced/
+location ~ ^${WPSUBDIR}/wp-content/plugins/tinymce-advanced/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/updraftplus/
+location ~ ^${WPSUBDIR}/wp-content/plugins/updraftplus/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/wordpress-importer/
+location ~ ^${WPSUBDIR}/wp-content/plugins/wordpress-importer/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/wordpress-seo/
+location ~ ^${WPSUBDIR}/wp-content/plugins/wordpress-seo/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/wpclef/
+location ~ ^${WPSUBDIR}/wp-content/plugins/wpclef/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/mailchimp-for-wp/
+location ~ ^${WPSUBDIR}/wp-content/plugins/mailchimp-for-wp/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/wp-optimize/
+location ~ ^${WPSUBDIR}/wp-content/plugins/wp-optimize/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/si-contact-form/
+location ~ ^${WPSUBDIR}/wp-content/plugins/si-contact-form/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/akismet/
+location ~ ^${WPSUBDIR}/wp-content/plugins/akismet/ {
+  location ~ ^${WPSUBDIR}/wp-content/plugins/akismet/(.+/)?(form|akismet)\.(css|js)\$ { allow all; }
+  location ~ ^${WPSUBDIR}/wp-content/plugins/akismet/(.+/)?(.+)\.(png|gif)\$ { allow all; }
+  location ~* ${WPSUBDIR}/wp-content/plugins/akismet/akismet/.*\.php\$ {
+    include /usr/local/nginx/conf/php.conf;
+    # below include file needs to be manually created at that path and to be uncommented
+    # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+    # allows you to add commonly shared settings to all wp plugin location matches which
+    # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+    #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+    allow 127.0.0.1;
+    deny all;
+  }
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/bbpress/
+location ~ ^${WPSUBDIR}/wp-content/plugins/bbpress/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/buddypress/
+location ~ ^${WPSUBDIR}/wp-content/plugins/buddypress/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/all-in-one-seo-pack/
+location ~ ^${WPSUBDIR}/wp-content/plugins/all-in-one-seo-pack/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/google-analytics-for-wordpress/
+location ~ ^${WPSUBDIR}/wp-content/plugins/google-analytics-for-wordpress/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/regenerate-thumbnails/
+location ~ ^${WPSUBDIR}/wp-content/plugins/regenerate-thumbnails/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/wp-pagenavi/
+location ~ ^${WPSUBDIR}/wp-content/plugins/wp-pagenavi/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/wordfence/
+location ~ ^${WPSUBDIR}/wp-content/plugins/wordfence/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/really-simple-captcha/
+location ~ ^${WPSUBDIR}/wp-content/plugins/really-simple-captcha/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/wp-pagenavi/
+location ~ ^${WPSUBDIR}/wp-content/plugins/wp-pagenavi/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/ml-slider/
+location ~ ^${WPSUBDIR}/wp-content/plugins/ml-slider/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/black-studio-tinymce-widget/
+location ~ ^${WPSUBDIR}/wp-content/plugins/black-studio-tinymce-widget/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/disable-comments/
+location ~ ^${WPSUBDIR}/wp-content/plugins/disable-comments/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for https://wordpress.org/plugins/better-wp-security/
+location ~ ^${WPSUBDIR}/wp-content/plugins/better-wp-security/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for http://wlmsocial.com/
+location ~ ^${WPSUBDIR}/wp-content/plugins/wlm-social/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for mediagrid timthumb
+location ~ ^${WPSUBDIR}/wp-content/plugins/media-grid/classes/ {
+  include /usr/local/nginx/conf/php.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
 }
 
 # Block PHP files in content directory.
-location ~* /wp-content/.*\.php\$ {
+location ~* ${WPSUBDIR}/wp-content/.*\.php\$ {
   deny all;
 }
 
 # Block PHP files in includes directory.
-location ~* /wp-includes/.*\.php\$ {
+location ~* ${WPSUBDIR}/wp-includes/.*\.php\$ {
   deny all;
 }
 
 # Block PHP files in uploads, content, and includes directory.
-location ~* /(?:uploads|files|wp-content|wp-includes)/.*\.php\$ {
+location ~* ${WPSUBDIR}/(?:uploads|files|wp-content|wp-includes)/.*\.php\$ {
   deny all;
 }
 
@@ -783,19 +1392,20 @@ location ~* (w00tw00t) {
 return 444;
 }
 
-location ~* /(\.|wp-config\.php|wp-config\.txt|changelog\.txt|readme\.txt|readme\.html|license\.txt) { deny all; }
+location ~* ${WPSUBDIR}/(\.|wp-config\.php|wp-config\.txt|changelog\.txt|readme\.txt|readme\.html|license\.txt) { deny all; }
 EEF
 
-cat > "/usr/local/nginx/conf/wpsupercache_${vhostname}.conf" <<EFF
+# WP super cache
+cat > "/usr/local/nginx/conf/wpincludes/${vhostname}/wpsupercache_${vhostname}.conf" <<EFF
 set \$cache_uri \$request_uri;
 
 if (\$request_method = POST) { set \$cache_uri 'null cache'; }
 
 if (\$query_string != "") { set \$cache_uri 'null cache'; }
 
-if (\$request_uri ~* "/(\?add-to-cart=|cart|my-account|checkout|addons|wp-admin/.*|xmlrpc\.php|wp-.*\.php|index\.php|feed/|sitemap(_index)?\.xml|[a-z0-9_-]+-sitemap([0-9]+)?\.xml)") { set \$cache_uri 'null cache'; }
+if (\$request_uri ~* "/(\?add-to-cart=|cart/|my-account/|checkout/|shop/checkout/|store/checkout/|customer-dashboard/|addons/|wp-admin/.*|xmlrpc\.php|wp-.*\.php|index\.php|feed/|sitemap(_index)?\.xml|[a-z0-9_-]+-sitemap([0-9]+)?\.xml)") { set \$cache_uri 'null cache'; }
 
-if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_logged_in") { set \$cache_uri 'null cache'; }
+if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_logged_in|edd_items_in_cart|woocommerce_items_in_cart|woocommerce_cart_hash|woocommerce_recently_viewed|wc_session_cookie_HASH|wp_woocommerce_session_|wptouch_switch_toogle") { set \$cache_uri 'null cache'; }
 EFF
 
 ######### Wordpress Manual Install no WP-CLI ######################
@@ -810,7 +1420,7 @@ if [[ -d "/home/nginx/domains/${vhostname}/public" ]]; then
 
   # download wordpress latest zip
   rm -rf latest.zip
-  wget -cnv https://wordpress.org/latest.zip
+  wget -4 -cnv https://wordpress.org/latest.zip
   unzip -q latest.zip
   cd wordpress
   \cp -Rf * /home/nginx/domains/${vhostname}/public
@@ -843,7 +1453,10 @@ if [[ -z "$(crontab -l 2>&1 | grep '\/${vhostname}/wp-cron.php')" ]]; then
     # making sure they do not run at very same time during cron scheduling
     DELAY=$(echo ${RANDOM:0:3})
     crontab -l > cronjoblist
+    mkdir -p /home/nginx/domains/${vhostname}/cronjobs
+    cp cronjoblist /home/nginx/domains/${vhostname}/cronjobs/cronjoblist-before-wp-cron.txt
     echo "*/15 * * * * sleep ${DELAY}s ; wget -O - -q -t 1 http://${vhostname}/wp-cron.php?doing_wp_cron=1 > /dev/null 2>&1" >> cronjoblist
+    cp cronjoblist /home/nginx/domains/${vhostname}/cronjobs/cronjoblist-after-wp-cron.txt
     crontab cronjoblist
     rm -rf cronjoblist
     crontab -l
@@ -880,21 +1493,40 @@ fi # wp install if web root exists
 
 cat > "/root/tools/wp_uninstall_${vhostname}.sh" <<END
 #/bin/bash
+echo "-------------------------------------------------------------------------"
+echo "Do you want to uninstall/delete WP install for ${vhostname}"
+echo "This will delete all data from /home/nginx/domains/${vhostname}"
+echo "including any non-wordpress data installed at /home/nginx/domains/${vhostname}"
+echo "This script will NOT delete the database, you will have to manually remove the"
+echo "database named: $DB"
+echo "Please backup your MySQL database called $DB before deleting"
+echo "-------------------------------------------------------------------------"
+read -ep "Uninstall WP Install For ${vhostname} [y/n]: " uninstall
+echo
+if [[ "\$uninstall" != [yY] ]]; then
+  exit
+fi
+
 rm -rf /usr/local/nginx/conf/conf.d/${vhostname}.conf
 rm -rf /usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf
 rm -rf /home/nginx/domains/${vhostname}
-rm -rf /usr/local/nginx/conf/wpsecure_${vhostname}.conf
-rm -rf /usr/local/nginx/conf/wpsupercache_${vhostname}.conf
+rm -rf /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+rm -rf /usr/local/nginx/conf/wpincludes/${vhostname}/wpsupercache_${vhostname}.conf
 rm -rf /root/tools/wp_updater_${vhostname}.sh
 rm -rf /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt
 rm -rf /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.key
 rm -rf /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.csr
 rm -rf /usr/local/nginx/conf/ssl/${vhostname}
+rm -rf /usr/local/nginx/conf/wpincludes/${vhostname}/rediscache_${vhostname}.conf
+rm -rf /usr/local/nginx/conf/wpincludes/${vhostname}/wpcacheenabler_${vhostname}.conf
+rm -rf /root/.acme.sh/${vhostname}
 crontab -l > cronjoblist
 sed -i "/wp_updater_${vhostname}.sh/d" cronjoblist
 sed -i "/\/${vhostname}\/wp-cron.php/d" cronjoblist
+sed -i "/$vhostname cacheenabler cron/d" cronjoblist
 crontab cronjoblist
 rm -rf cronjoblist
+pure-pw userdel $ftpuser >/dev/null 2>&1
 service nginx restart
 END
 
@@ -907,7 +1539,7 @@ chmod 0700 /root/tools/wp_uninstall_${vhostname}.sh
 
 # cat > "/root/tools/wp_updater_${vhostname}.sh" <<ENDA
 # #!/bin/bash
-# PATH=/usr/lib64/ccache:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin:/root/bin
+# PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin:/root/bin
 # EMAIL=$WPADMINEMAIL
 
 # {
@@ -935,27 +1567,43 @@ chmod 0700 /root/tools/wp_uninstall_${vhostname}.sh
 
 echo 
 cecho "-------------------------------------------------------------" $boldyellow
+if [ -f "${SCRIPT_DIR}/autoprotect.sh" ]; then
+  "${SCRIPT_DIR}/autoprotect.sh"
+fi
+
 service nginx restart
+
 if [[ "$PUREFTPD_DISABLED" = [nN] ]]; then
   cmservice pure-ftpd restart
+fi
+
+FINDUPPERDIR=$(dirname $SCRIPT_DIR)
+if [ -f "$FINDUPPERDIR/addons/acmetool.sh" ] && [[ "$sslconfig" = 'le' ]]; then
+  echo
+  cecho "-------------------------------------------------------------" $boldyellow
+  echo "ok: $FINDUPPERDIR/addons/acmetool.sh"
+  echo ""$FINDUPPERDIR/addons/acmetool.sh" issue "$vhostname""
+  "$FINDUPPERDIR/addons/acmetool.sh" issue "$vhostname"
+  cecho "-------------------------------------------------------------" $boldyellow
+  echo
 fi
 
 echo 
 if [[ "$PUREFTPD_DISABLED" = [nN] ]]; then
 cecho "-------------------------------------------------------------" $boldyellow
-cecho "FTP hostname : $CNIP" $boldwhite
-cecho "FTP port : 21" $boldwhite
-cecho "FTP mode : FTP (explicit SSL)" $boldwhite
-cecho "FTP Passive (PASV) : ensure is checked/enabled" $boldwhite
-cecho "FTP username created for $vhostname : $ftpuser" $boldwhite
-cecho "FTP password created for $vhostname : $ftppass" $boldwhite
+echo "FTP hostname : $CNIP"
+echo "FTP port : 21"
+echo "FTP mode : FTP (explicit SSL)"
+echo "FTP Passive (PASV) : ensure is checked/enabled"
+echo "FTP username created for $vhostname : $ftpuser"
+echo "FTP password created for $vhostname : $ftppass"
 fi
 cecho "-------------------------------------------------------------" $boldyellow
 cecho "vhost for $vhostname created successfully" $boldwhite
 echo
 cecho "domain: http://$vhostname" $boldyellow
 cecho "vhost conf file for $vhostname created: /usr/local/nginx/conf/conf.d/$vhostname.conf" $boldwhite
-if [[ "$sslconfig" = [yY] ]]; then
+if [[ "$vhostssl" = [yY] ]]; then
   echo
   cecho "vhost ssl for $vhostname created successfully" $boldwhite
   echo
@@ -965,8 +1613,8 @@ if [[ "$sslconfig" = [yY] ]]; then
   cecho "Self-signed SSL Certificate: /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt" $boldyellow
   cecho "SSL Private Key: /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.key" $boldyellow
   cecho "SSL CSR File: /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.csr" $boldyellow
-  # cecho "Backup SSL Private Key: /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-backup.key" $boldyellow
-  # cecho "Backup SSL CSR File: /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-backup.csr" $boldyellow  
+  cecho "Backup SSL Private Key: /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-backup.key" $boldyellow
+  cecho "Backup SSL CSR File: /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-backup.csr" $boldyellow  
 fi
 echo
 cecho "upload files to /home/nginx/domains/$vhostname/public" $boldwhite
@@ -1015,13 +1663,20 @@ cecho "Current vhost listing at: /usr/local/nginx/conf/conf.d/" $boldwhite
 echo
 ls -Alhrt /usr/local/nginx/conf/conf.d/ | awk '{ printf "%-4s%-4s%-8s%-6s %s\n", $6, $7, $8, $5, $9 }'
 
-if [[ "$sslconfig" = [yY] ]]; then
+if [[ "$vhostssl" = [yY] ]]; then
 echo
 cecho "-------------------------------------------------------------" $boldyellow
 cecho "Current vhost ssl files listing at: /usr/local/nginx/conf/ssl/${vhostname}" $boldwhite
 echo
 ls -Alhrt /usr/local/nginx/conf/ssl/${vhostname} | awk '{ printf "%-4s%-4s%-8s%-6s %s\n", $6, $7, $8, $5, $9 }'
 fi
+
+cecho "-------------------------------------------------------------" $boldyellow
+cecho "vhost for $vhostname wordpress setup successfully" $boldwhite
+cecho "$vhostname setup info log saved at: " $boldwhite
+cecho "$LOGPATH" $boldwhite
+cecho "-------------------------------------------------------------" $boldyellow
+echo ""
 
 else
 
@@ -1040,7 +1695,7 @@ fi
 if [[ "$RUN" = [yY] ]]; then
   {
     funct_nginxaddvhost
-  } 2>&1 | tee ${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nvwp.log
+  } 2>&1 | tee "${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nvwp.log"
 else
   usage
 fi

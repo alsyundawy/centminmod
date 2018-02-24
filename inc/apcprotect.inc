@@ -37,14 +37,14 @@ server {
 
             location / {
 
-#               Enables directory listings when index file not found
-#               autoindex  on;
+#Enables directory listings when index file not found
+#autoindex  on;
 
-#               Shows file listing times as local time
-#               autoindex_localtime on;
+#Shows file listing times as local time
+#autoindex_localtime on;
 
-#               Enable for vBulletin usage WITHOUT vbSEO installed
-#               try_files               $uri $uri/ /index.php;
+# Wordpress Permalinks example
+#try_files \$uri \$uri/ /index.php?q=\$uri&\$args;
 
             }
 
@@ -81,9 +81,9 @@ cecho "Important instructions above to protect your apc.php page" $boldgreen
 	fi #unattended
 
 	if [ "$UNATTENDED" == 'n' ]; then
-	sleep 30
+	sleep 20
 	else
-	sleep 3
+	sleep 2
 	fi #unattended
 
 }

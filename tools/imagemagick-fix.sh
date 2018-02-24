@@ -11,11 +11,24 @@
 # one liner
 # rm -rf imagemagick-fix.sh; wget --no-check-certificate https://gist.github.com/centminmod/4d1be818c0b0f27fb9f504885e379c4b/raw/imagemagick-fix.sh; chmod +x imagemagick-fix.sh; dos2unix imagemagick-fix.sh >/dev/null 2>&1; ./imagemagick-fix.sh
 #########################################################
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+
+shopt -s expand_aliases
+for g in "" e f; do
+    alias ${g}grep="LC_ALL=C ${g}grep"  # speed-up grep, egrep, fgrep
+done
 
 if [[ "$(which convert >/dev/null 2>&1; echo $?)" = '0' && ! -d /var/cpanel ]]; then
 	POLICYPATH=$(convert -list policy | grep 'Path: ' | awk '/policy.xml/ {print $2}')
 	if [[ ! -f "$POLICYPATH" ]]; then
-		if [[ -f /etc/ImageMagick/policy.xml ]]; then
+		if [[ -f /etc/ImageMagick6/ImageMagick-6/policy.xml ]]; then
+			POLICYPATH='/etc/ImageMagick6/ImageMagick-6/policy.xml'
+		elif [[ -f /etc/ImageMagick/policy.xml ]]; then
 			POLICYPATH='/etc/ImageMagick/policy.xml'
 		fi
 	fi
@@ -43,7 +56,9 @@ if [[ "$(which convert >/dev/null 2>&1; echo $?)" = '0' && ! -d /var/cpanel ]]; 
 		echo "convert -list policy"
 		convert -list policy
 	else
-		cat $POLICYPATH
+		if [[ -f "$POLICYPATH" ]]; then
+			cat $POLICYPATH
+		fi
 	fi
 elif [ -f /usr/local/cpanel/3rdparty/etc/ImageMagick-6/policy.xml ]; then
 	POLICYPATH='/usr/local/cpanel/3rdparty/etc/ImageMagick-6/policy.xml'
@@ -71,7 +86,9 @@ elif [ -f /usr/local/cpanel/3rdparty/etc/ImageMagick-6/policy.xml ]; then
 		echo "/usr/local/cpanel/3rdparty/bin/convert -list policy"
 		/usr/local/cpanel/3rdparty/bin/convert -list policy
 	else
-		cat $POLICYPATH
+		if [[ -f "$POLICYPATH" ]]; then
+			cat $POLICYPATH
+		fi
 	fi
 
 	if [[ -f /etc/ImageMagick/policy.xml && "$(which convert >/dev/null 2>&1; echo $?)" = '0' ]]; then
@@ -100,7 +117,9 @@ elif [ -f /usr/local/cpanel/3rdparty/etc/ImageMagick-6/policy.xml ]; then
 			echo "convert -list policy"
 			convert -list policy
 		else
-			cat $POLICYPATH
+			if [[ -f "$POLICYPATH" ]]; then
+				cat $POLICYPATH
+			fi
 		fi
 	fi
 fi

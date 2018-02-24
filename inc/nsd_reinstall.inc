@@ -1,4 +1,5 @@
 nsdreinstall() {
+    axelsetup
 
     echo "*************************************************"
     cecho "* Re-Installing NSD" $boldgreen
@@ -7,7 +8,7 @@ nsdreinstall() {
     if [ -s nsd-${NSD_VERSION}.tar.gz ]; then
         cecho "NSD ${NSD_VERSION} Archive found, skipping download..." $boldgreen 
     else
-        $DOWNLOADAPP http://www.nlnetlabs.nl/downloads/nsd/nsd-${NSD_VERSION}.tar.gz $WGETRETRY
+        download_cmd http://www.nlnetlabs.nl/downloads/nsd/nsd-${NSD_VERSION}.tar.gz $WGETRETRY
     fi
     # check if NSD is v3 or v4
     NSD_VERCHECK=$(echo $NSD_VERSION | cut -d . -f1)
@@ -160,7 +161,7 @@ fi # NSD_VERCHECK
     chown -R nsd:nsd /var/run/nsd/
     chown -R nsd:nsd /var/db/nsd/
     chown -R nsd:nsd /etc/nsd/
-    chmod 0755/var/db/nsd/
+    chmod 0755 /var/db/nsd/
 
 #killall -9 nsd
 /etc/init.d/nsd stop

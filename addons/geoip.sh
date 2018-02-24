@@ -7,7 +7,7 @@
 ######################################################
 # variables
 #############
-DT=`date +"%d%m%y-%H%M%S"`
+DT=$(date +"%d%m%y-%H%M%S")
 CENTMINLOGDIR='/root/centminlogs'
 DIR='/svr-setup'
 
@@ -50,16 +50,35 @@ return
 ###########################################
 # functions
 #############
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+
+shopt -s expand_aliases
+for g in "" e f; do
+    alias ${g}grep="LC_ALL=C ${g}grep"  # speed-up grep, egrep, fgrep
+done
+
+if [ ! -d "$CENTMINLOGDIR" ]; then
+	mkdir -p "$CENTMINLOGDIR"
+fi
 
 geoipinstall() {
 
 cecho "GeoIP database and library install..." $boldyellow
 
-yum -y install GeoIP GeoIP-devel --disablerepo=rpmforge
+if [ -f /etc/yum.repos.d/rpmforge.repo ]; then
+	yum -y install GeoIP GeoIP-devel --disablerepo=rpmforge
+else
+	yum -y install GeoIP GeoIP-devel
+fi
 rpm -ql GeoIP-devel GeoIP
 
 	cd $DIR
-# 	# wget http://geolite.maxmind.com/download/geoip/api/c/GeoIP.tar.gz
+# 	# wget -4 http://geolite.maxmind.com/download/geoip/api/c/GeoIP.tar.gz
 # 	# tar -zxvf GeoIP.tar.gz
 
 #         cecho "Download GeoIP.tar.gz ..." $boldyellow
@@ -97,13 +116,13 @@ rpm -ql GeoIP-devel GeoIP
 # 	ldconfig -v | grep GeoIP
 
 cecho "GeoLiteCity database download ..." $boldyellow
-	wget -cnv http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz -O /usr/share/GeoIP/GeoLiteCity.dat.gz
+	wget -4 -cnv http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz -O /usr/share/GeoIP/GeoLiteCity.dat.gz
 	# gzip -d /usr/local/share/GeoIP/GeoLiteCity.dat.gz
 	gzip -d -f /usr/share/GeoIP/GeoLiteCity.dat.gz
 	cp -a /usr/share/GeoIP/GeoLiteCity.dat /usr/share/GeoIP/GeoIPCity.dat
 	
 	# cp -a /usr/share/GeoIP/GeoIP.dat /usr/share/GeoIP/GeoIP.dat-backup
-	# wget -cnv http://geolite.maxmind.com/download/geoip/database/GeoLiteCountry/GeoIP.dat.gz -O /usr/share/GeoIP/GeoIP.dat.gz
+	# wget -4 -cnv http://geolite.maxmind.com/download/geoip/database/GeoLiteCountry/GeoIP.dat.gz -O /usr/share/GeoIP/GeoIP.dat.gz
 	# gzip -df /usr/share/GeoIP/GeoIP.dat.gz
 	
 # if [[ "$GEOIPUPDATE" == [yY] ]]; then
@@ -238,7 +257,7 @@ END
 
 }
 ##############################################################
-starttime=$(date +%s.%N)
+starttime=$(TZ=UTC date +%s.%N)
 {
 geoipinstall
 geoinccheck
@@ -248,7 +267,7 @@ echo
 cecho "GeoIP database and library installed..." $boldyellow
 } 2>&1 | tee ${CENTMINLOGDIR}/centminmod_geoipdb_install_${DT}.log
 
-endtime=$(date +%s.%N)
+endtime=$(TZ=UTC date +%s.%N)
 
 INSTALLTIME=$(echo "scale=2;$endtime - $starttime"|bc )
 echo "" >> ${CENTMINLOGDIR}/centminmod_geoipdb_install_${DT}.log

@@ -18,8 +18,8 @@ CPUSPEED=$(awk -F: '/cpu MHz/{print $2}' /proc/cpuinfo | sort | uniq -c)
 CPUMODEL=$(awk -F: '/model name/{print $2}' /proc/cpuinfo | sort | uniq -c)
 CPUCACHE=$(awk -F: '/cache size/{print $2}' /proc/cpuinfo | sort | uniq -c)
 
-VHOSTS=$(ls /usr/local/nginx/conf/conf.d | egrep 'ssl.conf|.conf' | egrep -v 'virtual.conf|^ssl.conf|demodomain.com.conf' |  sed -e 's/.ssl.conf//' -e 's/.conf//' | uniq)
-VHOSTSCONF=$(ls /usr/local/nginx/conf/conf.d | egrep 'ssl.conf|.conf' | egrep -v 'virtual.conf|^ssl.conf|demodomain.com.conf' | uniq)
+VHOSTS=$(ls /home/nginx/domains | egrep -v 'demodomain.com.conf')
+VHOSTSCONF=$(ls /usr/local/nginx/conf/conf.d | egrep -vw '^ssl.conf' | uniq)
 
 CENTOSVER=$(awk '{ print $3 }' /etc/redhat-release)
 
@@ -30,9 +30,17 @@ if [ "$CENTOSVER" == 'release' ]; then
     fi
 fi
 
+# Check for Redhat Enterprise Linux 7.x
 if [ "$CENTOSVER" == 'Enterprise' ]; then
-    CENTOSVER=$(cat /etc/redhat-release | awk '{ print $7 }')
-    OLS='y'
+    CENTOSVER=$(awk '{ print $7 }' /etc/redhat-release)
+    if [[ "$(awk '{ print $1,$2 }' /etc/redhat-release)" = 'Red Hat' && "$(awk '{ print $7 }' /etc/redhat-release | cut -d . -f1)" = '7' ]]; then
+        CENTOS_SEVEN='7'
+        REDHAT_SEVEN='y'
+    fi
+fi
+
+if [[ -f /etc/system-release && "$(awk '{print $1,$2,$3}' /etc/system-release)" = 'Amazon Linux AMI' ]]; then
+    CENTOS_SIX='6'
 fi
 
 if [ ! -f /usr/sbin/virt-what ]; then
@@ -41,6 +49,10 @@ fi
 
 if [ ! -f /usr/sbin/lshw ]; then
     yum -y -q install lshw
+fi
+
+if [ ! -f /usr/bin/tree ]; then
+    yum -y -q install tree
 fi
 
 if [ -z $PASS ]; then
@@ -59,9 +71,14 @@ MARIADB_INFOVER=$(rpm -qa | grep -i MariaDB-server | head -n1 | cut -d '-' -f3)
 MEMCACHEDSERVER_INFOVER=$(/usr/local/bin/memcached -h | head -n1 | awk '{print $2}')
 CSF_INFOVER=$(csf -v | head -n1 | awk '{print $2}')
 SIEGE_INFOVER=$(siege -V 2>&1 | head -n1 | awk '{print $2}')
-NSD_INFOVER=$(nsd -v 2>&1 | head -n1 | awk '{print $3}')
 APC_INFOVER=$(php --ri apc | awk '/Version/ {print $3}' | head -n1)
 OPCACHE_INFOVER=$(php -v 2>&1 | grep OPcache | awk '{print $4}' | sed 's/,//')
+
+if [[ "$(which nsd >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+  NSD_INFOVER=$(nsd -v 2>&1 | head -n1 | awk '{print $3}')
+else
+  NSD_INFOVER=" - "
+fi
 
 # only assign variables if mysql is running
 if [[ "$(ps -o comm -C mysqld >/dev/null 2>&1; echo $?)" = '0' ]]; then
@@ -104,6 +121,12 @@ CPUCORES=$((${CPUCORES} * ${PHYSICALCPUS}));
     else HT=no; 
 fi
 #####################################################
+list_logs() {
+    echo
+    echo "List all /root/centminlogs in data ascending order"
+    ls -lahrt /root/centminlogs
+}
+
 setupdate() {
 cat > "/usr/bin/cminfo_updater"<<EOF
 #!/bin/bash
@@ -111,7 +134,7 @@ rm -rf /usr/bin/cminfo
 CMINFOLINK='https://raw.githubusercontent.com/centminmod/centminmod/master/tools/cminfo.sh'
 
 # fallback mirror
-curl -sI --connect-timeout 5 --max-time 5 \$CMINFOLINK | grep 'HTTP\/' | grep '200' >/dev/null 2>&1
+curl -4Is --connect-timeout 5 --max-time 5 \$CMINFOLINK | grep 'HTTP\/' | grep '200' >/dev/null 2>&1
 CMINFO_CURLCHECK=\$?
 if [[ "\$CMINFO_CURLCHECK" != '0' ]]; then
     CMINFOLINK='https://gitlab.com/centminmod-github-mirror/centminmod/raw/master/tools/cminfo.sh'
@@ -142,7 +165,7 @@ if [[ -z "$(crontab -l 2>&1 | grep cminfo_updater)" ]]; then
     crontab -l > cronjoblist
     mkdir -p /etc/centminmod/cronjobs
     cp cronjoblist /etc/centminmod/cronjobs/cronjoblist-before-cminfo-setup.txt
-    echo "*/4 * * * * /usr/bin/cminfo_updater" >> cronjoblist
+    echo "*/4 * * * * /usr/bin/cminfo_updater 2>/dev/null" >> cronjoblist
     cp cronjoblist /etc/centminmod/cronjobs/cronjoblist-after-cminfo-setup.txt
     crontab cronjoblist
     rm -rf cronjoblist
@@ -156,7 +179,7 @@ echo "------------------------------------------------------------------"
 
 echo "Server Location Info"
 # echo
-curl -s${CURL_TIMEOUTS} ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | egrep -v 'phone|postal|loc'
+curl -4s${CURL_TIMEOUTS} ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | egrep -v 'phone|postal|loc'
 
 echo
 echo "Processors" "physical = ${PHYSICALCPUS}, cores = ${CPUCORES}, virtual = ${VIRTUALCORES}, hyperthreading = ${HT}"
@@ -219,7 +242,8 @@ echo " Site Nginx Vhost Accounts:"
 echo "------------------------------------------------------------------"
 echo
 for d in $VHOSTS; do 
-    echo "* $d - /home/nginx/domains/${d}"; 
+    echo -n "* $d: ";
+    tree -dl --noreport -L 1 "/home/nginx/domains/${d}"
 done
 
 echo "------------------------------------------------------------------"
@@ -273,6 +297,7 @@ echo
 for u in $(pure-pw list | awk '{print $1}'); do 
 echo "-------------------------------------"
 echo "Virtual FTP user: $u"; 
+echo "password displayed is encrypted"; 
 pure-pw show $u; 
 done
 echo
@@ -291,7 +316,7 @@ echo " Nginx Settings:"
 echo "------------------------------------------------------------------"
 echo
 
-egrep '(^user|^worker_processes|^worker_priority|^worker_rlimit_nofile|^timer_resolution|^pcre_jit|^worker_connections|^accept_mutex|^multi_accept|tcp_|server_tokens|keepalive_|lingering_|gzip|client_|connection_pool_size|directio|large_client|types_hash|server_names_hash|open_file|open_log)' /usr/local/nginx/conf/nginx.conf | egrep -v 'gzip_ratio'
+egrep '(^user|^worker_processes|^worker_priority|^worker_rlimit_nofile|^timer_resolution|^pcre_jit|^worker_connections|^accept_mutex|^multi_accept|^accept_mutex_delay|map_hash|server_names_hash|variables_hash|tcp_|^limit_|sendfile|server_tokens|keepalive_|lingering_|gzip|client_|connection_pool_size|directio|large_client|types_hash|server_names_hash|open_file|open_log|^include|^#include)' /usr/local/nginx/conf/nginx.conf | egrep -v 'gzip_ratio'
 
 echo
 echo "------------------------------------------------------------------"
@@ -323,6 +348,9 @@ case "$1" in
         ;;
     update)
     setupdate
+        ;;
+    listlogs)
+    list_logs
         ;;
     *)
     infooutput

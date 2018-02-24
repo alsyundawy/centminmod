@@ -1,3 +1,20 @@
+grub_efi_fix() {
+    if [[ "$CENTOS_SEVEN" -eq '7' && "$(curl -4s${CURL_TIMEOUTS} ipinfo.io/org | grep -o 'OVH' >/dev/null 2>&1; echo $?)" -eq '0' && -d /boot/efi/EFI/centos && ! -f /boot/efi/EFI/centos/grub.cfg ]]; then
+        echo
+        cecho "--------------------------------------------------------" $boldyellow
+        cecho "Fix CentOS 7 EFI Bios based systems with missing" $boldyellow
+        cecho "/boot/efi/EFI/centos/grub.cfg" $boldyellow
+        cecho "https://community.centminmod.com/posts/57100/" $boldyellow
+        echo
+        grub2-mkconfig -o /boot/efi/EFI/centos/grub.cfg
+
+        echo
+        ls -lah /boot/efi/EFI/centos/grub.cfg
+        cecho "--------------------------------------------------------" $boldyellow
+        echo
+    fi
+}
+
 function checkcentosver {
 
 if [[ "$INITIALINSTALL" = [yY] ]]; then
@@ -29,6 +46,8 @@ if [[ "$INITIALINSTALL" = [yY] ]]; then
     fi
 fi
 
+sshdtweaks
+
 # swap file detection and setup routine add a 1GB swap file 
 # to servers without swap setup and non-openvz based as a 
 # precaution for low memory vps systems <1GB which require
@@ -38,14 +57,20 @@ fi
 # an additional memory buffer
   FINDSWAPSIZE=$(free -m | awk '/Swap: / {print $2}' | head -n1)
   # if free -m output swap size = 0, create a 1GB swap file for
-  # non-openvz systems
-  if [[ "$FINDSWAPSIZE" = '0' && ! -f /proc/user_beancounters && ! -f /swapfile ]]; then
+  # non-openvz systems or if less than 1GB of memory and swap 
+  # smaller than 512MB on non-openvz systems, create a 1GB additional
+  # swap file
+  if [[ "$FINDSWAPSIZE" -eq '0' && ! -f /proc/user_beancounters && ! -f /swapfile ]] || [[ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -le '1048576' && "$FINDSWAPSIZE" -le '512' && ! -f /proc/user_beancounters && ! -f /swapfile ]]; then
     {
     echo
     free -m
     echo
     echo "create 1GB swap file"; 
-    dd if=/dev/zero of=/swapfile bs=1024 count=1024k; 
+    if [ "$(df -hT | grep -w xfs)" ]; then
+        dd if=/dev/zero of=/swapfile bs=1024 count=1024k;
+    else
+        fallocate -l 1G /swapfile
+    fi
     ls -lah /swapfile; 
     mkswap /swapfile; 
     swapon /swapfile; 
@@ -129,6 +154,10 @@ if [[ -f /usr/bin/ccache && ! -f "${DIR_TMP}/${CCACHEFILE}" ]];then
     ccacheinstall
 fi
 
+if [[ -f /usr/local/bin/ccache && ! -f "${DIR_TMP}/${CCACHEFILE}" ]] || [[ -f /usr/local/bin/ccache && -d "${DIR_TMP}/ccache-${CCACHE_VER}" && "$CCACHE_VER" != "$(ccache -V | head -n 1 | awk '{print $3}')" ]]; then
+    ccacheinstall
+fi
+
 if [ -f /etc/centminmod-release ];then
 	if [[ "$SCRIPT_VERSION" != "$(cat /etc/centminmod-release >/dev/null)" ]]; then
 	setupmotd
@@ -137,8 +166,8 @@ else
 	setupmotd
 fi
 
-sshdtweaks
-
 countcpus
+
+nano_highlight
 
 }

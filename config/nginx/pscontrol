@@ -3,10 +3,10 @@
 # turn ngx_pagespeed on or off switch
 
 CMSDEBUG=n
-CENTOSVER=$(cat /etc/redhat-release | awk '{ print $3 }')
+CENTOSVER=$(awk '{ print $3 }' /etc/redhat-release)
 
 if [ "$CENTOSVER" == 'release' ]; then
-    CENTOSVER=$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1,2)
+    CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
     fi
@@ -49,14 +49,20 @@ nano -w /usr/local/nginx/conf/pagespeed.conf
 }
 
 psoff() {
-sed -i 's/pagespeed on;/pagespeed off;/g' /usr/local/nginx/conf/pagespeed.conf
-sed -i 's/pagespeed on;/pagespeed off;/g' /usr/local/nginx/conf/pagespeedadmin.conf
+sed -i 's/pagespeed on;/pagespeed unplugged;/g' /usr/local/nginx/conf/pagespeed.conf
+sed -i 's/pagespeed on;/pagespeed unplugged;/g' /usr/local/nginx/conf/pagespeedadmin.conf
+if [ -d /var/ngx_pagespeed_cache ]; then
+    rm -rf /var/ngx_pagespeed_cache/*
+fi
+if [ -d /tmp/ngx_pagespeed_cache ]; then
+    rm -rf /tmp/ngx_pagespeed_cache/*
+fi
 cmservice nginx restart
 }
 
 pson() {
-sed -i 's/pagespeed off;/pagespeed on;/g' /usr/local/nginx/conf/pagespeed.conf
-sed -i 's/pagespeed off;/pagespeed on;/g' /usr/local/nginx/conf/pagespeedadmin.conf
+sed -i 's/pagespeed unplugged;/pagespeed on;/g' /usr/local/nginx/conf/pagespeed.conf
+sed -i 's/pagespeed unplugged;/pagespeed on;/g' /usr/local/nginx/conf/pagespeedadmin.conf
 cmservice nginx restart
 }
 

@@ -5,7 +5,7 @@
 # install swapped to disk by ~68MB, so you need at least 192MB and adequate swap disk size
 ABORTINSTALL='y'
 #############################################################
-TOTALMEM=$(cat /proc/meminfo | grep MemTotal | awk '{print $2}')
+TOTALMEM=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
 ISLOWMEM='262144'
 #############################################################
 # Formulas
@@ -15,9 +15,24 @@ CHECKLOWMEM=`expr $TOTALMEM \< $ISLOWMEM`
 #############################################################
 
 lowmemcheck() {
+  MEMFIRSTINSTALL=$1
+  if [[ "$MEMFIRSTINSTALL" = 'initialinstall' ]]; then
+    INITIALINSTALL='y'
+  else
+    INITIALINSTALL='n'
+  fi
 
-cpcheck
+  # function checks if persistent config file has low mem variable enabled
+  # LOWMEM_INSTALL='y'
+  checkfor_lowmem
+
+  if [[ "$INITIALINSTALL" = [yY] ]]; then
+    cpcheck initialinstall
+  else
+    cpcheck
+  fi
 histformat
+expand_cmdprompt
 
 # Check memory installed threshold
 if [ "$CHECKLOWMEM" == "1" ]; then

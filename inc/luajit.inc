@@ -4,7 +4,6 @@ if [[ "$ORESTY_LUANGINX" = [yY] ]]; then
     echo "*************************************************"
     cecho "* LuaJIT-${ORESTY_LUAGITVER} install" $boldgreen
     echo "*************************************************"
-
     if [[ "$LUAJIT_GITINSTALL" = [nN] ]]; then
         cd $DIR_TMP
         cd LuaJIT-${ORESTY_LUAGITVER}
@@ -12,7 +11,9 @@ if [[ "$ORESTY_LUANGINX" = [yY] ]]; then
             make clean
         fi
         make${MAKETHREADS}
+        sar_call
         make install
+        sar_call
     
         export LUAJIT_LIB='/usr/local/lib'
         export LUAJIT_INC='/usr/local/include/luajit-2.0'
@@ -23,19 +24,24 @@ if [[ "$ORESTY_LUANGINX" = [yY] ]]; then
             git stash
             git pull
             git log -3
+            sar_call
         elif [[ -d "LuaJIT-${LUAJIT_GITINSTALLVER}" && ! -d "LuaJIT-${LUAJIT_GITINSTALLVER}/.git" ]]; then
             rm -rf LuaJIT-*
-            git clone http://luajit.org/git/luajit-2.0.git -b v${LUAJIT_GITINSTALLVER} LuaJIT-${LUAJIT_GITINSTALLVER}
+            time git clone http://luajit.org/git/luajit-2.0.git -b v${LUAJIT_GITINSTALLVER} LuaJIT-${LUAJIT_GITINSTALLVER}
+            sar_call
             cd LuaJIT-${LUAJIT_GITINSTALLVER}
         else
-            git clone http://luajit.org/git/luajit-2.0.git -b v${LUAJIT_GITINSTALLVER} LuaJIT-${LUAJIT_GITINSTALLVER}
+            time git clone http://luajit.org/git/luajit-2.0.git -b v${LUAJIT_GITINSTALLVER} LuaJIT-${LUAJIT_GITINSTALLVER}
+            sar_call
             cd LuaJIT-${LUAJIT_GITINSTALLVER}
         fi
         if [[ "$INITIALINSTALL" != [yY] ]]; then
             make clean
         fi
         make${MAKETHREADS}
+        sar_call
         make install
+        sar_call
 
         MAJVER=$(awk -F "=  " '/MAJVER=  / {print $2}' Makefile)
         MINVER=$(awk -F "=  " '/MINVER=  / {print $2}' Makefile)

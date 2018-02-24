@@ -6,7 +6,7 @@
 # is Python 2.6
 #
 # i.e. python 2.7
-# yum -y install python27 python27-devel python27-pip python27-setuptools python27-tools python27-virtualenv --enablerepo=ius
+# yum -y install python27 python27-devel python27-pip python27-setuptools python27-virtualenv --enablerepo=ius
 # rpm -ql python27 python27-devel python27-pip python27-setuptools python27-tools tkinter27 python27-virtualenv
 # 
 # rpm -ql python27 python27-pip python27-virtualenv | grep bin
@@ -32,12 +32,28 @@
 # 
 # https://docs.python.org/3/library/venv.html
 ###########################################################
-DT=`date +"%d%m%y-%H%M%S"`
+DT=$(date +"%d%m%y-%H%M%S")
 CENTMINLOGDIR='/root/centminlogs'
 DIR_TMP='/svr-setup'
 
 ###########################################################
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+
+shopt -s expand_aliases
+for g in "" e f; do
+    alias ${g}grep="LC_ALL=C ${g}grep"  # speed-up grep, egrep, fgrep
+done
+
 CENTOSVER=$(awk '{ print $3 }' /etc/redhat-release)
+
+if [ ! -d "$CENTMINLOGDIR" ]; then
+  mkdir -p "$CENTMINLOGDIR"
+fi
 
 if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
@@ -50,9 +66,17 @@ if [[ "$(cat /etc/redhat-release | awk '{ print $3 }' | cut -d . -f1)" = '6' ]];
     CENTOS_SIX='6'
 fi
 
+# Check for Redhat Enterprise Linux 7.x
 if [ "$CENTOSVER" == 'Enterprise' ]; then
-    CENTOSVER=$(cat /etc/redhat-release | awk '{ print $7 }')
-    OLS='y'
+    CENTOSVER=$(awk '{ print $7 }' /etc/redhat-release)
+    if [[ "$(awk '{ print $1,$2 }' /etc/redhat-release)" = 'Red Hat' && "$(awk '{ print $7 }' /etc/redhat-release | cut -d . -f1)" = '7' ]]; then
+        CENTOS_SEVEN='7'
+        REDHAT_SEVEN='y'
+    fi
+fi
+
+if [[ -f /etc/system-release && "$(awk '{print $1,$2,$3}' /etc/system-release)" = 'Amazon Linux AMI' ]]; then
+    CENTOS_SIX='6'
 fi
 
 if [[ "$CENTOS_SEVEN" = '7' ]]; then
@@ -152,20 +176,21 @@ cecho "Installing Python 2.7" $boldgreen
 cecho "*************************************************" $boldgreen
 
 # install Python 2.7 besides system default Python 2.6
-yum -y install python27 python27-devel python27-pip python27-setuptools python27-tools python27-virtualenv --enablerepo=ius
+yum -y remove python-tools
+yum -y install python27 python27-devel python27-pip python27-setuptools python27-virtualenv --enablerepo=ius
 
-rpm -ql python27 python27-devel python27-pip python27-setuptools python27-tools tkinter27 python27-virtualenv | grep bin
+rpm -ql python27 python27-devel python27-pip python27-setuptools python27-virtualenv tkinter27 | grep bin
 }
 
 ###########################################################################
 case $1 in
   install)
-starttime=$(date +%s.%N)
+starttime=$(TZ=UTC date +%s.%N)
 {
   installpythonfuct
 } 2>&1 | tee ${CENTMINLOGDIR}/python27_install_${DT}.log
 
-endtime=$(date +%s.%N)
+endtime=$(TZ=UTC date +%s.%N)
 
 INSTALLTIME=$(echo "scale=2;$endtime - $starttime"|bc )
 echo "" >> ${CENTMINLOGDIR}/python27_install_${DT}.log

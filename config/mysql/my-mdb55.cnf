@@ -1,7 +1,13 @@
+[client]
+socket=/var/lib/mysql/mysql.sock
+
+[mysql]
+max_allowed_packet = 32M
+
 [mysqld]
 local-infile=0
 ignore-db-dir=lost+found
-#character-set-server=utf8
+character-set-server=utf8
 datadir=/var/lib/mysql
 socket=/var/lib/mysql/mysql.sock
 
@@ -35,8 +41,8 @@ connect_timeout = 10
 tmp_table_size = 32M
 max_heap_table_size = 32M
 max_allowed_packet = 32M
-max_seeks_for_key = 1000
-group_concat_max_len = 1024
+#max_seeks_for_key = 4294967295
+#group_concat_max_len = 1024
 max_length_for_sort_data = 1024
 net_buffer_length = 16384
 max_connect_errors = 100000

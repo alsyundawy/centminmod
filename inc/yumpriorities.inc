@@ -203,8 +203,9 @@ EOF
         fi
 
 else
+        # check if CentOS-Base.repo is actually used
+        if [[ "$(grep -q '^#\[base\]$' /etc/yum.repos.d/CentOS-Base.repo; echo $?)" != '0' ]]; then
         #centos repo priorities
-        
         cp -p /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.OLD
         
         if [ -n "$(grep ^priority /etc/yum.repos.d/CentOS-Base.repo)" ]
@@ -213,6 +214,7 @@ else
 	       PRIOREXISTS=1
                 else
                         echo "setting yum priorities for CentOS-Base.repo"
+if [[ "$REDHAT_SEVEN" != [yY] ]]; then
                 ex -s /etc/yum.repos.d/CentOS-Base.repo << EOF
 :/\[base/ , /gpgkey/
 :a
@@ -243,6 +245,7 @@ priority=2
 :w
 :q
 EOF
+fi # check for redhat 7
         
         cecho "*************************************************" $boldgreen
         cecho "Fixing CentOS-Base.repo YUM Priorities" $boldgreen
@@ -250,7 +253,7 @@ EOF
         cat /etc/yum.repos.d/CentOS-Base.repo
         echo ""
         fi
-        
+        fi # check if CentOS-Base.repo is actually used
         
         if [ -f /etc/yum.repos.d/CentOS-CR.repo ]; then
         cp -p /etc/yum.repos.d/CentOS-CR.repo /etc/yum.repos.d/CentOS-CR.OLD
@@ -260,6 +263,7 @@ EOF
 	       PRIOREXISTS=1
                 else
                         echo "setting yum priorities for CentOS-CR.repo"
+if [[ "$REDHAT_SEVEN" != [yY] ]]; then
                 ex -s /etc/yum.repos.d/CentOS-CR.repo << EOF
 :/\[cr/ , /gpgkey/
 :a
@@ -268,6 +272,7 @@ priority=1
 :w
 :q
 EOF
+fi # check for redhat 7
         
         cecho "*************************************************" $boldgreen
         cecho "Fixing CentOS-CR.repo YUM Priorities" $boldgreen
@@ -295,7 +300,7 @@ PRIOREXISTS=1
 :/\[epel\]/ , /gpgkey/
 :a
 priority=3
-exclude=varnish clamd clamav clamav-db
+exclude=varnish varnish-libs galera nodejs nginx mongodb redis* scl-utils
 .
 :w
 :q
@@ -312,8 +317,12 @@ fi # repo file check
 
 
 yumpriorrpmforge() {
+  forgefix
 if [ -f /etc/yum.repos.d/rpmforge.repo ]; then
 cp -p /etc/yum.repos.d/rpmforge.repo /etc/yum.repos.d/rpmforge.OLD
+    if [[ "$CENTOS_SEVEN" = '7' && "$DNF_ENABLE" = [yY] ]]; then
+        sed -i 's|enabled .*|enabled = 0|g' /etc/yum.repos.d/rpmforge.repo
+    fi
 if [ -n "$(grep ^priority /etc/yum.repos.d/rpmforge.repo)" ]
         then
                 #echo priorities already set for rpmforge.repo
@@ -324,7 +333,7 @@ PRIOREXISTS=1
 :/\[rpmforge\]/ , /gpgcheck/
 :a
 priority=5
-exclude=pure-ftpd optipng
+exclude=pure-ftpd optipng clamav* clamd
 .
 :w
 :q
@@ -398,16 +407,16 @@ fi # repo file check
 }
 
 yumpriorvarnish() {
-if [ -f /etc/yum.repos.d/varnish.repo ]; then
-cp -p /etc/yum.repos.d/varnish.repo /etc/yum.repos.d/varnish.OLD
-if [ -n "$(grep ^priority /etc/yum.repos.d/varnish.repo)" ]
+if [ -f "$VARNISH_REPOFILE" ]; then
+cp -p "$VARNISH_REPOFILE" /etc/yum.repos.d/varnishcache_varnish41.OLD
+if [ -n "$(grep ^priority /etc/yum.repos.d/varnishcache_varnish41.repo)" ]
         then
-                #echo priorities already set for varnish.repo
+                #echo priorities already set for varnishcache_varnish41.repo
 PRIOREXISTS=1
         else
-                echo "setting yum priorities for varnish.repo"
-                ex -s /etc/yum.repos.d/varnish.repo << EOF
-:/\[rpmforge\]/ , /gpgcheck/
+                echo "setting yum priorities for varnish-4.1.repo"
+                ex -s /etc/yum.repos.d/varnishcache_varnish41.repo << EOF
+:/\[varnishcache_varnish41\]/ , /gpgcheck/
 :a
 priority=2
 .
@@ -415,12 +424,12 @@ priority=2
 :q
 EOF
 
-sed -i 's/enabled=1/enabled=0/g' /etc/yum.repos.d/varnish.repo
+# sed -i 's/enabled=1/enabled=0/g' /etc/yum.repos.d/varnishcache_varnish41.repo
 
 cecho "*************************************************" $boldgreen
-cecho "Fixing varnish.repo YUM Priorities" $boldgreen
+cecho "Fixing varnishcache_varnish41.repo YUM Priorities" $boldgreen
 cecho "*************************************************" $boldgreen
-cat /etc/yum.repos.d/varnish.repo
+cat /etc/yum.repos.d/varnishcache_varnish41.repo
 echo ""
 fi
 fi # repo file check
@@ -459,6 +468,9 @@ fi # AXIVOREPO_DISABLE
 yumpriorremi() {
 if [[ "$REMIREPO_DISABLE" = [nN] ]]; then
 if [ -f /etc/yum.repos.d/remi.repo ]; then
+        if [ -f /etc/yum.repos.d/remi-safe.repo ]; then
+                sed -i 's|enabled=1|enabled=0|' /etc/yum.repos.d/remi-safe.repo
+        fi
         cp -p /etc/yum.repos.d/remi.repo /etc/yum.repos.d/remi.OLD
         if [ -n "$(grep ^priority /etc/yum.repos.d/remi.repo)" ]
                 then

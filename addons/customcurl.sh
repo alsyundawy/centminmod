@@ -18,6 +18,18 @@ DIR_TMP='/svr-setup'
 CUSTOM_CURLRPM=y
 
 ###############################################################
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+
+shopt -s expand_aliases
+for g in "" e f; do
+    alias ${g}grep="LC_ALL=C ${g}grep"  # speed-up grep, egrep, fgrep
+done
+
 CENTOSVER=$(awk '{ print $3 }' /etc/redhat-release)
 
 if [ "$CENTOSVER" == 'release' ]; then
@@ -31,13 +43,26 @@ if [[ "$(cat /etc/redhat-release | awk '{ print $3 }' | cut -d . -f1)" = '6' ]];
     CENTOS_SIX='6'
 fi
 
+# Check for Redhat Enterprise Linux 7.x
 if [ "$CENTOSVER" == 'Enterprise' ]; then
-    CENTOSVER=$(cat /etc/redhat-release | awk '{ print $7 }')
-    OLS='y'
+    CENTOSVER=$(awk '{ print $7 }' /etc/redhat-release)
+    if [[ "$(awk '{ print $1,$2 }' /etc/redhat-release)" = 'Red Hat' && "$(awk '{ print $7 }' /etc/redhat-release | cut -d . -f1)" = '7' ]]; then
+        CENTOS_SEVEN='7'
+        REDHAT_SEVEN='y'
+    fi
+fi
+
+if [[ -f /etc/system-release && "$(awk '{print $1,$2,$3}' /etc/system-release)" = 'Amazon Linux AMI' ]]; then
+    CENTOS_SIX='6'
 fi
 
 if [ ! -d "$DIR_TMP" ]; then
 	mkdir -p "$DIR_TMP"
+  chmod 0750 "$DIR_TMP"
+fi
+
+if [ ! -d "$CENTMINLOGDIR" ]; then
+	mkdir -p "$CENTMINLOGDIR"
 fi
 ######################################################
 # Setup Colours
@@ -78,11 +103,22 @@ return
 
 curlrpm() {
 if [[ "$CUSTOM_CURLRPM" = [yY] ]]; then
+	if [ -f "/usr/local/src/centminmod/downloads/curlrpms.zip" ]; then
+    /usr/bin/unzip -qo "/usr/local/src/centminmod/downloads/curlrpms.zip" -d "$DIR_TMP"/
+	fi
 	###############################################################
 	if [[ "$CENTOS_SIX" = '6' && "$(uname -m)" != 'x86_64' ]]; then
 	#############################
 	# el6 32bit
-	rpm -Uvh http://mirror.city-fan.org/ftp/contrib/yum-repo/rhel6/i386/city-fan.org-release-1-13.rhel6.noarch.rpm
+	curl -4Is --connect-timeout 5 --max-time 5 http://www.city-fan.org/ftp/contrib/yum-repo/city-fan.org-release-2-1.rhel6.noarch.rpm
+	CURL_NOARCHRPMCHECK=$?
+	if [[ "$CURL_NOARCHRPMCHECK" = '0' ]]; then
+		rpm -Uvh http://www.city-fan.org/ftp/contrib/yum-repo/city-fan.org-release-2-1.rhel6.noarch.rpm
+	else
+		if [ -f "$DIR_TMP/city-fan.org-release-2-1.rhel6.noarch.rpm" ]; then
+			rpm -Uvh "$DIR_TMP/city-fan.org-release-2-1.rhel6.noarch.rpm"
+		fi
+	fi
 	sed -i 's|enabled=1|enabled=0|g' /etc/yum.repos.d/city-fan.org.repo
 	if [ -f /etc/yum.repos.d/city-fan.org.repo ]; then
 		cp -p /etc/yum.repos.d/city-fan.org.repo /etc/yum.repos.d/city-fan.org.OLD
@@ -91,7 +127,7 @@ if [[ "$CUSTOM_CURLRPM" = [yY] ]]; then
 			PRIOREXISTS=1
 		else
       echo "setting yum priorities for city-fan.org.repo"
-      sed -i 's|^gpgkey=.*|&\npriority=99|' /etc/yum.repos.d/city-fan.org.repo
+      sed -i 's|^gpgkey=.*|&\npriority=99\nexcludes=libtidy libtidy-devel|' /etc/yum.repos.d/city-fan.org.repo
 		fi
 	fi # repo file check
 	yum -y install curl libcurl libcurl-devel libcurl7112 libcurl7155 --enablerepo=city-fan.org --disableplugin=priorities
@@ -104,7 +140,16 @@ if [[ "$CUSTOM_CURLRPM" = [yY] ]]; then
 	elif [[ "$CENTOS_SIX" = '6' && "$(uname -m)" = 'x86_64' ]]; then
 	###############################################################
 	# el6 64bit
-	rpm -Uvh http://mirror.city-fan.org/ftp/contrib/yum-repo/rhel6/x86_64/city-fan.org-release-1-13.rhel6.noarch.rpm
+	curl -4Is --connect-timeout 5 --max-time 5 http://www.city-fan.org/ftp/contrib/yum-repo/city-fan.org-release-2-1.rhel6.noarch.rpm
+	CURL_NOARCHRPMCHECK=$?
+	if [[ "$CURL_NOARCHRPMCHECK" = '0' ]]; then
+		rpm -Uvh http://www.city-fan.org/ftp/contrib/yum-repo/city-fan.org-release-2-1.rhel6.noarch.rpm
+	else
+		if [ -f "$DIR_TMP/city-fan.org-release-2-1.rhel6.noarch.rpm" ]; then
+			rpm -Uvh "$DIR_TMP/city-fan.org-release-2-1.rhel6.noarch.rpm"
+		fi
+	fi
+	
 	sed -i 's|enabled=1|enabled=0|g' /etc/yum.repos.d/city-fan.org.repo
 	if [ -f /etc/yum.repos.d/city-fan.org.repo ]; then
 		cp -p /etc/yum.repos.d/city-fan.org.repo /etc/yum.repos.d/city-fan.org.OLD
@@ -113,7 +158,7 @@ if [[ "$CUSTOM_CURLRPM" = [yY] ]]; then
 			PRIOREXISTS=1
   	else
       echo "setting yum priorities for city-fan.org.repo"
-			sed -i 's|^gpgkey=.*|&\npriority=99|' /etc/yum.repos.d/city-fan.org.repo
+			sed -i 's|^gpgkey=.*|&\npriority=99\nexcludes=libtidy libtidy-devel|' /etc/yum.repos.d/city-fan.org.repo
 		fi
 	fi # repo file check
 	yum -y install curl libcurl libcurl-devel libcurl7112 libcurl7155 --enablerepo=city-fan.org --disableplugin=priorities
@@ -126,7 +171,16 @@ if [[ "$CUSTOM_CURLRPM" = [yY] ]]; then
 	elif [[ "$CENTOS_SEVEN" = '7' && "$(uname -m)" = 'x86_64' ]]; then
 	###############################################################
 	# el7 64bit
-	rpm -Uvh http://mirror.city-fan.org/ftp/contrib/yum-repo/rhel7/x86_64/city-fan.org-release-1-13.rhel7.noarch.rpm
+	curl -4Is --connect-timeout 5 --max-time 5 http://www.city-fan.org/ftp/contrib/yum-repo/city-fan.org-release-2-1.rhel7.noarch.rpm
+	CURL_NOARCHRPMCHECK=$?
+	if [[ "$CURL_NOARCHRPMCHECK" = '0' ]]; then
+		rpm -Uvh http://www.city-fan.org/ftp/contrib/yum-repo/city-fan.org-release-2-1.rhel7.noarch.rpm
+	else
+		if [ -f "$DIR_TMP/city-fan.org-release-2-1.rhel7.noarch.rpm" ]; then
+			rpm -Uvh "$DIR_TMP/city-fan.org-release-2-1.rhel7.noarch.rpm"
+		fi
+	fi
+	
 	sed -i 's|enabled=1|enabled=0|g' /etc/yum.repos.d/city-fan.org.repo
 	if [ -f /etc/yum.repos.d/city-fan.org.repo ]; then
 		cp -p /etc/yum.repos.d/city-fan.org.repo /etc/yum.repos.d/city-fan.org.OLD
@@ -135,7 +189,7 @@ if [[ "$CUSTOM_CURLRPM" = [yY] ]]; then
 			PRIOREXISTS=1
   	else
       echo "setting yum priorities for city-fan.org.repo"
-      sed -i 's|^gpgkey=.*|&\npriority=99|' /etc/yum.repos.d/city-fan.org.repo
+      sed -i 's|^gpgkey=.*|&\npriority=99\nexcludes=libtidy libtidy-devel|' /etc/yum.repos.d/city-fan.org.repo
 		fi
 	fi # repo file check
 	yum -y install curl libcurl libcurl-devel libcurl7112 libcurl7155 --enablerepo=city-fan.org --disableplugin=priorities
@@ -149,7 +203,7 @@ if [[ "$CUSTOM_CURLRPM" = [yY] ]]; then
 fi # CUSTOM_CURLRPM=y
 }
 ##############################################################
-starttime=$(date +%s.%N)
+starttime=$(TZ=UTC date +%s.%N)
 {
 curlrpm
 
@@ -161,7 +215,7 @@ echo " yum update --enablerepo=city-fan.org --disableplugin=priorities"
 echo
 } 2>&1 | tee "${CENTMINLOGDIR}/centminmod_customcurl_rpms_${DT}.log"
 
-endtime=$(date +%s.%N)
+endtime=$(TZ=UTC date +%s.%N)
 
 INSTALLTIME=$(echo "scale=2;$endtime - $starttime"|bc )
 echo "" >> "${CENTMINLOGDIR}/centminmod_customcurl_rpms_${DT}.log"

@@ -1,9 +1,224 @@
+postfix_presetup() {
+
+	if [ ! -f /bin/mailx ]; then
+		time $YUMDNFBIN -y install mailx${DISABLEREPO_DNF}
+	fi
+
+if [[ "$CENTOS_SIX" = '6' ]]; then
+	if [[ "$SENDMAIL_INSTALL" = [yY] && "$POSTFIX_INSTALL" = [nN] ]]; then
+		if [[ ! -f /etc/init.d/postfix && ! -f /etc/init.d/sendmail ]]; then
+			echo "*************************************************"
+			cecho "* Installing sendmail" $boldgreen
+			echo "*************************************************"
+			$YUMDNFBIN${CACHESKIP} -y -q install sendmail sendmail-cf${DISABLEREPO_DNF}
+            sar_call
+			chkconfig --levels 235 sendmail on
+			funct_sendmailmc
+			echo "*************************************************"
+			cecho "* sendmail installed" $boldgreen
+			echo "*************************************************"
+		elif [[ -f /etc/init.d/postfix ]]; then
+        	if [ ! -f /bin/mailx ]; then
+            	$YUMDNFBIN${CACHESKIP} -y -q install mailx${DISABLEREPO_DNF}
+                sar_call
+        	fi
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "Postfix already detected, sendmail install aborted" $boldgreen
+        	echo "*************************************************"
+    	elif [[ -f /etc/init.d/sendmail ]]; then
+        	if [ ! -f /bin/mailx ]; then
+            	$YUMDNFBIN${CACHESKIP} -y -q install mailx${DISABLEREPO_DNF}
+                sar_call
+        	fi
+        	chkconfig --levels 235 sendmail on
+        	funct_sendmailmc
+        	echo "*************************************************"
+        	cecho "sendmail already detected, sendmail install aborted" $boldgreen
+        	echo "*************************************************"
+		fi
+	fi
+	
+	if [[ "$SENDMAIL_INSTALL" = [yY] && "$POSTFIX_INSTALL" = [yY] ]]; then
+    	if [[ ! -f /etc/init.d/postfix && ! -f /etc/init.d/sendmail ]]; then
+        	echo "*************************************************"
+        	cecho "* Installing postfix" $boldgreen
+        	echo "*************************************************"
+        	$YUMDNFBIN${CACHESKIP} -y -q install postfix${DISABLEREPO_DNF}
+            sar_call
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "* postfix installed" $boldgreen
+        	echo "*************************************************"
+    	elif [[ -f /etc/init.d/postfix ]]; then
+        	if [ ! -f /bin/mailx ]; then
+            	$YUMDNFBIN${CACHESKIP} -y -q install mailx${DISABLEREPO_DNF}
+                sar_call
+        	fi
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "Postfix already detected, postfix install aborted" $boldgreen
+        	echo "*************************************************"
+    	elif [[ -f /etc/init.d/sendmail ]]; then
+        	$YUMDNFBIN${CACHESKIP} -y -q remove sendmail sendmail-cf${DISABLEREPO_DNF}
+            sar_call
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "* postfix installed" $boldgreen
+        	echo "*************************************************"
+    	fi
+	fi
+	
+	
+	if [[ "$POSTFIX_INSTALL" = [yY] && "$SENDMAIL_INSTALL" = [nN] ]]; then
+    	if [[ ! -f /etc/init.d/postfix && ! -f /etc/init.d/sendmail ]]; then
+        	echo "*************************************************"
+        	cecho "* Installing postfix" $boldgreen
+        	echo "*************************************************"
+        	$YUMDNFBIN${CACHESKIP} -y -q install postfix${DISABLEREPO_DNF}
+            sar_call
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "* postfix installed" $boldgreen
+        	echo "*************************************************"
+    	elif [[ -f /etc/init.d/postfix ]]; then
+        	if [ ! -f /bin/mailx ]; then
+            	$YUMDNFBIN${CACHESKIP} -y -q install mailx${DISABLEREPO_DNF}
+                sar_call
+        	fi
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "Postfix already detected, postfix install aborted" $boldgreen
+        	echo "*************************************************"
+    	elif [[ -f /etc/init.d/sendmail ]]; then
+        	if [ -f /usr/share/sendmail-cf ]; then
+            	$YUMDNFBIN${CACHESKIP} -y -q remove sendmail sendmail-cf${DISABLEREPO_DNF}
+                sar_call
+        	else
+           	$YUMDNFBIN${CACHESKIP} -y -q remove sendmail${DISABLEREPO_DNF}
+            sar_call
+        	fi
+        	$YUMDNFBIN${CACHESKIP} -y -q install postfix${DISABLEREPO_DNF}
+            sar_call
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "* postfix installed" $boldgreen
+        	echo "*************************************************"
+    	fi
+	fi
+fi # centos6
+
+if [[ "$CENTOS_SEVEN" = '7' ]]; then
+	if [[ "$SENDMAIL_INSTALL" = [yY] && "$POSTFIX_INSTALL" = [nN] ]]; then
+		if [[ ! -f /usr/lib/systemd/system/postfix.service && ! -f /usr/lib/systemd/system/sendmail.service ]]; then
+			echo "*************************************************"
+			cecho "* Installing sendmail" $boldgreen
+			echo "*************************************************"
+			$YUMDNFBIN${CACHESKIP} -y -q install sendmail sendmail-cf${DISABLEREPO_DNF}
+            sar_call
+			chkconfig --levels 235 sendmail on
+			funct_sendmailmc
+			echo "*************************************************"
+			cecho "* sendmail installed" $boldgreen
+			echo "*************************************************"
+		elif [[ -f /usr/lib/systemd/system/postfix.service ]]; then
+        	if [ ! -f /bin/mailx ]; then
+            	$YUMDNFBIN${CACHESKIP} -y -q install mailx${DISABLEREPO_DNF}
+                sar_call
+        	fi
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "Postfix already detected, sendmail install aborted" $boldgreen
+        	echo "*************************************************"
+    	elif [[ -f /usr/lib/systemd/system/sendmail.service ]]; then
+        	if [ ! -f /bin/mailx ]; then
+            	$YUMDNFBIN${CACHESKIP} -y -q install mailx${DISABLEREPO_DNF}
+                sar_call
+        	fi
+        	chkconfig --levels 235 sendmail on
+        	funct_sendmailmc
+        	echo "*************************************************"
+        	cecho "sendmail already detected, sendmail install aborted" $boldgreen
+        	echo "*************************************************"
+		fi
+	fi
+	
+	if [[ "$SENDMAIL_INSTALL" = [yY] && "$POSTFIX_INSTALL" = [yY] ]]; then
+    	if [[ ! -f /usr/lib/systemd/system/postfix.service && ! -f /usr/lib/systemd/system/sendmail.service ]]; then
+        	echo "*************************************************"
+        	cecho "* Installing postfix" $boldgreen
+        	echo "*************************************************"
+        	$YUMDNFBIN${CACHESKIP} -y -q install postfix mailx${DISABLEREPO_DNF}
+            sar_call
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "* postfix installed" $boldgreen
+        	echo "*************************************************"
+    	elif [[ -f /usr/lib/systemd/system/postfix.service ]]; then
+        	if [ ! -f /bin/mailx ]; then
+            	$YUMDNFBIN${CACHESKIP} -y -q install mailx${DISABLEREPO_DNF}
+                sar_call
+        	fi
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "Postfix already detected, postfix install aborted" $boldgreen
+        	echo "*************************************************"
+    	elif [[ -f /usr/lib/systemd/system/sendmail.service ]]; then
+        	$YUMDNFBIN${CACHESKIP} -y -q remove sendmail sendmail-cf${DISABLEREPO_DNF}
+            sar_call
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "* postfix installed" $boldgreen
+        	echo "*************************************************"
+    	fi
+	fi
+	
+	
+	if [[ "$POSTFIX_INSTALL" = [yY] && "$SENDMAIL_INSTALL" = [nN] ]]; then
+    	if [[ ! -f /usr/lib/systemd/system/postfix.service && ! -f /usr/lib/systemd/system/sendmail.service ]]; then
+        	echo "*************************************************"
+        	cecho "* Installing postfix" $boldgreen
+        	echo "*************************************************"
+        	$YUMDNFBIN${CACHESKIP} -y -q install postfix${DISABLEREPO_DNF}
+            sar_call
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "* postfix installed" $boldgreen
+        	echo "*************************************************"
+    	elif [[ -f /usr/lib/systemd/system/postfix.service ]]; then
+        	if [ ! -f /bin/mailx ]; then
+            	$YUMDNFBIN${CACHESKIP} -y -q install mailx${DISABLEREPO_DNF}
+                sar_call
+        	fi
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "Postfix already detected, postfix install aborted" $boldgreen
+        	echo "*************************************************"
+    	elif [[ -f /usr/lib/systemd/system/sendmail.service ]]; then
+        	if [ -f /usr/share/sendmail-cf ]; then
+            	$YUMDNFBIN${CACHESKIP} -y -q remove sendmail sendmail-cf${DISABLEREPO_DNF}
+                sar_call
+        	else
+           	$YUMDNFBIN${CACHESKIP} -y -q remove sendmail${DISABLEREPO_DNF}
+            sar_call
+        	fi
+        	$YUMDNFBIN${CACHESKIP} -y -q install postfix${DISABLEREPO_DNF}
+            sar_call
+        	postfixsetup
+        	echo "*************************************************"
+        	cecho "* postfix installed" $boldgreen
+        	echo "*************************************************"
+    	fi
+	fi
+fi # centos7
+}
+
 postfixsetup() {
 
 	if [ ! -f /usr/sbin/pflogsumm ]; then
-		yum -q -y install postfix-perl-scripts
+		time $YUMDNFBIN -q -y install postfix-perl-scripts${DISABLEREPO_DNF}
 	fi
-	yum -q -y update postfix --disableplugin=priorities
+	time $YUMDNFBIN -q -y update postfix --disableplugin=priorities${DISABLEREPO_DNF}
 
 	CHECKSENDMAILPATH=$(grep sendmail_path /usr/local/lib/php.ini)
 	if [ "$CHECKSENDMAILPATH" == ';sendmail_path =' ]; then
@@ -12,14 +227,18 @@ postfixsetup() {
 
 # tweak mailbox_size_limit from default 50MB to 1000MB
 
-MBOXSIZE=$(du -sh /var/mail/root | head -n1 | awk '{print $1}' | sed 's/M//')
+if [ ! -d /var/mail/root ]; then
+    MBOXSIZE='0'
+else    
+    MBOXSIZE=$(du -sh /var/mail/root | head -n1 | awk '{print $1}' | sed 's/M//')
+fi
 MBOXSIZEBYTES=$(echo "$MBOXSIZE*1024*1024" | bc)
 MBOXSIZELIMIT=$(postconf -d | grep mailbox_size_limit | head -n1 | awk '{print $3}')
 INCLIMIT=$(echo "$MBOXSIZELIMIT*20" | bc)
 CHECKMBOXSIZELIMIT=$(grep mailbox_size_limit /etc/postfix/main.cf)
 
 # check if /var/spool/postfix/public/pickup exists
-if [[ ! -f /var/spool/postfix/public/pickup ]]; then
+if [[ ! -S /var/spool/postfix/public/pickup ]]; then
 	mkfifo /var/spool/postfix/public/pickup
 	chown postfix:postfix /var/spool/postfix/public/pickup
 fi
@@ -81,11 +300,17 @@ postconf -e 'smtp_tls_session_cache_database = btree:/var/lib/postfix/smtp_scach
 service postfix reload
 postconf -n smtp_tls_CAfile smtp_tls_security_level smtp_tls_loglevel smtp_tls_session_cache_database
 
+if [[ "$DISABLE_IPVSIX" = [yY] ]]; then
+    postconf -n inet_protocols
+    postconf -e 'inet_protocols = ipv4'
+    postconf -n inet_protocols
+fi
+
 cmservice postfix restart
 postconf -n | grep mailbox_size_limit | head -n1 | awk '{print $3}'
 
 	cd $DIR_TMP
-	wget -cnv http://linxnet.com/downloads/pflogsumm-1.1.5.tar.gz --tries=3
+	wget -4 -cnv http://linxnet.com/downloads/pflogsumm-1.1.5.tar.gz --tries=3
 	tar -xzf pflogsumm-1.1.5.tar.gz
 	cd pflogsumm-1.1.5
 	cp pflogsumm.pl /usr/bin/pflogsumm

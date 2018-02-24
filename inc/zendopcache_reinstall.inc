@@ -1,5 +1,6 @@
 #################
 zopcachereinstall() {
+	axelsetup
 
 if [[ -f ${CONFIGSCANDIR}/xcache.ini ]]; then
     echo ""
@@ -38,32 +39,19 @@ echo "Current PHP upgrade version set: $PHPMUVER"
 echo "-------------------------------------------------------------------"
 
 
+ZOPCACHEPROMPT='n'
 
-# only prompt for Zend Opcache version if PHP version is between 5.2 and 5.4 inclusive
-if [[ "$(expr $PHPMVER \>= 5.2)" = 1 && "$(expr $PHPMVER \<= 5.4)" = 1 ]] && [[ "$(expr $PHPCURRENTVER \>= 5.2)" = 1 && "$(expr $PHPCURRENTVER \<= 5.4)" = 1 ]]; then
-	ZOPCACHEPROMPT='y'
-# prompt if ZOPCACHE_OVERRIDE=y for PHP versions between 5.5-5.6
-elif [[ "$(expr $PHPMVER \>= 5.5)" = 1 && "$(expr $PHPMVER \<= 5.6)" = 1 && "$ZOPCACHE_OVERRIDE" = [yY] ]] && [[ "$(expr $PHPCURRENTVER \>= 5.5)" = 1 && "$(expr $PHPCURRENTVER \<= 5.6)" = 1 && "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
-	ZOPCACHEPROMPT='y'
-# prompt if ZOPCACHE_OVERRIDE=y for PHP version 7.0	
-elif [[ "$(expr $PHPMVER \= 7.0)" = 1 && "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
-	ZOPCACHEPROMPT='y'	
-else
-	ZOPCACHEPROMPT='n'
-fi
+# prompt for Zend Opcache version if PHP version is 5.2-5.4 or if ZOPCACHE_OVERRIDE=y for PHP versions 5.5 and higher
 
-# check if this is a PHP upgrade task
 if [ "$PHPMUVER" ]; then
-	if [[ "$(expr $PHPMUVER \>= 5.2)" = 1 && "$(expr $PHPMUVER \<= 5.4)" = 1 ]]; then
+# run if this is a PHP upgrade task
+	if [[ "$PHPMUVER" = 5.[234] || "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
 		ZOPCACHEPROMPT='y'
-	# prompt if ZOPCACHE_OVERRIDE=y for PHP versions between 5.5-5.6
-	elif [[ "$(expr $PHPMUVER \>= 5.5)" = 1 && "$(expr $PHPMUVER \<= 5.6)" = 1 && "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
+	fi
+else
+# run from Zend Opcache sub menu
+	if [[ "$PHPCURRENTVER" = 5.[234] || "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
 		ZOPCACHEPROMPT='y'
-	# prompt if ZOPCACHE_OVERRIDE=y for PHP version 7.0		
-	elif [[ "$(expr $PHPMUVER \= 7.0)" = 1 && "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
-		ZOPCACHEPROMPT='y'		
-	else
-		ZOPCACHEPROMPT='n'
 	fi
 fi
 
@@ -82,7 +70,7 @@ ZENDOPCACHE_LINK="https://pecl.php.net/get/${ZENDOPCACHE_LINKFILE}"
     if [ -s ${ZENDOPCACHE_LINKFILE} ]; then
         cecho " ${ZENDOPCACHE_LINKFILE} Archive found, skipping download..." $boldgreen
     else
-        $DOWNLOADAPP ${ZENDOPCACHE_LINK} $WGETRETRY 
+        download_cmd ${ZENDOPCACHE_LINK} $WGETRETRY 
 ERROR=$?
 	if [[ "$ERROR" != '0' ]]; then
 	cecho "Error: ${ZENDOPCACHE_LINKFILE} download failed." $boldgreen
@@ -132,8 +120,7 @@ fi
 
 ######################################################
 # Randomize ${N}_opcache.php filename
-N=$(od -vAn -N4 -tx < /dev/urandom)
-N=$(echo ${N} | sed -e 's/\s//')
+N=$(od -vAn -N8 -tx < /dev/urandom | sed -e 's/\s//g')
 if [[ -f /usr/local/nginx/html/opcache.php ]]; then
 	mv /usr/local/nginx/html/opcache.php /usr/local/nginx/html/${N}_opcache.php
 	chown nginx:nginx /usr/local/nginx/html/${N}_opcache.php
@@ -160,11 +147,11 @@ if [ ! -f ${CONFIGSCANDIR}/zendopcache.ini ]; then
 fi
 
 # check if opcache.so exists in ${CONFIGSCANDIR}/zendopcache.ini
-ZOPLUSSOCHECK=$(grep 'opcache.so' ${CONFIGSCANDIR}/zendopcache.ini)
+ZOPLUSSOCHECK=$(grep 'opcache.so' "${CONFIGSCANDIR}/zendopcache.ini" >/dev/null 2>&1; echo $?)
 
 ################
 # if opcache.so doesn't exist then ZOPPLUSSOCHECK will be empty
-if [[ -z $ZOPLUSSOCHECK ]]; then
+if [[ "$ZOPLUSSOCHECK" = '1' ]]; then
 	echo
 	read -ep "Do you want to reset zendopcache.ini settings to default (y) or keep existing zendopcache.ini settings (n)? [y/n]: " resetzocache
 
@@ -204,8 +191,8 @@ fi # check if opcache.so exists in zendopcache.ini
 ################
 
 # DOUBLE CHECK as opcache.so needs extension path
-ZOPLUSSOPATHCHECK=$(grep 'zend_extension=opcache.so' ${CONFIGSCANDIR}/zendopcache.ini)
-if [[ $ZOPLUSSOPATHCHECK ]]; then
+ZOPLUSSOPATHCHECK=$(grep 'zend_extension=opcache.so' ${CONFIGSCANDIR}/zendopcache.ini >/dev/null 2>&1; echo $?)
+if [[ "$ZOPLUSSOPATHCHECK" = '0' ]]; then
 	echo
 	echo "replace 'zend_extension=opcache.so' "zend_extension=${PHPEXTDIRD}/opcache.so" -- ${CONFIGSCANDIR}/zendopcache.ini"
 	replace 'zend_extension=opcache.so' "zend_extension=${PHPEXTDIRD}/opcache.so" -- "${CONFIGSCANDIR}/zendopcache.ini"

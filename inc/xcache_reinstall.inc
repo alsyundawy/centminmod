@@ -81,7 +81,7 @@ fi # xcachever=2.0.0
     if [ -s xcache-${xcachever}.tar.gz ]; then
         cecho "xcache ${xcachever} Archive found, skipping download..." $boldgreen
     else
-        $DOWNLOADAPP http://xcache.lighttpd.net/pub/Releases/${xcachever}/xcache-${xcachever}.tar.gz $WGETRETRY
+        download_cmd http://xcache.lighttpd.net/pub/Releases/${xcachever}/xcache-${xcachever}.tar.gz $WGETRETRY
     fi
 
 XCACHESOCHECK=`grep 'xcache.so' /usr/local/lib/php.ini`
@@ -98,7 +98,7 @@ echo
 
 PHPVERCHECK=`cat /usr/local/bin/php-config | awk '/^version/ {phpver=$1} END {gsub(/"|version|=|)/,"",phpver); print phpver}' | awk -F "." '{print $1"."$2}'`
 
-if [[ "$PHPVERCHECK" == '5.4' || "$PHPVERCHECK" == '5.5' || "$PHPVERCHECK" == '5.6' ]]; then
+if [[ "$PHPVERCHECK" > 5.3 ]]; then
     #cat $CUR_DIR/config/xcache/xcache_php54.ini >> /usr/local/lib/php.ini
     cat $CUR_DIR/config/xcache/xcache_php54.ini > ${CONFIGSCANDIR}/xcache.ini
 else

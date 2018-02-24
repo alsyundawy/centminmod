@@ -1,3 +1,23 @@
+ngxpagespeed_setpipepatch() {
+  # patch for centos 6 and ngx_pagespeed 1.13.35.1 beta
+  if [[ "$CENTOS_SIX" -eq '6' && -z "$(grep 'ifdef F_SETPIPE_SZ' "$DIR_TMP/ngx_pagespeed-${NGXPGSPEED_VER}/src/ngx_event_connection.cc")" ]]; then
+    # only patch for 1.13.35.1 and lower
+    if [[ "$(echo "$NGINX_PAGESPEEDPSOL_VER" | cut -d . -f1)" -ge '1' ]] && [[ "$(echo $NGINX_PAGESPEEDPSOL_VER | cut -d . -f2)" -le '13' ]] && [[ "$(echo $NGINX_PAGESPEEDPSOL_VER | cut -d . -f3)" -le '35' ]] && [[ "$(echo $NGINX_PAGESPEEDPSOL_VER | cut -d . -f4)" -le '1' ]]; then
+        pushd "$DIR_TMP/ngx_pagespeed-${NGXPGSPEED_VER}/src"
+        wget -c4 --progress=bar https://gist.github.com/centminmod/72ac71f446a1ee169b3fb35cc65da0fa/raw/pagespeed-centos6.patch --tries=3
+        patch < pagespeed-centos6.patch 
+        popd
+    fi
+  fi
+}
+
+nginx_libuuid() {
+  if [ ! -f /usr/include/uuid/uuid.h ]; then
+    # https://github.com/pagespeed/ngx_pagespeed/issues/1499
+    time $YUMDNFBIN -y install libuuid-devel
+  fi
+}
+
 genpscontrolfile() {
 
 touch /usr/local/nginx/conf/pscontrol
@@ -57,14 +77,20 @@ nano -w /usr/local/nginx/conf/pagespeedstatslog.conf
 }
 
 psoff() {
-sed -i 's/pagespeed on;/pagespeed off;/g' /usr/local/nginx/conf/pagespeed.conf
-sed -i 's/pagespeed on;/pagespeed off;/g' /usr/local/nginx/conf/pagespeedadmin.conf
+sed -i 's/pagespeed on;/pagespeed unplugged;/g' /usr/local/nginx/conf/pagespeed.conf
+sed -i 's/pagespeed on;/pagespeed unplugged;/g' /usr/local/nginx/conf/pagespeedadmin.conf
+if [ -d /var/ngx_pagespeed_cache ]; then
+    rm -rf /var/ngx_pagespeed_cache/*
+fi
+if [ -d /tmp/ngx_pagespeed_cache ]; then
+    rm -rf /tmp/ngx_pagespeed_cache/*
+fi
 cmservice nginx restart
 }
 
 pson() {
-sed -i 's/pagespeed off;/pagespeed on;/g' /usr/local/nginx/conf/pagespeed.conf
-sed -i 's/pagespeed off;/pagespeed on;/g' /usr/local/nginx/conf/pagespeedadmin.conf
+sed -i 's/pagespeed unplugged;/pagespeed on;/g' /usr/local/nginx/conf/pagespeed.conf
+sed -i 's/pagespeed unplugged;/pagespeed on;/g' /usr/local/nginx/conf/pagespeedadmin.conf
 cmservice nginx restart
 }
 
@@ -126,7 +152,14 @@ END
 makepsconf() {
 touch /usr/local/nginx/conf/pagespeed.conf
 cat > "/usr/local/nginx/conf/pagespeed.conf" <<END
-pagespeed off;
+pagespeed unplugged;
+
+#######################################################
+# Purge nginx pagespeed cache
+# https://developers.google.com/speed/pagespeed/module/system#flush_cache
+#######################################################
+pagespeed EnableCachePurge on;
+pagespeed PurgeMethod PURGE;
 
 #######################################################
 # File cache settings 
@@ -153,9 +186,21 @@ pagespeed off;
 #  pagespeed MemcachedTimeoutUs 100000;
 
 #######################################################
-## https://developers.google.com/speed/pagespeed/module/admin#virtual-hosts-and-stats
+## 1.11.33.0 beta save-data
 ######################################
-# pagespeed UsePerVhostStatistics on;
+# https://developers.google.com/speed/pagespeed/module/filter-image-optimize#image-quality
+
+# https://developers.google.com/speed/pagespeed/module/reference-image-optimize#JpegQualityForSaveData
+pagespeed JpegQualityForSaveData 50;
+
+# https://developers.google.com/speed/pagespeed/module/reference-image-optimize#WebpQualityForSaveData
+pagespeed WebpQualityForSaveData 50;
+
+# https://developers.google.com/speed/pagespeed/module/filter-image-optimize#resize_rendered_image_dimensions
+pagespeed EnableFilters resize_rendered_image_dimensions;
+
+# https://developers.google.com/speed/pagespeed/module/filter-image-optimize#WebpRecompressionQuality
+pagespeed WebpRecompressionQuality 75;
 
 #######################################################
 ## 1.7.30.1 beta defaults
@@ -187,14 +232,50 @@ pagespeed MinImageSizeLowResolutionBytes 3072;
 #  pagespeed ExperimentSpec "id=1;percent=50;level=CoreFilters;enabled=collapse_whitespace,remove_comments;";
 #  pagespeed ExperimentSpec "id=2;percent=50";
  
-  # Filter settings
+  # Filter settings 
   # filters outlined at http://ngxpagespeed.com/ngx_pagespeed_example/
   pagespeed RewriteLevel CoreFilters;
   pagespeed EnableFilters collapse_whitespace,remove_comments;
 
+  # https://www.modpagespeed.com/doc/config_filters#FinderPropertiesCacheExpirationTimeMs
+#  pagespeed FinderPropertiesCacheExpirationTimeMs 7200000;  
+
+  # https://www.modpagespeed.com/doc/config_filters#forbidding
+   pagespeed ForbidAllDisabledFilters true;
+
+  # https://developers.google.com/speed/pagespeed/module/filter-attribute-elide
+#  pagespeed EnableFilters elide_attributes;
+
+  # https://developers.google.com/speed/pagespeed/module/filter-dedup-inlined-images
+#  pagespeed EnableFilters dedup_inlined_images;
+
   # make_google_analytics_async
   # https://developers.google.com/speed/docs/mod_pagespeed/filter-make-google-analytics-async
 #  pagespeed EnableFilters make_google_analytics_async;
+
+  # make_show_ads_async
+  # https://developers.google.com/speed/pagespeed/module/filter-make-show-ads-async
+#  pagespeed EnableFilters make_show_ads_async;
+
+  # responsive_images, responsive_images_zoom
+  # https://developers.google.com/speed/pagespeed/module/filter-image-responsive
+#  pagespeed EnableFilters responsive_images;
+#  pagespeed EnableFilters responsive_images_zoom;
+
+  # convert_to_webp_animated
+  # https://developers.google.com/speed/pagespeed/module/filter-image-optimize#convert_to_webp_animated
+#  pagespeed EnableFilters convert_to_webp_animated;
+
+  # inline_google_font_css
+  # https://developers.google.com/speed/pagespeed/module/filter-css-inline-google-fonts
+  pagespeed EnableFilters inline_google_font_css;
+
+  # require FetchHttps if using https site
+#   pagespeed FetchHttps enable;
+
+  # https://www.modpagespeed.com/doc/https_support
+    pagespeed SslCertDirectory /etc/pki/tls/certs;
+    pagespeed SslCertFile /etc/pki/tls/cert.pem;
 
   # inline_css
   # https://developers.google.com/speed/pagespeed/module/filter-css-inline
@@ -249,11 +330,11 @@ pagespeed MinImageSizeLowResolutionBytes 3072;
 
   # rewrite_images
   # https://developers.google.com/speed/docs/mod_pagespeed/filter-image-optimize
-#  pagespeed EnableFilters rewrite_images;
-   pagespeed DisableFilters rewrite_images;
-   pagespeed DisableFilters recompress_images;
-   pagespeed DisableFilters convert_png_to_jpeg;
-   pagespeed DisableFilters extend_cache_images;
+   pagespeed EnableFilters rewrite_images;
+#   pagespeed DisableFilters rewrite_images;
+#   pagespeed DisableFilters recompress_images;
+#   pagespeed DisableFilters convert_png_to_jpeg;
+#   pagespeed DisableFilters extend_cache_images;
 #  pagespeed EnableFilters convert_png_to_jpeg;
 #  pagespeed EnableFilters convert_jpeg_to_webp;
 #  pagespeed EnableFilters convert_to_webp_lossless;
@@ -284,9 +365,15 @@ cat > "/usr/local/nginx/conf/pagespeedadmin.conf" <<END
 #######################################################
 # 1.9.32.1 beta required change
 # https://community.centminmod.com/threads/how-can-i-disable-it-after-installation.1603/#post-7665
-# add a second pagespeed off; variable 
+# add a second pagespeed unplugged; variable 
 # loaded in nginx.conf via pagespeedadmin.conf include file
-pagespeed off;
+pagespeed unplugged;
+
+#######################################################
+## https://developers.google.com/speed/pagespeed/module/admin#virtual-hosts-and-stats
+######################################
+# pagespeed UsePerVhostStatistics on;
+
 #######################################################
 pagespeed FileCachePath /var/ngx_pagespeed_cache;
 pagespeed StatisticsPath /ngx_pagespeed_statistics;
@@ -355,12 +442,12 @@ pagespeedbackup() {
 echo ""
 echo "backup ngx_pagespeed pagespeed.conf"
 echo "cp -a /usr/local/nginx/conf/pagespeed.conf /usr/local/nginx/conf/pagespeed.conf_${DT}"
-cp -a /usr/local/nginx/conf/pagespeed.conf /usr/local/nginx/conf/pagespeed.conf_${DT}
+cp -a /usr/local/nginx/conf/pagespeed.conf "/usr/local/nginx/conf/pagespeed.conf_${DT}"
 
 echo ""
 echo "backup ngx_pagespeed pagespeedhandler.conf"
 echo "cp -a /usr/local/nginx/conf/pagespeedhandler.conf /usr/local/nginx/conf/pagespeedhandler.conf_${DT}"
-cp -a /usr/local/nginx/conf/pagespeedhandler.conf /usr/local/nginx/conf/pagespeedhandler.conf_${DT}
+cp -a /usr/local/nginx/conf/pagespeedhandler.conf "/usr/local/nginx/conf/pagespeedhandler.conf_${DT}"
 }
 
 pagespeeduptasks() {
@@ -371,11 +458,21 @@ cecho "**********************************************************************" $
 
 #####################################################
 # if NGINX_PAGESPEED=n is disabled in centmin.sh do some commenting out
+# modified to support detecting ngx_pagespeed.so dynamic module + load module line
+# even if NGINX_PAGESPEED=n set https://community.centminmod.com/posts/47781/
 if [[ "$NGINX_PAGESPEED" = [nN] ]]; then
+  PSCHECK_DYNAMICMODULE=$(ls /usr/local/nginx/modules | grep -qw 'ngx_pagespeed.so'; echo $?)
+  PSCHECK_DYNAMICMODULELOAD=$(grep -qw 'ngx_pagespeed.so' /usr/local/nginx/conf/dynamic-modules.conf; echo $?)
   PSADMINCHECK=$(grep '^include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;' /usr/local/nginx/conf/nginx.conf)
 
+  # do not disable pagespeedadmin.conf if dynamic module and load module line detected
+  # for ngx_pagespeed.so
+  if [[ "$DYNAMIC_SUPPORT" = [yY] && "$PSCHECK_DYNAMICMODULE" -eq '0' && "$PSCHECK_DYNAMICMODULELOAD" -eq '0' ]]; then
+    # enable/uncomment pagespeedadmin.conf include line in nginx.conf if ngx_pagespeed.so dynamic module
+    # is detected and loaded
+    sed -i 's/^#include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;/include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;/g' /usr/local/nginx/conf/nginx.conf
   # disable pagespeedadmin.conf if enabled/uncommented
-  if [[ ! -z "$PSADMINCHECK" ]]; then
+  elif [[ ! -z "$PSADMINCHECK" ]]; then
     sed -i 's/^include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;/#include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;/g' /usr/local/nginx/conf/nginx.conf
   fi
 
@@ -388,17 +485,28 @@ if [[ "$NGINX_PAGESPEED" = [nN] ]]; then
     do
       echo
       echo "commenting out pagespeed includes in $v"
-      sed -i 's/include \/usr\/local\/nginx\/conf\/pagespeed.conf;/#include \/usr\/local\/nginx\/conf\/pagespeed.conf;/g' $v
-      sed -i 's/include \/usr\/local\/nginx\/conf\/pagespeedhandler.conf;/#include \/usr\/local\/nginx\/conf\/pagespeedhandler.conf;/g' $v
-      sed -i 's/include \/usr\/local\/nginx\/conf\/pagespeedstatslog.conf;/#include \/usr\/local\/nginx\/conf\/pagespeedstatslog.conf;/g' $v
+      sed -i 's/include \/usr\/local\/nginx\/conf\/pagespeed.conf;/#include \/usr\/local\/nginx\/conf\/pagespeed.conf;/g' "$v"
+      sed -i 's/include \/usr\/local\/nginx\/conf\/pagespeedhandler.conf;/#include \/usr\/local\/nginx\/conf\/pagespeedhandler.conf;/g' "$v"
+      sed -i 's/include \/usr\/local\/nginx\/conf\/pagespeedstatslog.conf;/#include \/usr\/local\/nginx\/conf\/pagespeedstatslog.conf;/g' "$v"
     done
   fi
 fi # NGINX_PAGESPEED=n
+
+if [[ "$NGINX_PAGESPEED" = [yY] ]]; then
+  PSADMINCHECK=$(grep '^#include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;' /usr/local/nginx/conf/nginx.conf)
+
+  # re-enable pagespeedadmin.conf if commented out
+  if [[ "$PSADMINCHECK" ]]; then
+    sed -i 's/^#include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;/include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;/g' /usr/local/nginx/conf/nginx.conf
+  fi
+fi
 #####################################################
 
 	if [ -d /var/ngx_pagespeed_cache ]; then
 	chmod 1777 /var/ngx_pagespeed_cache
-	chmod -R 1777 /var/ngx_pagespeed_cache/http,3A
+    if [ -d /var/ngx_pagespeed_cache/http ]; then
+	   chmod -R 1777 /var/ngx_pagespeed_cache/http,3A
+    fi
 	chown -R nginx:nginx /var/ngx_pagespeed_cache/
 	ls -lah /var | grep ngx_pagespeed_cache
 	fi
@@ -440,17 +548,19 @@ if [[ -f /usr/bin/pscontrol ]]; then
 PSSTATSCHECK=$(grep 'statson' /usr/bin/pscontrol)
 PSADMINCHECK=$(grep 'psadmin' /usr/bin/pscontrol)
 PSADMINFIXCHECK=$(grep '1.9.32.1 fixed' /usr/bin/pscontrol)
+PSCLEARCACHECHECK=$(grep 'ngx_pagespeed_cache' /usr/bin/pscontrol)
+PSUNPLUGCHECK=$(grep 'unplugged' /usr/bin/pscontrol)
 
-	if [[ -z "$PSSTATSCHECK" || -z "$PSADMINCHECK" || -z "$PSADMINFIXCHECK" ]]; then
-	rm -rf /usr/bin/pscontrol
-	rm -rf /usr/local/nginx/conf/pscontrol
-	genpscontrolfile
-	echo "cp /usr/local/nginx/conf/pscontrol /usr/bin/pscontrol"
-	cp /usr/local/nginx/conf/pscontrol /usr/bin/pscontrol
-	chmod 0700 /usr/bin/pscontrol
-	else
-	echo "/usr/bin/pscontrol already up to dated"
-	fi
+  if [[ -z "$PSUNPLUGCHECK" || -z "$PSSTATSCHECK" || -z "$PSADMINCHECK" || -z "$PSADMINFIXCHECK" || -z "$PSCLEARCACHECHECK" ]]; then
+    rm -rf /usr/bin/pscontrol
+    rm -rf /usr/local/nginx/conf/pscontrol
+    genpscontrolfile
+    echo "\cp -af /usr/local/nginx/conf/pscontrol /usr/bin/pscontrol"
+    \cp -af /usr/local/nginx/conf/pscontrol /usr/bin/pscontrol
+    chmod 0700 /usr/bin/pscontrol
+    else
+    echo "/usr/bin/pscontrol already up to dated"
+  fi
 fi
 
 # checks for ngx_pagespeed 1.8.31.2 beta introduced features
@@ -464,12 +574,51 @@ fi
 
 # checks for ngx_pagespeed 1.9.32.1 beta change
 # https://community.centminmod.com/threads/how-can-i-disable-it-after-installation.1603/#post-7665
-ADMINPSSWITCHCHECK=$(egrep '^pagespeed on;|pagespeed off;' /usr/local/nginx/conf/pagespeedadmin.conf)
+if [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f1)" -ge '1' ]] && [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f2)" -ge '13' ]] && [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f3)" -ge '35' ]]; then
+  ADMINPSSWITCHCHECK=$(egrep '^pagespeed on;|pagespeed unplugged;' /usr/local/nginx/conf/pagespeedadmin.conf)
+elif [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f1)" -ge '1' ]] && [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f2)" -lt '13' ]] && [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f3)" -lt '35' ]]; then
+  ADMINPSSWITCHCHECK=$(egrep '^pagespeed on;|pagespeed off;' /usr/local/nginx/conf/pagespeedadmin.conf)
+fi
 
 if [[ -z "$ADMINPSSWITCHCHECK" || ! -f /usr/local/nginx/conf/pagespeedadmin.conf ]]; then
   makepsadmin
   # makepsconf
   makepshandler
+fi
+
+if [[ "$NGINX_PAGESPEED" = [yY] ]]; then
+  # 1.13.35.1 deprecated pagespeed off > pagespeed unplugged
+  if [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f1)" -ge '1' ]] && [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f2)" -ge '13' ]] && [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f3)" -ge '35' ]]; then
+    CHECKNGXPS_UNPLUG=$(grep 'pagespeed off;' /usr/local/nginx/conf/pagespeed.conf)
+    if [[ "$CHECKNGXPS_UNPLUG" ]]; then
+      sed -i 's|pagespeed off;|pagespeed unplugged;|g' /usr/local/nginx/conf/pagespeed.conf
+      if [[ -f /usr/bin/pscontrol ]]; then
+        sed -i 's|pagespeed off|pagespeed unplugged|g' /usr/bin/pscontrol
+      fi
+    fi
+    CHECKNGXPSADMIN_UNPLUG=$(grep 'pagespeed off;' /usr/local/nginx/conf/pagespeedadmin.conf)
+    if [[ "$CHECKNGXPSADMIN_UNPLUG" ]]; then
+      sed -i 's|pagespeed off;|pagespeed unplugged;|g' /usr/local/nginx/conf/pagespeedadmin.conf
+      if [[ -f /usr/bin/pscontrol ]]; then
+        sed -i 's|pagespeed off|pagespeed unplugged|g' /usr/bin/pscontrol
+      fi
+    fi
+  elif [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f1)" -ge '1' ]] && [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f2)" -lt '13' ]] && [[ "$(echo "$NGXPGSPEED_VER" | cut -d . -f3)" -lt '35' ]]; then
+    CHECKNGXPS_UNPLUG=$(grep 'pagespeed unplugged;' /usr/local/nginx/conf/pagespeed.conf)
+    if [[ "$CHECKNGXPS_UNPLUG" ]]; then
+      sed -i 's|pagespeed unplugged;|pagespeed off;|g' /usr/local/nginx/conf/pagespeed.conf
+      if [[ -f /usr/bin/pscontrol ]]; then
+        sed -i 's|pagespeed unplugged|pagespeed off|g' /usr/bin/pscontrol
+      fi
+    fi
+    CHECKNGXPSADMIN_UNPLUG=$(grep 'pagespeed unplugged;' /usr/local/nginx/conf/pagespeedadmin.conf)
+    if [[ "$CHECKNGXPSADMIN_UNPLUG" ]]; then
+      sed -i 's|pagespeed unplugged;|pagespeed off;|g' /usr/local/nginx/conf/pagespeedadmin.conf
+      if [[ -f /usr/bin/pscontrol ]]; then
+        sed -i 's|pagespeed unplugged|pagespeed off|g' /usr/bin/pscontrol
+      fi
+    fi
+  fi
 fi
 
 # check for 1.8.31.3 change from ngx_pagespeed_static to pagespeed_static
@@ -479,10 +628,13 @@ if [[ -z "$PSSTATSCHECK" ]]; then
   makepshandler
 fi
 
+ngxpagespeed_setpipepatch
 
 } #pagespeeduptasks
 
 ngxpagespeedinstall() {
+
+  nginx_libuuid
 
 if [[ ! -f /usr/local/nginx/conf/pagespeed.conf ]]; then
 echo ""
@@ -535,8 +687,8 @@ genpscontrolfile
 fi
 
 if [[ ! -f /usr/bin/pscontrol ]]; then
-echo "cp /usr/local/nginx/conf/pscontrol /usr/bin/pscontrol"
-cp /usr/local/nginx/conf/pscontrol /usr/bin/pscontrol
+echo "\cp -af /usr/local/nginx/conf/pscontrol /usr/bin/pscontrol"
+\cp -af /usr/local/nginx/conf/pscontrol /usr/bin/pscontrol
 chmod 0700 /usr/bin/pscontrol
 else
 echo "/usr/bin/pscontrol already exists"

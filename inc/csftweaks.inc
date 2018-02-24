@@ -1,3 +1,17 @@
+reduceports() {
+    PORTS_TOCHECK='3000 3334 8080 8888 9312 6081 6082 30865'
+    # reduce number of whitelisted open ports setup by csf install routine
+    # double check if any services are listening on these ports before removal
+    for p in $PORTS_TOCHECK; do
+        if [[ -z "$(netstat -plnt | awk '{print $4}' | grep "$p")" ]]; then
+            # grep --color ",$p," /etc/csf/csf.conf
+            sed -i "s|,$p,|,|g" /etc/csf/csf.conf
+            # sed -e "s|,$p,|,|g" /etc/csf/csf.conf |egrep --color '^TCP_|^TCP6_|^UDP_|^UDP6_'
+        fi
+    done
+    # csf -r >/dev/null 2>&1
+}
+
 rpcnfsports() {
     # remove RPC/portmapper and NFS ports 111 and 2049 
     # from CSF Firewall whitelist by default so that folks who 
@@ -42,14 +56,62 @@ rpcnfsports() {
     fi
 }
 
+setiplimits(){
+    # only applies to non-openvz systems which have ipset detected support otherwise
+    # DENY_IP_LIMIT & DENY_TEMP_IP_LIMIT are both set to 200 for openvz systems or
+    # not-openvz systems without a linux kernel to support ipset hashed ip sets
+  CSFTOTALMEM=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+  if [[ "$CSFTOTALMEM" -ge '65000001' ]]; then
+    sed -i 's/^DENY_IP_LIMIT = .*/DENY_IP_LIMIT = \"20000\"/' /etc/csf/csf.conf
+    sed -i 's/^DENY_TEMP_IP_LIMIT = .*/DENY_TEMP_IP_LIMIT = \"30000\"/' /etc/csf/csf.conf
+  elif [[ "$CSFTOTALMEM" -gt '32500001' && "$CSFTOTALMEM" -le '65000000' ]]; then
+    sed -i 's/^DENY_IP_LIMIT = .*/DENY_IP_LIMIT = \"15000\"/' /etc/csf/csf.conf
+    sed -i 's/^DENY_TEMP_IP_LIMIT = .*/DENY_TEMP_IP_LIMIT = \"20000\"/' /etc/csf/csf.conf
+  elif [[ "$CSFTOTALMEM" -gt '16250001' && "$CSFTOTALMEM" -le '32500000' ]]; then
+    sed -i 's/^DENY_IP_LIMIT = .*/DENY_IP_LIMIT = \"10000\"/' /etc/csf/csf.conf
+    sed -i 's/^DENY_TEMP_IP_LIMIT = .*/DENY_TEMP_IP_LIMIT = \"15000\"/' /etc/csf/csf.conf
+  elif [[ "$CSFTOTALMEM" -gt '8125001' && "$CSFTOTALMEM" -le '16250000' ]]; then
+    sed -i 's/^DENY_IP_LIMIT = .*/DENY_IP_LIMIT = \"8000\"/' /etc/csf/csf.conf
+    sed -i 's/^DENY_TEMP_IP_LIMIT = .*/DENY_TEMP_IP_LIMIT = \"10000\"/' /etc/csf/csf.conf
+  elif [[ "$CSFTOTALMEM" -gt '4062501' && "$CSFTOTALMEM" -le '8125000' ]]; then
+    sed -i 's/^DENY_IP_LIMIT = .*/DENY_IP_LIMIT = \"6000\"/' /etc/csf/csf.conf
+    sed -i 's/^DENY_TEMP_IP_LIMIT = .*/DENY_TEMP_IP_LIMIT = \"8000\"/' /etc/csf/csf.conf
+  elif [[ "$CSFTOTALMEM" -gt '2045001' && "$CSFTOTALMEM" -le '4062500' ]]; then
+    sed -i 's/^DENY_IP_LIMIT = .*/DENY_IP_LIMIT = \"4000\"/' /etc/csf/csf.conf
+    sed -i 's/^DENY_TEMP_IP_LIMIT = .*/DENY_TEMP_IP_LIMIT = \"5000\"/' /etc/csf/csf.conf
+  elif [[ "$CSFTOTALMEM" -gt '1022501' && "$CSFTOTALMEM" -le '2045000' ]]; then
+    sed -i 's/^DENY_IP_LIMIT = .*/DENY_IP_LIMIT = \"1500\"/' /etc/csf/csf.conf
+    sed -i 's/^DENY_TEMP_IP_LIMIT = .*/DENY_TEMP_IP_LIMIT = \"3000\"/' /etc/csf/csf.conf
+  elif [[ "$CSFTOTALMEM" -le '1022500' ]]; then
+    sed -i 's/^DENY_IP_LIMIT = .*/DENY_IP_LIMIT = \"1000\"/' /etc/csf/csf.conf
+    sed -i 's/^DENY_TEMP_IP_LIMIT = .*/DENY_TEMP_IP_LIMIT = \"2000\"/' /etc/csf/csf.conf
+  fi
+}
+
 csftweaks() {
 if [ -f /etc/csf/csf.conf ]; then
-    echo "Custom configure CSF settings...set"
-    rpcnfsports
-if [ ! -z "$EMAIL" ]; then
+  # auto detect which SSHD port is default and auto update it for base
+  # csf firewall template
+  CSFSSHD_PORT='22'
+  DETECTED_PORT=$(awk '/^Port / {print $2}' /etc/ssh/sshd_config)
+  if [[ "$DETECTED_PORT" != '22' && -z "$(netstat -plant | grep sshd | grep ':22')" ]] && [[ -z "$(netstat -plant | grep sshd | grep ":$DETECTED_PORT")" ]]; then
+    echo "switching csf.conf SSHD port default from $CSFSSHD_PORT to detected SSHD port $DETECTED_PORT"
+    sed -i "s/,${CSFSSHD_PORT},/,${DETECTED_PORT},/" /etc/csf/csf.conf
+  fi
+  if [[ "$(cat /etc/csf/csf.conf | grep TCP_IN | grep ',,')" ]] && [[ "$(netstat -plant | grep sshd | grep ":${CSFSSHD_PORT}")" ]]; then
+    echo "correct bug that removed $CSFSSHD_PORT in CSF firewall TCP_IN entry"
+    echo "https://community.centminmod.com/posts/34444/"
+    sed -i "s/\,\,/,${CSFSSHD_PORT},/" /etc/csf/csf.conf
+  fi
+
+  # echo "Custom configure CSF settings...set"
+  rpcnfsports
+  reduceports
+  if [ ! -z "$EMAIL" ]; then
     sed -i "s/LF_ALERT_TO = \"\"/LF_ALERT_TO = \"$EMAIL\"/g" /etc/csf/csf.conf
-fi
+  fi
     #sed -i 's/LF_TRIGGER = "0"/LF_TRIGGER = "1"/g' /etc/csf/csf.conf
+    sed -i 's|USE_CONNTRACK = "1"|USE_CONNTRACK = "0"|g' /etc/csf/csf.conf
     sed -i 's/LF_IPSET = "0"/LF_IPSET = "1"/g' /etc/csf/csf.conf
     sed -i 's/LF_DSHIELD = "0"/LF_DSHIELD = "86400"/g' /etc/csf/csf.conf
     sed -i 's/LF_SPAMHAUS = "0"/LF_SPAMHAUS = "86400"/g' /etc/csf/csf.conf
@@ -69,8 +131,8 @@ fi
     sed -i 's/LF_FTPD = "10"/LF_FTPD = "3"/g' /etc/csf/csf.conf
 
     sed -i 's/LF_DISTATTACK = "0"/LF_DISTATTACK = "1"/g' /etc/csf/csf.conf
-    sed -i 's/LF_DISTFTP = "0"/LF_DISTFTP = "1"/g' /etc/csf/csf.conf
-    sed -i 's/LF_DISTFTP_UNIQ = "3"/LF_DISTFTP_UNIQ = "6"/g' /etc/csf/csf.conf
+    sed -i 's/LF_DISTFTP = "0"/LF_DISTFTP = "40"/g' /etc/csf/csf.conf
+    sed -i 's/LF_DISTFTP_UNIQ = "3"/LF_DISTFTP_UNIQ = "40"/g' /etc/csf/csf.conf
     sed -i 's/LF_DISTFTP_PERM = "3600"/LF_DISTFTP_PERM = "6000"/g' /etc/csf/csf.conf
 
     # enable CSF support of dynamic DNS
@@ -86,22 +148,29 @@ fi
             # does not work with OpenVZ VPS so only implement for non-OpenVZ
             yum -q -y install ipset ipset-devel
             sed -i 's/LF_IPSET = \"0\"/LF_IPSET = \"1\"/' /etc/csf/csf.conf
-            sed -i 's/DENY_IP_LIMIT = \"100\"/DENY_IP_LIMIT = \"3000\"/' /etc/csf/csf.conf
-            sed -i 's/DENY_TEMP_IP_LIMIT = \"100\"/DENY_TEMP_IP_LIMIT = \"3000\"/' /etc/csf/csf.conf
+            setiplimits
         elif [[ -f /usr/sbin/ipset ]]; then
             sed -i 's/LF_IPSET = \"0\"/LF_IPSET = \"1\"/' /etc/csf/csf.conf
-            sed -i 's/DENY_IP_LIMIT = \"100\"/DENY_IP_LIMIT = \"3000\"/' /etc/csf/csf.conf
-            sed -i 's/DENY_TEMP_IP_LIMIT = \"100\"/DENY_TEMP_IP_LIMIT = \"3000\"/' /etc/csf/csf.conf
+            setiplimits
         fi
     else
         sed -i 's/LF_IPSET = \"1\"/LF_IPSET = \"0\"/' /etc/csf/csf.conf
-        sed -i 's/DENY_IP_LIMIT = \"100\"/DENY_IP_LIMIT = \"200\"/' /etc/csf/csf.conf
-        sed -i 's/DENY_TEMP_IP_LIMIT = \"100\"/DENY_TEMP_IP_LIMIT = \"200\"/' /etc/csf/csf.conf
+        sed -i 's/^DENY_IP_LIMIT = .*/DENY_IP_LIMIT = \"200\"/' /etc/csf/csf.conf
+        sed -i 's/^DENY_TEMP_IP_LIMIT = .*/DENY_TEMP_IP_LIMIT = \"200\"/' /etc/csf/csf.conf
     fi
 
     sed -i 's/UDPFLOOD = \"0\"/UDPFLOOD = \"1\"/g' /etc/csf/csf.conf
-
     sed -i 's/UDPFLOOD_ALLOWUSER = \"named\"/UDPFLOOD_ALLOWUSER = \"named nsd\"/g' /etc/csf/csf.conf
+
+    # whitelist the SSH client IP from initial installation to prevent some
+    # instances of end user IP being blocked from CSF Firewall
+    if [[ "$INITIALINSTALL" = [yY] ]]; then
+        CMUSER_SSHCLIENTIP=$(echo $SSH_CLIENT | awk '{print $1}' | head -n1)
+        csf -a $CMUSER_SSHCLIENTIP # initialinstall_userip
+        echo "$CMUSER_SSHCLIENTIP" >> /etc/csf/csf.ignore
+    fi
+
+    cp -a /etc/csf/csf.conf /etc/csf/csf.conf-tweakbak
 
 fi
 }

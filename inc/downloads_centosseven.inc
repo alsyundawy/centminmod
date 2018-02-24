@@ -9,7 +9,7 @@ if [[ "$ATRPMSREPO_DISABLE" = [nN] ]]; then
   if [ -s "${CENTOSSEVENATRPMSFILE}" ]; then
     echo "${CENTOSSEVENATRPMSFILE} [found]"
     rpm --import http://packages.atrpms.net/RPM-GPG-KEY.atrpms
-    rpm -ivh ${CENTOSSEVENATRPMSFILE}
+    rpm -Uvh ${CENTOSSEVENATRPMSFILE}
     sed -i 's|enabled=1|enabled=0|g' /etc/yum.repos.d/atrpms.repo
     ERR=$?
     CCATRPMSCHECK="$ERR"
@@ -18,7 +18,7 @@ if [[ "$ATRPMSREPO_DISABLE" = [nN] ]]; then
         echo ""
       else
         cecho "Error: problem with ${CENTOSSEVENATRPMSFILE} install." $boldgreen
-        exit $ERR
+        # exit $ERR
       fi    
     else
     echo "Error: ${CENTOSSEVENATRPMSFILE} not found !!! Downloading now......"
@@ -33,7 +33,7 @@ if [[ "$ATRPMSREPO_DISABLE" = [nN] ]]; then
   else 
     cecho "Download done." $boldyellow
     rpm --import http://packages.atrpms.net/RPM-GPG-KEY.atrpms
-    rpm -ivh ${CENTOSSEVENATRPMSFILE}
+    rpm -Uvh ${CENTOSSEVENATRPMSFILE}
     sed -i 's|enabled=1|enabled=0|g' /etc/yum.repos.d/atrpms.repo
     ERR=$?
     CCATRPMSCHECK="$ERR"
@@ -42,7 +42,7 @@ if [[ "$ATRPMSREPO_DISABLE" = [nN] ]]; then
         echo ""
       else
         cecho "Error: problem with ${CENTOSSEVENATRPMSFILE} install." $boldgreen
-        exit $ERR
+        # exit $ERR
       fi
     fi
   
@@ -77,7 +77,7 @@ checklogdetails
   # exit #$ERROR
 else 
   cecho "Download done." $boldyellow
-  rpm -ivh --nosignature ${CENTOSSEVENAXIVOFILE}
+  rpm -Uvh --nosignature ${CENTOSSEVENAXIVOFILE}
   ERR=$?
   CCAXIVOCHECK="$ERR"
     if [ "$CCAXIVOCHECK" == '0' ]; then
@@ -85,7 +85,7 @@ else
       echo ""
     else
       cecho "Error: problem with ${CENTOSSEVENAXIVOFILE} install." $boldgreen
-      exit $ERR
+      # exit $ERR
     fi
   fi
 
@@ -108,7 +108,10 @@ if [[ "$REMIREPO_DISABLE" = [nN] ]]; then
 
   if [ -s "${CENTOSSEVENREMIFILE}" ]; then
     echo "${CENTOSSEVENREMIFILE} [found]"
-    rpm -ivh --nosignature ${CENTOSSEVENREMIFILE}
+    rpm --import http://rpms.remirepo.net/RPM-GPG-KEY-remi
+    rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2017
+    rpm -q gpg-pubkey --qf "%{summary} ->%{version}-%{release}\n"
+    rpm -Uvh --nosignature ${CENTOSSEVENREMIFILE}
     ERR=$?
     CCREMICHECK="$ERR"
       if [ "$CCREMICHECK" == '0' ]; then
@@ -116,7 +119,7 @@ if [[ "$REMIREPO_DISABLE" = [nN] ]]; then
         echo ""
       else
         cecho "Error: problem with ${CENTOSSEVENREMIFILE} install." $boldgreen
-        exit $ERR
+        # exit $ERR
       fi    
     else
     echo "Error: ${CENTOSSEVENREMIFILE} not found !!! Downloading now......"
@@ -130,7 +133,10 @@ if [[ "$REMIREPO_DISABLE" = [nN] ]]; then
     # exit #$ERROR
   else 
     cecho "Download done." $boldyellow
-    rpm -ivh --nosignature ${CENTOSSEVENREMIFILE}
+    rpm --import http://rpms.remirepo.net/RPM-GPG-KEY-remi
+    rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2017
+    rpm -q gpg-pubkey --qf "%{summary} ->%{version}-%{release}\n"
+    rpm -Uvh --nosignature ${CENTOSSEVENREMIFILE}
     ERR=$?
     CCREMICHECK="$ERR"
       if [ "$CCREMICHECK" == '0' ]; then
@@ -138,7 +144,7 @@ if [[ "$REMIREPO_DISABLE" = [nN] ]]; then
         echo ""
       else
         cecho "Error: problem with ${CENTOSSEVENREMIFILE} install." $boldgreen
-        exit $ERR
+        # exit $ERR
       fi
     fi
   
@@ -153,7 +159,7 @@ fi # REMIREPO_DISABLE
 ###############################################
 yumcentossevendownload() {
 
-if [[ "$CENTOSVER" = '7.0' || "$CENTOSVER" = '7.1' || "$CENTOSVER" = '7.2' || "$CENTOSVER" = '7.3' || "$CENTOSVER" = '7.4' || "$CENTOSVER" = '7.5' || "$CENTOSVER" = '7.6' || "$CENTOSVER" = '7.7' ]]; then
+if [[ "$CENTOS_SEVEN" = '7' ]]; then
 {
 echo "*************************************************"
 cecho "* CentOS 7.x detected installing EPEL Repo" $boldgreen
@@ -188,8 +194,8 @@ elif [ ! -f /etc/yum.repos.d/epel.repo ]; then
   else 
 	 cecho "Download done." $boldyellow
     rpm --import http://epel.mirror.constant.com/RPM-GPG-KEY-EPEL-7
-    rpm -i ${CENTOSSEVENEPELFILE}
-	 #yum${CACHESKIP} -q list ccache 2>&1 >/dev/null
+    rpm -Uvh ${CENTOSSEVENEPELFILE}
+	 #${YUMDNFBIN}${CACHESKIP} -q list ccache 2>&1 >/dev/null
 	 ERR=$?
 	 CCEPELCHECK="$ERR"
 		  if [ "$CCEPELCHECK" == '0' ]; then
@@ -197,7 +203,7 @@ elif [ ! -f /etc/yum.repos.d/epel.repo ]; then
 			 echo ""
 		  else
 			 cecho "Error: problem with ${CENTOSSEVENEPELFILE} install." $boldgreen
-			 exit $ERR
+			 # exit $ERR
 		  fi
 	 fi
   fi
@@ -218,7 +224,7 @@ if [[ "$RPMFORGEREPO_DISABLE" = [nN] ]]; then
   if [ -s "${CENTOSSEVENRPMFORGEFILE}" ]; then
     echo "${CENTOSSEVENRPMFORGEFILE} [found]"
   rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt
-  rpm -i ${CENTOSSEVENRPMFORGEFILE}    
+  rpm -Uvh ${CENTOSSEVENRPMFORGEFILE}    
     ERR=$?
     CCRPMFORGECHECK="$ERR"
       if [ "$CCRPMFORGECHECK" == '0' ]; then
@@ -240,8 +246,8 @@ if [[ "$RPMFORGEREPO_DISABLE" = [nN] ]]; then
   else 
           cecho "Download done." $boldyellow
   rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt
-  rpm -i ${CENTOSSEVENRPMFORGEFILE}
-    yum${CACHESKIP} -q list axel 2>&1 >/dev/null
+  rpm -Uvh ${CENTOSSEVENRPMFORGEFILE}
+    # ${YUMDNFBIN}${CACHESKIP} -q list axel 2>&1 >/dev/null
     ERR=$?
     CCRPMFORGECHECK="$ERR"
       if [ "$CCRPMFORGECHECK" == '0' ]; then
@@ -273,7 +279,7 @@ checklogdetails
 else 
          cecho "Download done." $boldyellow
 rpm --import http://centos.alt.ru/pub/repository/centos/RPM-GPG-KEY-CentALT
-rpm -i ${CENTOSSEVENCENTALTFILE}
+rpm -Uvh ${CENTOSSEVENCENTALTFILE}
 yumpriorcentalt
 echo ""
   fi
@@ -286,7 +292,7 @@ fi # CENTALTREPO_DISABLE
 if [ -s "${CENTOSSEVENPERCONALRELEASEFILE}" ]; then
   echo "${CENTOSSEVENPERCONALRELEASEFILE} [found]"
   rpm --import http://www.percona.com/downloads/RPM-GPG-KEY-percona
-  rpm -i ${CENTOSSEVENPERCONALRELEASEFILE}  
+  rpm -Uvh ${CENTOSSEVENPERCONALRELEASEFILE}  
   ERR=$?
   CCPERCONACHECK="$ERR"
     if [ "$CCPERCONACHECK" == '0' ]; then
@@ -294,7 +300,7 @@ if [ -s "${CENTOSSEVENPERCONALRELEASEFILE}" ]; then
       echo ""
     else
       cecho "Error: problem with ${CENTOSSEVENPERCONALRELEASEFILE} install." $boldgreen
-      exit $ERR
+      # exit $ERR
     fi  
   else
   echo "Error: ${CENTOSSEVENPERCONALRELEASEFILE} not found !!! Downloading now......"
@@ -308,7 +314,7 @@ checklogdetails
 else 
          cecho "Download done." $boldyellow
 rpm --import http://www.percona.com/downloads/RPM-GPG-KEY-percona
-rpm -i ${CENTOSSEVENPERCONALRELEASEFILE}
+rpm -Uvh ${CENTOSSEVENPERCONALRELEASEFILE}
   #yum -q list axel 2>&1 >/dev/null
   ERR=$?
   CCPERCONACHECK="$ERR"
@@ -317,54 +323,16 @@ rpm -i ${CENTOSSEVENPERCONALRELEASEFILE}
       echo ""
     else
       cecho "Error: problem with ${CENTOSSEVENPERCONALRELEASEFILE} install." $boldgreen
-      exit $ERR
+      # exit $ERR
     fi
   fi
 
 fi
 
-    cd $DIR_TMP
-
-if [ -s "${CENTOSSEVENVARNISHFILE}" ]; then
-  echo "${CENTOSSEVENVARNISHFILE} [found]"
-  rpm --nosignature -i ${CENTOSSEVENVARNISHFILE}
-  ERR=$?
-  CCVARNISHCHECK="$ERR"
-    if [ "$CCVARNISHCHECK" == '0' ]; then
-      sed -i 's|el6|el7|g' /etc/yum.repos.d/varnish.repo
-      yumpriorvarnish
-      echo ""
-    else
-      cecho "Error: problem with ${CENTOSSEVENVARNISHFILE} install." $boldgreen
-      exit $ERR
-    fi  
-  else
-  echo "Error: ${CENTOSSEVENVARNISHFILE} not found !!! Downloading now......"
-  wget ${WGETOPT} ${CENTOSSEVENVARNISH} --tries=3
-  # wget ${WGETOPT} ${CENTOSSEVENVARNISHLOCAL} --tries=3
-ERROR=$?
-  if [[ "$ERROR" != '0' ]]; then
-  cecho "Error: ${CENTOSSEVENVARNISHFILE} download failed." $boldgreen
-FAILVARNISH='y'
-checklogdetails
-  # exit #$ERROR
-else 
-         cecho "Download done." $boldyellow
-
-rpm --nosignature -i ${CENTOSSEVENVARNISHFILE}
-  #yum -q list axel 2>&1 >/dev/null
-  ERR=$?
-  CCVARNISHCHECK="$ERR"
-    if [ "$CCVARNISHCHECK" == '0' ]; then
-      yumpriorvarnish
-      echo ""
-    else
-      cecho "Error: problem with ${CENTOSSEVENVARNISHFILE} install." $boldgreen
-      exit $ERR
-    fi
-  fi
-
-fi
+  if [[ "$(uname -m)" = 'x86_64' ]]; then
+    varnishfour_setup
+    yumpriorvarnish
+  fi # 64bit only
 
 ####
 # axivo centos 6.x 64bit only
@@ -374,7 +342,7 @@ remisevenyum
 atrpmssevenyum
 
 # CentOS 7 repo mirrors aren't fully updated so need to specify actual kernel-headers version
-PACKAGEEXTRA='clang clang-devel jemalloc jemalloc-devel pngquant optipng jpegoptim pwgen aria2 pigz pbzip2 xz pxz lz4 uw-imap-devel libtidy libtidy-devel libJudy axel glances bash-completion mlocate re2c libmcrypt libmcrypt-devel kernel-headers kernel-devel cmake28'
+PACKAGEEXTRA='figlet moreutils libzip5 libzip5-devel nghttp2 libnghttp2 libnghttp2-devel clang clang-devel jemalloc jemalloc-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 uw-imap-devel libtidy libtidy-devel libJudy axel glances bash-completion bash-completion-extras mlocate re2c libmcrypt libmcrypt-devel kernel-headers kernel-devel cmake28'
 
 declare -a arrays
 arrays=(${PACKAGEEXTRA})
@@ -386,20 +354,24 @@ if [ ! -f /usr/local/src/curlinstall_yum.txt ]; then
 for pkgs in ${arrays[@]}
 do
 echo Processing package: $pkgs
-YUMINSTALLRPMCHECKS=$(rpm -qa $pkgs)
-#echo $YUMINSTALLRPMCHECKS
-        if [ "$YUMINSTALLRPMCHECKS" ]; then
+YUMINSTALLRPMCHECK=$(rpm -ql $pkgs >/dev/null 2>&1; echo $?)
+#echo $YUMINSTALLRPMCHECK
+        if [[ "$YUMINSTALLRPMCHECK" = '0' ]]; then
 echo "----------------------------------------------------------------------------------"
-        # yum${CACHESKIP} -q -y update $pkgs
-        # yum${CACHESKIP} -q list $pkgs
-        echo "$pkg already installed"
+        # ${YUMDNFBIN}${CACHESKIP} -q -y update $pkgs
+        # ${YUMDNFBIN}${CACHESKIP} -q list $pkgs
+        echo "$pkgs already installed"
 echo "----------------------------------------------------------------------------------"
         else
 echo "----------------------------------------------------------------------------------"
 cecho "Installing $pkgs" $boldyellow
 echo "----------------------------------------------------------------------------------"
-        yum${CACHESKIP} -q -y install $pkgs
-        # yum${CACHESKIP} -q list $pkgs
+      if [[ "$pkgs" = 'libzip5' || "$pkgs" = 'libzip5-devel' ]]; then
+        ${YUMDNFBIN}${CACHESKIP} -q -y install $pkgs --enablerepo=remi
+      else
+        ${YUMDNFBIN}${CACHESKIP} -q -y install $pkgs
+      fi
+        # ${YUMDNFBIN}${CACHESKIP} -q list $pkgs
 echo "----------------------------------------------------------------------------------"
         fi
 done

@@ -5,12 +5,24 @@
 # reuse locally for new installs without having
 # to redownload the entire info
 ################################################
-DT=`date +"%d%m%y-%H%M%S"`
+DT=$(date +"%d%m%y-%H%M%S")
 PKGBASE='/home'
 PKGDIR="${PKGBASE}/centminmod_pkg"
 PKGNAME='centminmod_pkg'
 
 ################################################
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+
+shopt -s expand_aliases
+for g in "" e f; do
+    alias ${g}grep="LC_ALL=C ${g}grep"  # speed-up grep, egrep, fgrep
+done
+
 mkdir -p $PKGDIR
 
 cd /svr-setup

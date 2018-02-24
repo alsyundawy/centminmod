@@ -1,12 +1,13 @@
-Note: 1.2.3-eva2000.08 stable = Github branch 123.08stable and is not official released until after July 31, 2015
+[![GitHub stars](https://img.shields.io/github/stars/centminmod/centminmod.svg?style=flat-square)](https://github.com/centminmod/centminmod/stargazers) [![GitHub forks](https://img.shields.io/github/forks/centminmod/centminmod.svg?style=flat-square)](https://github.com/centminmod/centminmod/network) [![GitHub issues](https://img.shields.io/github/issues/centminmod/centminmod.svg?style=flat-square)](https://github.com/centminmod/centminmod/issues) [![GitHub license](https://img.shields.io/badge/license-AGPL-blue.svg?style=flat-square)](https://raw.githubusercontent.com/centminmod/centminmod/master/license.txt)
 
-Centmin Mod can be installed via 3 different ways:
+![Centmin Mod](/centmin-mod-logo2.jpg)
 
-1. Centmin Mod Unattended Command Line Install
+Centmin Mod can be installed via 2 different ways or latest install instructions on [Official Install Guide](https://centminmod.com/install.html):
+
+1. Centmin Mod Unattended Command Line Install (highly recommended)
 2. Centmin Mod installed via Git
-3. Centmin Mod installed via Github zip download
 
-After install bookmark and read the [Getting Started Guide](http://centminmod.com/getstarted.html) and check out the Centmin Mod Community forum at [https://community.centminmod.com](https://community.centminmod.com)
+After install bookmark and read the [Getting Started Guide](https://centminmod.com/getstarted.html) and check out the Centmin Mod Community forum at [https://community.centminmod.com](https://community.centminmod.com)
 
 ## Centmin Mod Unattended Command Line Install
 
@@ -14,11 +15,11 @@ Fastest method of install and allows fully unattended installation. Just type th
 
 ### For latest 1.2.3-eva2000.08 stable install
 
-    curl -O https://centminmod.com/installer.sh && chmod 0700 installer.sh && bash installer.sh
+    yum -y update; curl -O https://centminmod.com/installer.sh && chmod 0700 installer.sh && bash installer.sh
 
 ### For latest 1.2.3-eva2000.09 beta install
 
-    curl -O https://centminmod.com/betainstaller.sh && chmod 0700 betainstaller.sh && bash betainstaller.sh
+    yum -y update; curl -O https://centminmod.com/betainstaller.sh && chmod 0700 betainstaller.sh && bash betainstaller.sh
 
 ## Centmin Mod installed via Git    
 
@@ -40,33 +41,21 @@ or for CLI install mode
 
     ./centmin.sh install    
 
-## Centmin Mod installed via Github zip download
+## Contributing
 
+Below are guidelines for contributing code wise. 
 
-### Step 1.
+* [Centmin Mod Insights forum](https://community.centminmod.com/forums/centmin-mod-insights.20/) is the place to ask questions or clarifications about how Centmin Mod works under the hood.
+* Every Git committed code also has a corresponding forum thread in [Centmin Mod Github.com Repo forums](https://community.centminmod.com/link-forums/centmin-mod-github-com-repository.13/) if you're more comfortable using the forums instead of the [Github issue tracker](https://github.com/centminmod/centminmod/issues).
 
+# Bug Reports
 
-Select the branch you want to install from list at https://github.com/centminmod/centminmod/branches and use the following command (in your SSH console) to set it:
+* Bug reports can be made via [Github issue tracker](https://github.com/centminmod/centminmod/issues) or Centmin Mod official forum's [Bug Reports forums](https://community.centminmod.com/forums/bug-reports.12/).
 
-    branchname=123.08stable
+# Pull Requests
 
-### Step 2.
+* Pull requests can be done against the current [Github active branches](https://github.com/centminmod/centminmod/branches/active) - currently being [123.08stable](https://github.com/centminmod/centminmod/tree/123.08stable) and [123.09beta01](https://github.com/centminmod/centminmod/tree/123.09beta01). Usually once weekly, active branch changes are then merged into [master branch](https://github.com/centminmod/centminmod).
 
+# Suggestions
 
-To get the Centmin Mod files, run the following commands in a console as root. These commands will download the files to `/usr/local/src/centminmod`
-
-    yum -y install wget nano bc unzip
-    branchname=123.08stable
-    wget -O /usr/local/src/${branchname}.zip https://github.com/centminmod/centminmod/archive/${branchname}.zip
-    cd /usr/local/src
-    unzip ${branchname}.zip
-    mv centminmod-${branchname} centminmod
-    cd centminmod
-
-To run the actual install in menu mode run `centmin.sh` (still as root) and select menu option 1 to install:
-
-    ./centmin.sh
-
-or to install in CLI mode:
-
-    ./centmin.sh install
+* Suggestions and feedback can be made via [Github issue tracker](https://github.com/centminmod/centminmod/issues) or Centmin Mod official forum's [Feature Requests & Suggestions forums](https://community.centminmod.com/forums/feature-requests-suggestions.11/).
