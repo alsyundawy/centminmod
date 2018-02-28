@@ -1,3 +1,12 @@
+ngx_gzipbuffersfix() {
+  # raising default gzip_buffers setting to accommodate very very
+  # large javascript js file libraries that can be as large as 5+ MB
+  if [[ -f /usr/local/nginx/conf/nginx.conf && "$(grep -w 'gzip_buffers      32 8k;' /usr/local/nginx/conf/nginx.conf)" ]]; then
+    sed -i 's|gzip_buffers .*|gzip_buffers      1024 8k;|' /usr/local/nginx/conf/nginx.conf
+    service nginx restart >/dev/null 2>&1
+  fi
+}
+
 pip_updates() {
   # for glances and psutil as glances is installed via outdated EPEL
   # yum repo but there's a new version available
@@ -1536,6 +1545,13 @@ cronpathadjust() {
 	# fi
 }
 
+crontabdisable_r() {
+  if [[ ! "$(grep -w 'crontab \(\)' /root/.bashrc)" ]]; then
+    # disable crontab -r commmand https://community.centminmod.com/threads/strange-cancellation-of-the-cron.14059/#post-59929
+    echo 'crontab () { [[ $@ =~ -[iel]*r ]] && echo '"r" not allowed' || command crontab "$@" ;}' >> /root/.bashrc
+  fi
+}
+
 xpowerby() {
 	# add x-powered-by header check
 	if [ -f /usr/local/nginx/conf/nginx.conf ]; then
@@ -2124,6 +2140,7 @@ yumfastmirror_check
 ovhkernelcheck
 fileperm_fixes
 cronpathadjust
+crontabdisable_r
 rclocalchecks
 checkovzkernels
 kernelchecks
@@ -2205,7 +2222,9 @@ if [[ "$INITIALINSTALL" != [yY] ]]; then
   disablelogs
   nginxlargefile_fix
   fix_phperrorlogperm
+  crontabdisable_r
   # pip_updates
+  ngx_gzipbuffersfix
 fi
 
 }
