@@ -69,6 +69,19 @@ if [ -f /proc/user_beancounters ]; then
     # MAKETHREADS_PHP=" -j$CPUS"
     # speed up make
     CPUS_MAKEPHP=$(grep -c "processor" /proc/cpuinfo)
+    if [[ "$(grep -o 'AMD EPYC 7601' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7601' ]]; then
+        # 7601 at 12 cpu cores has 3.20hz clock frequency https://en.wikichip.org/wiki/amd/epyc/7601
+        # while greater than 12 cpu cores downclocks to 2.70Ghz
+        CPUS_MAKEPHP=12
+    elif [[ "$(grep -o 'AMD EPYC 7551' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7551' ]]; then
+        # 7551P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7551p
+        # while greater than 12 cpu cores downclocks to 2.55Ghz
+        CPUS_MAKEPHP=12
+    elif [[ "$(grep -o 'AMD EPYC 7401' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7401' ]]; then
+        # 7401P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7401p
+        # while greater than 12 cpu cores downclocks to 2.8Ghz
+        CPUS_MAKEPHP=12
+    fi
     if [[ "$CPUS_MAKEPHP" -gt '8' ]]; then
         if [[ "$PHP_LTO" = [yY] ]]; then
           CPUS_MAKEPHP=$(echo "$CPUS_MAKEPHP" | bc)
@@ -974,6 +987,18 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
       export CFLAGS="-O3 $PHP_MTUNEOPT -pipe${PHPEXTRA_CFLAGS}"
     fi
 		export CXXFLAGS="$CFLAGS"
+  elif [[ "$(uname -m)" = 'x86_64' && "$CPUVENDOR" = 'AuthenticAMD' && "$CPU_MARCH" = 'znver1' ]] && [[ "$CLANG_PHP" = [nN] ]]; then
+    CCM=64
+    PHP_MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}"
+    # if only 1 cpu thread use -O2 to keep compile times sane
+    if [[ "$(grep -c "processor" /proc/cpuinfo)" -eq '1' ]]; then
+      export CFLAGS="-O2 $PHP_MTUNEOPT -pipe${PHPEXTRA_CFLAGS}"
+    elif [[ "$(grep -c "processor" /proc/cpuinfo)" -eq '2' ]]; then
+      export CFLAGS="-O2 $PHP_MTUNEOPT -pipe${PHPEXTRA_CFLAGS}"
+    else
+      export CFLAGS="-O3 $PHP_MTUNEOPT -pipe${PHPEXTRA_CFLAGS}"
+    fi
+    export CXXFLAGS="$CFLAGS"
   elif [[ "$(uname -m)" = 'x86_64' && "$CPUVENDOR" = 'GenuineIntel' && ! -z "$(echo $MARCHCHECK | grep 'core-avx-i')" ]] && [[ "$CLANG_PHP" = [nN] ]]; then
     CCM=64
     PHP_MTUNEOPT="-m${CCM} -mtune=native"

@@ -207,7 +207,7 @@ fi
 
 if [ ! -f /usr/bin/sar ]; then
   time $YUMDNFBIN -y -q install sysstat${DISABLEREPO_DNF}
-  if [[ "$(uname -m)" = 'x86_64' ]]; then
+  if [[ "$(uname -m)" = 'x86_64' || "$(uname -m)" = 'aarch64' ]]; then
     SARCALL='/usr/lib64/sa/sa1'
   else
     SARCALL='/usr/lib/sa/sa1'
@@ -228,7 +228,7 @@ if [ ! -f /usr/bin/sar ]; then
     systemctl enable sysstat.service
   fi
 elif [ -f /usr/bin/sar ]; then
-  if [[ "$(uname -m)" = 'x86_64' ]]; then
+  if [[ "$(uname -m)" = 'x86_64' || "$(uname -m)" = 'aarch64' ]]; then
     SARCALL='/usr/lib64/sa/sa1'
   else
     SARCALL='/usr/lib/sa/sa1'
@@ -809,6 +809,9 @@ net.netfilter.nf_conntrack_tcp_timeout_established = 28800
 net.netfilter.nf_conntrack_generic_timeout = 60
 net.ipv4.tcp_challenge_ack_limit = 999999999
 EOF
+        if [[ "$(grep -o 'AMD EPYC' /proc/cpuinfo | sort -u)" = 'AMD EPYC' ]]; then
+          echo "kernel.watchdog_thresh = 20" >> /etc/sysctl.d/101-sysctl.conf
+        fi
         /sbin/sysctl --system
             fi           
         fi
@@ -1102,7 +1105,7 @@ cd $INSTALLDIR
 #sed -i "s|PHPREDIS='y'|PHPREDIS='n'|" centmin.sh
 
 # switch from PHP 5.4.41 to 5.6.9 default with Zend Opcache
-sed -i "s|^PHP_VERSION='.*'|PHP_VERSION='7.1.14'|" centmin.sh
+sed -i "s|^PHP_VERSION='.*'|PHP_VERSION='7.1.15'|" centmin.sh
 sed -i "s|ZOPCACHEDFT='n'|ZOPCACHEDFT='y'|" centmin.sh
 
 # disable axivo yum repo

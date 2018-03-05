@@ -201,7 +201,21 @@ if [ -f /proc/user_beancounters ]; then
     # speed up make
     CPUS=$(grep -c "processor" /proc/cpuinfo)
     if [[ "$CPUS" -gt '8' ]]; then
-        CPUS=$(echo $(($CPUS+2)))
+        if [[ "$(grep -o 'AMD EPYC 7601' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7601' ]]; then
+            # 7601 at 12 cpu cores has 3.20hz clock frequency https://en.wikichip.org/wiki/amd/epyc/7601
+            # while greater than 12 cpu cores downclocks to 2.70Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7551' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7551' ]]; then
+            # 7551P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7551p
+            # while greater than 12 cpu cores downclocks to 2.55Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7401' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7401' ]]; then
+            # 7401P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7401p
+            # while greater than 12 cpu cores downclocks to 2.8Ghz
+            CPUS=12
+        else
+            CPUS=$(echo $(($CPUS+2)))
+        fi
     else
         CPUS=$(echo $(($CPUS+1)))
     fi
@@ -210,7 +224,21 @@ else
     # speed up make
     CPUS=$(grep -c "processor" /proc/cpuinfo)
     if [[ "$CPUS" -gt '8' ]]; then
-        CPUS=$(echo $(($CPUS+4)))
+        if [[ "$(grep -o 'AMD EPYC 7601' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7601' ]]; then
+            # 7601 at 12 cpu cores has 3.20hz clock frequency https://en.wikichip.org/wiki/amd/epyc/7601
+            # while greater than 12 cpu cores downclocks to 2.70Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7551' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7551' ]]; then
+            # 7551P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7551p
+            # while greater than 12 cpu cores downclocks to 2.55Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7401' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7401' ]]; then
+            # 7401P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7401p
+            # while greater than 12 cpu cores downclocks to 2.8Ghz
+            CPUS=12
+        else
+            CPUS=$(echo $(($CPUS+4)))
+        fi
     elif [[ "$CPUS" -eq '8' ]]; then
         CPUS=$(echo $(($CPUS+2)))
     else
@@ -593,7 +621,7 @@ MAILPARSEPHP_VER='2.1.6'       # https://pecl.php.net/package/mailparse
 MAILPARSEPHP_COMPATVER='3.0.2' # For PHP 7
 MEMCACHED_INSTALL='y'          # Install Memcached
 LIBEVENT_VERSION='2.1.8'   # Use this version of Libevent
-MEMCACHED_VERSION='1.5.5'  # Use this version of Memcached server
+MEMCACHED_VERSION='1.5.6'  # Use this version of Memcached server
 MEMCACHE_VERSION='3.0.8'    # Use this version of Memcache
 MEMCACHEDPHP_VER='2.2.0'    # Memcached PHP extension not server
 MEMCACHEDPHP_SEVENVER='3.0.3' # Memcached PHP 7 only extension version
@@ -620,7 +648,7 @@ PHP_MEMCACHED='y'           # memcached PHP extension
 FFMPEGVER='0.6.0'
 SUHOSINVER='0.9.38'
 PHP_OVERWRITECONF='y'       # whether to show the php upgrade prompt to overwrite php-fpm.conf
-PHP_VERSION='5.6.33'        # Use this version of PHP
+PHP_VERSION='5.6.34'        # Use this version of PHP
 PHP_MIRRORURL='http://php.net'
 PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
 XCACHE_VERSION='3.2.0'      # Use this version of Xcache
@@ -1020,7 +1048,7 @@ fi
 
 if [ ! -f /usr/bin/sar ]; then
   time $YUMDNFBIN -y -q install sysstat${DISABLEREPO_DNF}
-  if [[ "$(uname -m)" = 'x86_64' ]]; then
+  if [[ "$(uname -m)" = 'x86_64' || "$(uname -m)" = 'aarch64' ]]; then
     SARCALL='/usr/lib64/sa/sa1'
   else
     SARCALL='/usr/lib/sa/sa1'
@@ -1035,7 +1063,7 @@ if [ ! -f /usr/bin/sar ]; then
     systemctl enable sysstat.service
   fi
 else
-  if [[ "$(uname -m)" = 'x86_64' ]]; then
+  if [[ "$(uname -m)" = 'x86_64' || "$(uname -m)" = 'aarch64' ]]; then
     SARCALL='/usr/lib64/sa/sa1'
   else
     SARCALL='/usr/lib/sa/sa1'
@@ -1498,8 +1526,12 @@ then
     echo "*************************************************"
     cecho "* Setting preferred localtime for VPS" $boldgreen
     echo "*************************************************"
-    rm -f /etc/localtime
-    ln -s "/usr/share/zoneinfo/$ZONEINFO" /etc/localtime
+    if [[ "$CENTOS_SIX" = '6' ]]; then
+        rm -f /etc/localtime
+        ln -s "/usr/share/zoneinfo/$ZONEINFO" /etc/localtime
+    elif [[ "$CENTOS_SEVEN" = '7' ]]; then
+        timedatectl set-timezone "$ZONEINFO"
+    fi
     echo "Current date & time for the zone you selected is:"
     date
 fi

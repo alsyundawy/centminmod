@@ -120,7 +120,21 @@ if [ -f /proc/user_beancounters ]; then
     # speed up make
     CPUS=$(grep -c "processor" /proc/cpuinfo)
     if [[ "$CPUS" -gt '8' ]]; then
-        CPUS=$(echo $(($CPUS+2)))
+        if [[ "$(grep -o 'AMD EPYC 7601' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7601' ]]; then
+            # 7601 at 12 cpu cores has 3.20hz clock frequency https://en.wikichip.org/wiki/amd/epyc/7601
+            # while greater than 12 cpu cores downclocks to 2.70Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7551' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7551' ]]; then
+            # 7551P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7551p
+            # while greater than 12 cpu cores downclocks to 2.55Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7401' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7401' ]]; then
+            # 7401P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7401p
+            # while greater than 12 cpu cores downclocks to 2.8Ghz
+            CPUS=12
+        else
+            CPUS=$(echo $(($CPUS+2)))
+        fi
     else
         CPUS=$(echo $(($CPUS+1)))
     fi
@@ -129,7 +143,21 @@ else
     # speed up make
     CPUS=$(grep -c "processor" /proc/cpuinfo)
     if [[ "$CPUS" -gt '8' ]]; then
-        CPUS=$(echo $(($CPUS+4)))
+        if [[ "$(grep -o 'AMD EPYC 7601' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7601' ]]; then
+            # 7601 at 12 cpu cores has 3.20hz clock frequency https://en.wikichip.org/wiki/amd/epyc/7601
+            # while greater than 12 cpu cores downclocks to 2.70Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7551' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7551' ]]; then
+            # 7551P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7551p
+            # while greater than 12 cpu cores downclocks to 2.55Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7401' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7401' ]]; then
+            # 7401P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7401p
+            # while greater than 12 cpu cores downclocks to 2.8Ghz
+            CPUS=12
+        else
+            CPUS=$(echo $(($CPUS+4)))
+        fi
     elif [[ "$CPUS" -eq '8' ]]; then
         CPUS=$(echo $(($CPUS+2)))
     else
@@ -209,7 +237,7 @@ fi
 
 if [ ! -f /usr/bin/sar ]; then
   time $YUMDNFBIN -y -q install sysstat${DISABLEREPO_DNF}
-  if [[ "$(uname -m)" = 'x86_64' ]]; then
+  if [[ "$(uname -m)" = 'x86_64' || "$(uname -m)" = 'aarch64' ]]; then
     SARCALL='/usr/lib64/sa/sa1'
   else
     SARCALL='/usr/lib/sa/sa1'
@@ -230,7 +258,7 @@ if [ ! -f /usr/bin/sar ]; then
     systemctl enable sysstat.service
   fi
 elif [ -f /usr/bin/sar ]; then
-  if [[ "$(uname -m)" = 'x86_64' ]]; then
+  if [[ "$(uname -m)" = 'x86_64' || "$(uname -m)" = 'aarch64' ]]; then
     SARCALL='/usr/lib64/sa/sa1'
   else
     SARCALL='/usr/lib/sa/sa1'
@@ -805,6 +833,9 @@ net.netfilter.nf_conntrack_tcp_timeout_established = 28800
 net.netfilter.nf_conntrack_generic_timeout = 60
 net.ipv4.tcp_challenge_ack_limit = 999999999
 EOF
+        if [[ "$(grep -o 'AMD EPYC' /proc/cpuinfo | sort -u)" = 'AMD EPYC' ]]; then
+          echo "kernel.watchdog_thresh = 20" >> /etc/sysctl.d/101-sysctl.conf
+        fi
         /sbin/sysctl --system
             fi           
         fi
@@ -1098,7 +1129,7 @@ cd $INSTALLDIR
 #sed -i "s|PHPREDIS='y'|PHPREDIS='n'|" centmin.sh
 
 # switch from PHP 5.4.41 to 5.6.9 default with Zend Opcache
-sed -i "s|^PHP_VERSION='.*'|PHP_VERSION='7.1.14'|" centmin.sh
+sed -i "s|^PHP_VERSION='.*'|PHP_VERSION='7.1.15'|" centmin.sh
 sed -i "s|ZOPCACHEDFT='n'|ZOPCACHEDFT='y'|" centmin.sh
 
 # disable axivo yum repo
