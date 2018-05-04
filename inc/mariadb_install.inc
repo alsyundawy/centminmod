@@ -27,7 +27,7 @@ chmod 600 /var/log/mysqld.log
 ls -lah /var/log/mysqld.log
 echo
 
-MDB_COUNTRY=$(curl -s ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | awk '/country: / {print $2}')
+MDB_COUNTRY=$(curl -s https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | awk '/country: / {print $2}')
 
 # MariaDB yum mirrors may have connectivity issues for servers in China (CN)
 # so can use alternative mirrors for better speed and connectivity
@@ -296,6 +296,7 @@ cat >> "/etc/my.cnf" <<FFF
 
 [mariadb-10.1]
 innodb_file_format = Barracuda
+innodb_default_row_format = dynamic
 innodb_file_per_table = 1
 
 ## wsrep specific
@@ -401,7 +402,7 @@ cmservice mysql restart
     echo "mysql -t -e \"SHOW ENGINES;\""
     mysql -t -e "SHOW ENGINES;"
 
-	if [ "$UNATTENDED" == 'nn' ]; then
+    if [ "$UNATTENDED" == 'nn' ]; then
 echo ""
 echo "------------------------------------------------"
 echo "Updating MySQL database tables"
@@ -461,7 +462,7 @@ else
     mysql -t -e "SHOW ENGINES;"
 
 fi
-	fi #unattended
+    fi #unattended
 echo ""
 
 perdbiinstall
@@ -571,12 +572,12 @@ echo "rpm -Uvh MariaDB-server-${MDB_VERSION}.el5.${ARCH}.rpm"
 cmservice mysql status
 
 ERROR=$?
-	if [[ "$ERROR" != '0' ]]; then
-	echo ""
-	echo "MariaDB-server-${MDB_VERSION}.el5.${ARCH}.rpm not installed properly"
-	exit
-	echo ""
-	fi
+    if [[ "$ERROR" != '0' ]]; then
+    echo ""
+    echo "MariaDB-server-${MDB_VERSION}.el5.${ARCH}.rpm not installed properly"
+    exit
+    echo ""
+    fi
 
 cecho "Ensure mysql system directory has correct permissions" $boldgreen
 cecho " chown -R mysql:mysql /var/lib/mysql/mysql/" $boldgreen

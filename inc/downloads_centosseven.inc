@@ -186,26 +186,26 @@ elif [ ! -f /etc/yum.repos.d/epel.repo ]; then
     wget ${WGETOPT} ${CENTOSSEVENEPEL} --tries=3
     # wget ${WGETOPT} ${CENTOSSEVENEPELLOCAL} --tries=3
   ERROR=$?
-	 if [[ "$ERROR" != '0' ]]; then
-	 cecho "Error: ${CENTOSSEVENEPELFILE} download failed." $boldgreen
+   if [[ "$ERROR" != '0' ]]; then
+   cecho "Error: ${CENTOSSEVENEPELFILE} download failed." $boldgreen
   FAILEPEL='y'
   checklogdetails
-	 # exit #$ERROR
+   # exit #$ERROR
   else 
-	 cecho "Download done." $boldyellow
+   cecho "Download done." $boldyellow
     rpm --import http://epel.mirror.constant.com/RPM-GPG-KEY-EPEL-7
     rpm -Uvh ${CENTOSSEVENEPELFILE}
-	 #${YUMDNFBIN}${CACHESKIP} -q list ccache 2>&1 >/dev/null
-	 ERR=$?
-	 CCEPELCHECK="$ERR"
-		  if [ "$CCEPELCHECK" == '0' ]; then
-			 yumpriorepel
-			 echo ""
-		  else
-			 cecho "Error: problem with ${CENTOSSEVENEPELFILE} install." $boldgreen
-			 # exit $ERR
-		  fi
-	 fi
+   #${YUMDNFBIN}${CACHESKIP} -q list ccache 2>&1 >/dev/null
+   ERR=$?
+   CCEPELCHECK="$ERR"
+      if [ "$CCEPELCHECK" == '0' ]; then
+       yumpriorepel
+       echo ""
+      else
+       cecho "Error: problem with ${CENTOSSEVENEPELFILE} install." $boldgreen
+       # exit $ERR
+      fi
+   fi
   fi
 fi
 
@@ -332,7 +332,7 @@ fi
   if [[ "$(uname -m)" = 'x86_64' ]]; then
     varnishfour_setup
     yumpriorvarnish
-    if [[ "$INITIALINSTALL" = [yY] ]]; then
+    if [[ "$VARNISHREPO_DISABLE" = [nN] && "$INITIALINSTALL" = [yY] && -f "$VARNISH_REPOFILE" ]]; then
       # disable for install stage to speed up install
       yum-config-manager --disable varnishcache_varnish41 varnishcache_varnish41-source
     fi
@@ -342,8 +342,10 @@ fi
 # axivo centos 6.x 64bit only
 # axivoseven
 ####
-remisevenyum
-atrpmssevenyum
+if [[ "$(uname -m)" != 'aarch64' ]]; then
+  remisevenyum
+  atrpmssevenyum
+fi
 
 # CentOS 7 repo mirrors aren't fully updated so need to specify actual kernel-headers version
 PACKAGEEXTRA='figlet moreutils libzip5 libzip5-devel nghttp2 libnghttp2 libnghttp2-devel clang clang-devel jemalloc jemalloc-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 uw-imap-devel libtidy libtidy-devel libJudy axel glances bash-completion bash-completion-extras mlocate re2c libmcrypt libmcrypt-devel kernel-headers kernel-devel cmake28'

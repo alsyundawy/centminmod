@@ -187,7 +187,7 @@ mariadb102install() {
     fi
 
     echo "*************************************************"
-	cecho "MariaDB 10.2.x Repo setup..." $boldgreen
+    cecho "MariaDB 10.2.x Repo setup..." $boldgreen
    echo "*************************************************"
 echo ""
 
@@ -208,7 +208,7 @@ fi
 
 MARIADB55ARCH=`uname -m`
 
-MDB_COUNTRY=$(curl -s ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | awk '/country: / {print $2}')
+MDB_COUNTRY=$(curl -s https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | awk '/country: / {print $2}')
 
 # MariaDB yum mirrors may have connectivity issues for servers in China (CN)
 # so can use alternative mirrors for better speed and connectivity
@@ -428,7 +428,7 @@ cecho "yum -q -y install MariaDB-client MariaDB-common MariaDB-compat MariaDB-de
 echo ""
 time yum -y install MariaDB-client MariaDB-common MariaDB-compat MariaDB-devel MariaDB-server MariaDB-shared --disablerepo=epel --disableplugin=priorities
 
-\cp -f /etc/my.cnf /etc/my.cnf-newold
+\cp -af /etc/my.cnf /etc/my.cnf-newold-mariadb10-2
 echo ""
     echo "*************************************************"
     cecho "* Adjust old MariaDB 10.x /etc/my.cnf " $boldyellow
@@ -449,6 +449,7 @@ cat >>/etc/my.cnf<<FFF
 
 [mariadb-10.2]
 #innodb_file_format = Barracuda
+innodb_default_row_format = dynamic
 innodb_file_per_table = 1
 
 ## wsrep specific

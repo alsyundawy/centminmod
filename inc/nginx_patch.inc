@@ -1,5 +1,11 @@
 ngx_hpack_patch() {
-  if [ "$ngver" ]; then
+  if [[ "$ngver" && "$ngver" = 'master-google' ]]; then
+    DETECT_NGXVER=$(awk '/define nginx_version  / {print $3}' "/svr-setup/nginx-$ngver/src/core/nginx.h")
+    NGINX_PUSHBASE=$ngver
+    echo "$DETECT_NGXVER"
+    NGX_HPACK_OPT=""
+    NGINX_HPACK='n'
+  elif [ "$ngver" ]; then
     DETECT_NGXVER=$(awk '/define nginx_version  / {print $3}' "/svr-setup/nginx-$ngver/src/core/nginx.h")
     NGINX_PUSHBASE=$ngver
     echo "$DETECT_NGXVER"
@@ -22,7 +28,7 @@ ngx_hpack_patch() {
     echo "patching nginx http/2 full HPACK encoding for nginx 1.13.6+"
     popd
     NGX_HPACK_OPT=' --with-http_v2_hpack_enc'
-  elif [[ "$NGINX_HPACK" = [yY] && "$DETECT_NGXVER" -ge '1013009' ]]; then
+  elif [[ "$NGINX_HPACK" = [yY] && "$DETECT_NGXVER" -ge '1013009' && "$DETECT_NGXVER" -lt '1013010' ]]; then
     pushd "${DIR_TMP}/nginx-${NGINX_PUSHBASE}"
     cecho "patching nginx http/2 full HPACK encoding support" $boldyellow
     cecho "nginx-1.13.9_http2-hpack.patch" $boldyellow
@@ -34,6 +40,20 @@ ngx_hpack_patch() {
     echo "patching nginx http/2 full HPACK encoding for nginx 1.13.9+"
     popd
     NGX_HPACK_OPT=' --with-http_v2_hpack_enc'
+  elif [[ "$NGINX_HPACK" = [yY] && "$DETECT_NGXVER" -ge '1013010' ]] || [[ "$NGINX_HPACK" = [yY] && "$DETECT_NGXVER" -eq '1014000' ]]; then
+    pushd "${DIR_TMP}/nginx-${NGINX_PUSHBASE}"
+    cecho "patching nginx http/2 full HPACK encoding support" $boldyellow
+    cecho "nginx-1.13.10_http2-hpack.patch" $boldyellow
+    # rm -rf nginx-1.13.10_http2-hpack.patch
+    # wget -4 -cnv https://github.com/cloudflare/sslconfig/raw/hpack_1.13.1/patches/nginx-1.13.10_http2-hpack.patch
+    cecho "patch -p1 < $CUR_DIR/patches/cloudflare/nginx-1.13.10_http2-hpack.patch" $boldyellow
+    patch -p1 < $CUR_DIR/patches/cloudflare/nginx-1.13.10_http2-hpack.patch
+    echo 
+    echo "patching nginx http/2 full HPACK encoding for nginx 1.13.10+"
+    popd
+    NGX_HPACK_OPT=' --with-http_v2_hpack_enc'
+    # NGX_HPACK_OPT=""
+    # NGINX_HPACK='n'
   else
     NGX_HPACK_OPT=""
     NGINX_HPACK='n'
@@ -231,38 +251,38 @@ patchnginx() {
           cecho "$CUR_DIR/patches/nginx/openssl-110ticket.patch not found" $boldyellow
         fi
       elif [[ "$DETECT_NGXVER" -lt '1011000' ]]; then
-        # OPENSSL_VERSION='1.1.0g'
+        # OPENSSL_VERSION='1.1.0h'
         cecho "skipping patching due to Nginx version less than 1.11.0" $boldyellow
       fi
     fi
   fi
 
-	if [[ "$NGINX_HTTP2" = [yY] ]]; then
-		# assign NGX_VEREVAL nginx version based on if it's an initial
-		# centmin mod fresh install or a nginx upgrade run
-		if [[ "$INITIALINSTALL" != [yY] ]]; then
-			NGX_VEREVAL=${CUR_NGINXUPGRADEVER}
-		else
-			NGX_VEREVAL=${SET_NGINXVER}
-		fi
-		# only apply Nginx HTTP/2 patch if Nginx version is >= 1.9.3 and <1.9.5
-		if [[ "$NGX_VEREVAL" -ge '10903' && "$NGX_VEREVAL" -lt '10905' ]]; then
-			NGINX_SPDY=n
-			# http/2 patch
-			echo
-			cecho "patching nginx for http/2 support" $boldyellow
-			echo
-			cecho "wget -4 http://nginx.org/patches/http2/patch.http2.txt" $boldyellow
-			wget -4 http://nginx.org/patches/http2/patch.http2.txt
-		
-			cecho "patch -p1 < patch.http2.txt" $boldyellow
-			patch -p1 < patch.http2.txt
-		
-			echo
-			cecho "nginx patched for http/2" $boldyellow
-			echo
-		fi
-	fi
+  if [[ "$NGINX_HTTP2" = [yY] ]]; then
+    # assign NGX_VEREVAL nginx version based on if it's an initial
+    # centmin mod fresh install or a nginx upgrade run
+    if [[ "$INITIALINSTALL" != [yY] ]]; then
+      NGX_VEREVAL=${CUR_NGINXUPGRADEVER}
+    else
+      NGX_VEREVAL=${SET_NGINXVER}
+    fi
+    # only apply Nginx HTTP/2 patch if Nginx version is >= 1.9.3 and <1.9.5
+    if [[ "$NGX_VEREVAL" -ge '10903' && "$NGX_VEREVAL" -lt '10905' ]]; then
+      NGINX_SPDY=n
+      # http/2 patch
+      echo
+      cecho "patching nginx for http/2 support" $boldyellow
+      echo
+      cecho "wget -4 http://nginx.org/patches/http2/patch.http2.txt" $boldyellow
+      wget -4 http://nginx.org/patches/http2/patch.http2.txt
+    
+      cecho "patch -p1 < patch.http2.txt" $boldyellow
+      patch -p1 < patch.http2.txt
+    
+      echo
+      cecho "nginx patched for http/2" $boldyellow
+      echo
+    fi
+  fi
   if [[ "$NGINX_SPDYPATCHED" = [yY] ]]; then
      if [ -f "$(which figlet)" ]; then
          figlet -ckf standard "Cloudflare Nginx HTTP/2 + SPDY Patch"
@@ -291,7 +311,10 @@ patchnginx() {
       rm -rf "${NGINXSPDYPATCHED_NAME}"
      fi
   fi
-	if [[ "$NGINX_DYNAMICTLS" = [yY] ]]; then
+  if [[ "$ngver" && "$ngver" = 'master-google' ]]; then
+    NGINX_DYNAMICTLS='n'
+  fi
+  if [[ "$NGINX_DYNAMICTLS" = [yY] ]]; then
      if [ -f "$(which figlet)" ]; then
          figlet -ckf standard "Cloudflare Nginx Dynamic TLS Patch"
      fi
@@ -314,7 +337,7 @@ patchnginx() {
      rm -rf "${NGINXTLSPATCH_NAME}"
      if [[ "$DETECT_NGXVER" -le '1011004' && "$DETECT_NGXVER" -ge '1011000' ]]; then
       NGINXTLSPATCHLINK="https://raw.githubusercontent.com/cloudflare/sslconfig/master/patches/${NGINXTLSPATCH_NAME}"
-		  # fallback mirror if github down, use gitlab mirror
+      # fallback mirror if github down, use gitlab mirror
       curl -4Is --connect-timeout 5 --max-time 5 "${NGINXTLSPATCHLINK}" | grep 'HTTP\/' | egrep '200' >/dev/null 2>&1
       NGINXTLSPATCH_CURLCHECK=$?
       if [[ "$NGINXTLSPATCH_CURLCHECK" != '0' ]]; then
@@ -322,7 +345,7 @@ patchnginx() {
       fi
       wget -4 -cnv --no-check-certificate "$NGINXTLSPATCHLINK"
       if [[ -f "${NGINXTLSPATCH_NAME}" && ! "$(grep 'dyn_rec.threshold' src/event/ngx_event_openssl.c)" ]]; then
-    	   echo "patch -p1 < "${NGINXTLSPATCH_NAME}""
+         echo "patch -p1 < "${NGINXTLSPATCH_NAME}""
          patch -p1 < "${NGINXTLSPATCH_NAME}"
       fi
      elif [[ "$DETECT_NGXVER" -ge '1011005' ]]; then
@@ -332,16 +355,16 @@ patchnginx() {
       fi
      fi
   else
-  	 if [ -f "${NGINXTLSPATCH_NAME}" ]; then
-  		rm -rf "${NGINXTLSPATCH_NAME}"
-  	 fi
-	fi
+     if [ -f "${NGINXTLSPATCH_NAME}" ]; then
+      rm -rf "${NGINXTLSPATCH_NAME}"
+     fi
+  fi
   ngx_hpack_patch
 } 2>&1 | tee "${CENTMINLOGDIR}/patch_patchnginx_${DT}.log"
 }
 
 luapatch() {
-	if [ ! -f lua.patch ]; then
+  if [ ! -f lua.patch ]; then
     {
     # echo
     echo "patching lua for nginx 1.9.11 workaround"
@@ -356,30 +379,30 @@ luapatch() {
     fi
   } 2>&1 | tee "${CENTMINLOGDIR}/patch_luapatch_${DT}.log"
 
-	fi
+  fi
 }
 
 luaopensslpatch() {
-	# for lua-nginx-module 0.10 https://community.centminmod.com/posts/24549/
-	# echo
+  # for lua-nginx-module 0.10 https://community.centminmod.com/posts/24549/
+  # echo
   { 
-	echo "patching nginx for lua 0.10+ branch support"
-	if [ "$ngver" ]; then
-		pushd "$DIR_TMP/nginx-${ngver}"
-	else
-		pushd "$DIR_TMP/nginx-${NGINX_VERSION}"
-	fi
-	OPENRESTYLUAPATCHLINK='https://github.com/openresty/openresty/raw/master/patches/nginx-1.9.7-ssl_cert_cb_yield.patch'
-	
-	# fallback mirror if github down, use gitlab mirror
-	curl -4Is --connect-timeout 5 --max-time 5 $OPENRESTYLUAPATCHLINK | grep 'HTTP\/' | egrep '200|302' >/dev/null 2>&1
-	OPENRESTYLUAPATCH_CURLCHECK=$?
-	if [[ "$OPENRESTYLUAPATCH_CURLCHECK" != '0' ]]; then
-		OPENRESTYLUAPATCHLINK='https://gitlab.com/centminmod-github-mirror/openresty/raw/master/patches/nginx-1.9.7-ssl_cert_cb_yield.patch'
-	fi
-	wget "$OPENRESTYLUAPATCHLINK"
-	patch -p1 < nginx-1.9.7-ssl_cert_cb_yield.patch
-	popd
+  echo "patching nginx for lua 0.10+ branch support"
+  if [ "$ngver" ]; then
+    pushd "$DIR_TMP/nginx-${ngver}"
+  else
+    pushd "$DIR_TMP/nginx-${NGINX_VERSION}"
+  fi
+  OPENRESTYLUAPATCHLINK='https://github.com/openresty/openresty/raw/master/patches/nginx-1.9.7-ssl_cert_cb_yield.patch'
+  
+  # fallback mirror if github down, use gitlab mirror
+  curl -4Is --connect-timeout 5 --max-time 5 $OPENRESTYLUAPATCHLINK | grep 'HTTP\/' | egrep '200|302' >/dev/null 2>&1
+  OPENRESTYLUAPATCH_CURLCHECK=$?
+  if [[ "$OPENRESTYLUAPATCH_CURLCHECK" != '0' ]]; then
+    OPENRESTYLUAPATCHLINK='https://gitlab.com/centminmod-github-mirror/openresty/raw/master/patches/nginx-1.9.7-ssl_cert_cb_yield.patch'
+  fi
+  wget "$OPENRESTYLUAPATCHLINK"
+  patch -p1 < nginx-1.9.7-ssl_cert_cb_yield.patch
+  popd
 } 2>&1 | tee "${CENTMINLOGDIR}/patch_luaopensslpatch_${DT}.log"
 
 }
@@ -400,7 +423,7 @@ ngxpagespeed_patched() {
         patch -p1 < $CUR_DIR/patches/nginxpagespeed/nginxpagespeed-1134.patch
       fi
     fi
-	 popd
+   popd
   fi
 } 2>&1 | tee "${CENTMINLOGDIR}/patch_ngxpagespeed_patched_${DT}.log"
 

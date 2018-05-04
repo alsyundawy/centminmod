@@ -90,7 +90,7 @@ PHP_UPDATEMAINTENANCE='n'
 MARIADB_UPDATEMAINTENANCE='n'
 
 # Nginx
-NGINX_VERSION='1.13.9'       # Use this version of Nginx
+NGINX_VERSION='1.13.12'       # Use this version of Nginx
 NGINX_VHOSTSSL='y'           # enable centmin.sh menu 2 prompt to create self signed SSL vhost 2nd vhost conf
 NGINXBACKUP='y'
 VHOST_PRESTATICINC='y'       # add pre-staticfiles-local.conf & pre-staticfiles-global.conf include files
@@ -159,7 +159,7 @@ NGINX_LIBATOMIC='y'          # Nginx configured with libatomic support
 NGINX_HTTPREDIS='y'          # Nginx redis http://wiki.nginx.org/HttpRedisModule
 NGINX_HTTPREDISVER='0.3.7'   # Nginx redis version
 NGINX_PCREJIT='y'            # Nginx configured with pcre & pcre-jit support
-NGINX_PCREVER='8.41'         # Version of PCRE used for pcre-jit support in Nginx
+NGINX_PCREVER='8.42'         # Version of PCRE used for pcre-jit support in Nginx
 NGINX_ZLIBCUSTOM='y'         # Use custom zlib instead of system version
 NGINX_ZLIBVER='1.2.11'       # http://www.zlib.net/
 ORESTY_HEADERSMORE='y'       # openresty headers more https://github.com/openresty/headers-more-nginx-module
@@ -175,36 +175,36 @@ ORESTY_MEMCVER='0.18'        # openresty memc module https://github.com/openrest
 ORESTY_SRCCACHEVER='0.31'    # openresty subrequest cache module https://github.com/openresty/srcache-nginx-module
 ORESTY_DEVELKITVER='0.3.0'  # openresty ngx_devel_kit module https://github.com/simpl/ngx_devel_kit
 ORESTY_SETMISCGIT='n'        # use git master instead of version specific
-ORESTY_SETMISCVER='0.31'     # openresty set-misc-nginx module https://github.com/openresty/set-misc-nginx-module
+ORESTY_SETMISCVER='0.32'     # openresty set-misc-nginx module https://github.com/openresty/set-misc-nginx-module
 ORESTY_ECHOGIT='n'           # use git master instead of version specific
 ORESTY_ECHOVER='0.61'        # openresty set-misc-nginx module https://github.com/openresty/echo-nginx-module
-ORESTY_REDISVER='0.14'       # openresty redis2-nginx-module https://github.com/openresty/redis2-nginx-module
+ORESTY_REDISVER='0.15'       # openresty redis2-nginx-module https://github.com/openresty/redis2-nginx-module
 
 LUAJIT_GITINSTALL='y'        # opt to install luajit 2.1 from dev branch http://repo.or.cz/w/luajit-2.0.git/shortlog/refs/heads/v2.1
 LUAJIT_GITINSTALLVER='2.1'   # branch version = v2.1 will override ORESTY_LUAGITVER if LUAJIT_GITINSTALL='y'
 
 ORESTY_LUANGINX='n'             # enable or disable or ORESTY_LUA* nginx modules below
-ORESTY_LUANGINXVER='0.10.11'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
+ORESTY_LUANGINXVER='0.10.13'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
 ORESTY_LUAGITVER='2.0.5'        # luagit http://luajit.org/
 ORESTY_LUAMEMCACHEDVER='0.14'   # openresty https://github.com/openresty/lua-resty-memcached
-ORESTY_LUAMYSQLVER='0.20'    # openresty https://github.com/openresty/lua-resty-mysql
+ORESTY_LUAMYSQLVER='0.21'    # openresty https://github.com/openresty/lua-resty-mysql
 ORESTY_LUAREDISVER='0.26'       # openresty https://github.com/openresty/lua-resty-redis
-ORESTY_LUADNSVER='0.20'         # openresty https://github.com/openresty/lua-resty-dns
+ORESTY_LUADNSVER='0.21'         # openresty https://github.com/openresty/lua-resty-dns
 ORESTY_LUAUPLOADVER='0.10'      # openresty https://github.com/openresty/lua-resty-upload
 ORESTY_LUAWEBSOCKETVER='0.05'   # openresty https://github.com/openresty/lua-resty-websocket
 ORESTY_LUALOCKVER='0.07'        # openresty https://github.com/openresty/lua-resty-lock
-ORESTY_LUASTRINGVER='0.10'      # openresty https://github.com/openresty/lua-resty-string
+ORESTY_LUASTRINGVER='0.11rc1'      # openresty https://github.com/openresty/lua-resty-string
 ORESTY_LUAREDISPARSERVER='0.13'    # openresty https://github.com/openresty/lua-redis-parser
 ORESTY_LUAUPSTREAMCHECKVER='0.04'  # openresty https://github.com/openresty/lua-resty-upstream-healthcheck
-ORESTY_LUALRUCACHEVER='0.07'       # openresty https://github.com/openresty/lua-resty-lrucache
-ORESTY_LUARESTYCOREVER='0.1.13' # openresty https://github.com/openresty/lua-resty-core
+ORESTY_LUALRUCACHEVER='0.08'       # openresty https://github.com/openresty/lua-resty-lrucache
+ORESTY_LUARESTYCOREVER='0.1.15' # openresty https://github.com/openresty/lua-resty-core
 ORESTY_LUAUPSTREAMVER='0.06'       # openresty https://github.com/openresty/lua-upstream-nginx-module
 NGX_LUAUPSTREAM='n'                # disable https://github.com/openresty/lua-upstream-nginx-module
 ORESTY_LUALOGGERSOCKETVER='0.1'    # cloudflare openresty https://github.com/cloudflare/lua-resty-logger-socket
 ORESTY_LUACOOKIEVER='master'       # cloudflare openresty https://github.com/cloudflare/lua-resty-cookie
 ORESTY_LUAUPSTREAMCACHEVER='0.1.1' # cloudflare openresty https://github.com/cloudflare/lua-upstream-cache-nginx-module
 NGX_LUAUPSTREAMCACHE='n'           # disable https://github.com/cloudflare/lua-upstream-cache-nginx-module
-LUACJSONVER='2.1.0.5'              # https://github.com/openresty/lua-cjson
+LUACJSONVER='2.1.0.6'              # https://github.com/openresty/lua-cjson
 
 STRIPPHP='y'                 # set 'y' to strip PHP binary to reduce size
 PHP_INSTALL='y'              # Install PHP /w Fast Process Manager
@@ -232,10 +232,17 @@ SHORTCUTS='y'                # shortcuts
 
 ##################################
 ## Nginx SSL options
+
+# control variables post vhost creation
+# whether cloudflare.conf include file is uncommented (enabled) or commented out (disabled)
+VHOSTCTRL_CLOUDFLAREINC='n'
+# whether autoprotect-$vhostname.conf include file is uncommented (enabled) or commented out (disabled)
+VHOSTCTRL_AUTOPROTECTINC='y'
+
 # OpenSSL
 NOSOURCEOPENSSL='y'        # set to 'y' to disable OpenSSL source compile for system default YUM package setup
-OPENSSL_VERSION='1.1.0g'   # Use this version of OpenSSL http://openssl.org/
-OPENSSL_VERSIONFALLBACK='1.0.2n'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
+OPENSSL_VERSION='1.1.0h'   # Use this version of OpenSSL http://openssl.org/
+OPENSSL_VERSIONFALLBACK='1.0.2o'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
 OPENSSL_THREADS='y'        # control whether openssl 1.1 branch uses threading or not
 OPENSSL_CUSTOMPATH='/opt/openssl'  # custom directory path for OpenSSL 1.0.2+
 CLOUDFLARE_PATCHSSL='n'    # set 'y' to implement Cloudflare's chacha20 patch https://github.com/cloudflare/sslconfig
@@ -250,7 +257,7 @@ OPENSSLEQUALCIPHER_PATCH='n' # https://community.centminmod.com/posts/57916/
 
 # LibreSSL
 LIBRESSL_SWITCH='y'        # if set to 'y' it overrides OpenSSL as the default static compiled option for Nginx server
-LIBRESSL_VERSION='2.6.4'   # Use this version of LibreSSL http://www.libressl.org/
+LIBRESSL_VERSION='2.7.2'   # Use this version of LibreSSL http://www.libressl.org/
 
 # BoringSSL
 BORINGSSL_SWITCH='n'       # if set to 'y' it overrides OpenSSL as the default static compiled option for Nginx server
@@ -265,7 +272,7 @@ GPERFTOOLS_VERSION='2.6.3'        # Use this version of google-perftools
 
 # Choose whether to compile PCRE from source. Note PHP 5.3.8 already includes PCRE
 PCRE_SOURCEINSTALL='n'     
-PCRE_VERSION='8.41'          # PCRE version
+PCRE_VERSION='8.42'          # PCRE version
 
 # PHP and Cache/Acceleration
 IMAGICKPHP_VER='3.4.3'   # PHP extension for imagick
@@ -273,10 +280,10 @@ MAILPARSEPHP_VER='2.1.6'    # https://pecl.php.net/package/mailparse
 MAILPARSEPHP_COMPATVER='3.0.2' # For PHP 7
 MEMCACHED_INSTALL='y'       # Install Memcached
 LIBEVENT_VERSION='2.1.8'   # Use this version of Libevent
-MEMCACHED_VERSION='1.5.6'  # Use this version of Memcached server
+MEMCACHED_VERSION='1.5.7'  # Use this version of Memcached server
 MEMCACHE_VERSION='3.0.8'    # Use this version of Memcache
 MEMCACHEDPHP_VER='2.2.0'    # Memcached PHP extension not server
-MEMCACHEDPHP_SEVENVER='3.0.3' # Memcached PHP 7 only extension version
+MEMCACHEDPHP_SEVENVER='3.0.4' # Memcached PHP 7 only extension version
 LIBMEMCACHED_YUM='y'        # switch to YUM install instead of source compile
 LIBMEMCACHED_VER='1.0.18'   # libmemcached version for source compile
 TWEMPERF_VER='0.1.1'
@@ -285,12 +292,14 @@ REDISPHP_VER='3.1.4'        # redis PHP version
 REDISPHPSEVEN_VER='3.1.4'   # redis PHP version for PHP =>7.x
 REDISPHP_GIT='n'            # pull php 7 redis extension from git or pecl downloads
 PHPMONGODB='n'              # MongoDB PHP extension install
-MONGODBPHP_VER='1.4.0'      # MongoDB PHP version
+MONGODBPHP_VER='1.4.3'      # MongoDB PHP version
 MONGODB_SASL='n'            # SASL not working yet leave = n
 PDOPGSQL_PHPVER='9.6'       # pdo-pgsql PHP extension version for postgresql
-LIBSODIUM_VER='1.0.15'      # https://github.com/jedisct1/libsodium/releases
+PHP_LIBZIP='n'              # use newer libzip instead of PHP embedded zip
+LIBZIP_VER='1.5.0'          # required for PHP 7.2 + with libsodium & argon2
+LIBSODIUM_VER='1.0.16'      # https://github.com/jedisct1/libsodium/releases
 LIBSODIUM_NATIVE='n'        # optimise for specific cpu not portable between different cpu modules
-LIBARGON_VER='20161029'     # https://github.com/P-H-C/phc-winner-argon2
+LIBARGON_VER='20171227'     # https://github.com/P-H-C/phc-winner-argon2
 PHP_MCRYPTPECL='y'          # PHP 7.2 deprecated mcrypt support so this adds it back as PECL extension
 PHP_MCRYPTPECLVER='1.0.1'   # https://pecl.php.net/package/mcrypt
 
@@ -299,7 +308,7 @@ PHP_MEMCACHE='y'            # memcache PHP extension
 PHP_MEMCACHED='y'           # memcached PHP extension
 FFMPEGVER='0.6.0'
 SUHOSINVER='0.9.38'
-PHP_VERSION='5.6.34'        # Use this version of PHP
+PHP_VERSION='5.6.36'        # Use this version of PHP
 PHP_MIRRORURL='http://php.net'
 PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
 XCACHE_VERSION='3.2.0'      # Use this version of Xcache
@@ -349,6 +358,7 @@ LETSENCRYPT_DETECT='n'
 # by default and can be re-enabled with commands:
 # service servicename start; chkconfig servicename on
 # From http://centminmod.com/faq.html Question #25
+CMSDEBUG='n'                  # leave as CMSDEBUG='n' so the below 5 services actually get disabled
 NSD_DISABLED='n'              # when set to ='y'NSD disabled by default with chkconfig off
 MEMCACHED_DISABLED='n'        # when set to ='y' Memcached server disabled by default via chkconfig off
 PHP_DISABLED='n'              # when set to ='y' PHP-FPM disabled by default with chkconfig off

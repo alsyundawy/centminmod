@@ -1,6 +1,20 @@
 ########################################################################
 autodetectextensions() {
 
+# on minor PHP version updates, auto detect is skipped for these
+# extensions recompilation to speed up php recompiles. However, if php
+# extension fails to compile, there is currently no menu option to
+# recompile mssql, mongodb and mailparse php extensions unless you
+# switch PHP major versions i.e. go from PHP 5.6 to 7.0 or 7.0 to 7.1
+# or 7.0 to 5.6. This quick workaround sets AUTODETECPHP_OVERRIDE='y'
+# when PHPMYYSQL='y' or # PHPMONGODB='y' or PHPMAILPARSE='y' is set
+# to enable these php extensions and php extension is detected as not
+# loaded into php. So that even on mionor PHP version updates the
+# extensions are recompiled.
+if [[ "$PHPMSSQL" = [yY] && "$(php --ri mssql | grep -o 'not present')" = 'not present' ]] || [[ "$PHPMONGODB" = [yY] && "$(php --ri mongodb | grep -o 'not present')" = 'not present' ]] || [[ "$PHPMAILPARSE" = [yY] && "$(php --ri mailparse | grep -o 'not present')" = 'not present' ]]; then
+    AUTODETECPHP_OVERRIDE='y'
+fi
+
 if [[ -f "${CONFIGSCANDIR}/mssql.ini" && "$PHPMSSQL" = [yY] ]]; then
     DETECTMSSQL=y
 elif [[ "$AUTODETECPHP_OVERRIDE" = [yY] ]]; then
@@ -149,12 +163,12 @@ if [[ "$DETECTMONGODB" = [yY] ]] || [[ "$DETECTMONGODB" = [yY] && ! -f "$PHPEXTD
 fi
 
 if [[ "$DETECTOPCACHE" = [yY] ]]; then
-	# ZOPCACHE_OVERRIDE=y allows you to override PHP 5.5-7.x's inbuilt included
-	# Zend Opcache version with one available from pecl site
-	if [[ "$PHPMUVER" = 5.[234] || "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
-		cecho "Auto reinstalling previously detected Zend Opcache" $boldyellow
-		zopcachereinstall
-	fi
+  # ZOPCACHE_OVERRIDE=y allows you to override PHP 5.5-7.x's inbuilt included
+  # Zend Opcache version with one available from pecl site
+  if [[ "$PHPMUVER" = 5.[234] || "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
+    cecho "Auto reinstalling previously detected Zend Opcache" $boldyellow
+    zopcachereinstall
+  fi
 fi
 
 if [[ "$DETECTMAILPARSE" = [yY] ]] || [[ "$DETECTMAILPARSE" = [yY] && ! -f "$PHPEXTDIR_AUTODETECT/mailparse.so" ]]; then
@@ -420,9 +434,9 @@ fi
 ################
 # error check
 
-	ERR=$?
-	if [ $ERR != 0 ]; then
-    	echo -e "\n`date`\nError: $ERR, PHP configure failed ($SCRIPT_VERSION)\n"
+  ERR=$?
+  if [ $ERR != 0 ]; then
+      echo -e "\n`date`\nError: $ERR, PHP configure failed ($SCRIPT_VERSION)\n"
         echo "report errors on the forums at community.centminmod.com/forums/8/"
         echo
         free -m
@@ -440,11 +454,11 @@ fi
             git log --numstat --pretty="%n%h %an %aD %n%s" --shortstat -1
             popd
         fi
-    	exit
-	else
-    	echo -e "\n`date`\nSuccess: PHP configure ok\n"
+      exit
+  else
+      echo -e "\n`date`\nSuccess: PHP configure ok\n"
         cmservice php-fpm restart
-	fi
+  fi
 
 # error check
 ################
@@ -474,6 +488,11 @@ else
         CPUS_MAKEPHP=$(echo "$CPUS_MAKEPHP" | bc)
     fi
     MAKETHREADS_PHP=" -j$CPUS_MAKEPHP"
+fi
+
+if [[ "$(grep -c "processor" /proc/cpuinfo)" -lt '2' ]]; then
+  # Disable PGO if less than 2 cpu threads
+  PHP_PGO='n'
 fi
 
     if [ -f "$(which figlet)" ]; then
@@ -536,10 +555,10 @@ fi
 ################
 # error check
 
-	ERR=$?
+  ERR=$?
     sar_call
-	if [ $ERR != 0 ]; then
-		echo -e "\n`date`\nError: $ERR, PHP make failed ($SCRIPT_VERSION)\n"
+  if [ $ERR != 0 ]; then
+    echo -e "\n`date`\nError: $ERR, PHP make failed ($SCRIPT_VERSION)\n"
         free -m
         echo
         echo "report errors on the forums at community.centminmod.com/forums/8/"
@@ -559,11 +578,11 @@ fi
             git log --numstat --pretty="%n%h %an %aD %n%s" --shortstat -1
             popd
         fi
-    	exit
-	else
-    	echo -e "\n`date`\nSuccess: PHP make ok\n"
+      exit
+  else
+      echo -e "\n`date`\nSuccess: PHP make ok\n"
         cmservice php-fpm restart
-	fi
+  fi
 
 # error check
 ################
@@ -590,10 +609,10 @@ fi
 ################
 # error check
 
-	ERR=$?
+  ERR=$?
     sar_call
-	if [ $ERR != 0 ]; then
-		echo -e "\n`date`\nError: $ERR, PHP wasn't installed properly ($SCRIPT_VERSION)\n"
+  if [ $ERR != 0 ]; then
+    echo -e "\n`date`\nError: $ERR, PHP wasn't installed properly ($SCRIPT_VERSION)\n"
         echo "report errors on the forums at community.centminmod.com/forums/8/"
         echo
         free -m
@@ -611,9 +630,9 @@ fi
             git log --numstat --pretty="%n%h %an %aD %n%s" --shortstat -1
             popd
         fi
-    	exit
-	else
-    	echo -e "\n`date`\nSuccess: PHP was installed properly\n"
+      exit
+  else
+      echo -e "\n`date`\nSuccess: PHP was installed properly\n"
         echo
         echo
 
@@ -902,7 +921,7 @@ fi
         figlet -ckf standard "PHP Upgraded"
     fi
 
-	fi
+  fi
 
 # error check
 ################

@@ -290,7 +290,7 @@ PUREGROUP=nginx
       CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
     fi
 # CURRENTIP=$(echo $SSH_CLIENT | awk '{print $1}')
-# CURRENTCOUNTRY=$(curl -s ipinfo.io/$CURRENTIP/country)
+# CURRENTCOUNTRY=$(curl -s https://ipinfo.io/$CURRENTIP/country)
 pureftpinstall
 
 # Support secondary dedicated IP configuration for centmin mod
@@ -1042,6 +1042,7 @@ cecho " rm -rf /usr/local/nginx/conf/ssl/${vhostname}" $boldwhite
 cecho " rm -rf /home/nginx/domains/$vhostname" $boldwhite
 cecho " rm -rf /root/.acme.sh/$vhostname" $boldwhite
 cecho " rm -rf /root/.acme.sh/${vhostname}_ecc" $boldwhite
+cecho " rm -rf /usr/local/nginx/conf/pre-staticfiles-local-${vhostname}.conf" $boldwhite
 cecho " service nginx restart" $boldwhite
 cecho "-------------------------------------------------------------" $boldyellow
 cecho "vhost for $vhostname setup successfully" $boldwhite
@@ -1050,6 +1051,28 @@ cecho ""${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_nginx_addvhost.log""
 cecho "-------------------------------------------------------------" $boldyellow
 echo ""
 } | tee "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_nginx_addvhost-remove-cmds-${vhostname}.log"
+
+  # control variables after vhost creation
+  # whether cloudflare.conf include file is uncommented (enabled) or commented out (disabled)
+  if [[ "$VHOSTCTRL_CLOUDFLAREINC" = [yY] ]]; then
+    if [ -f "/usr/local/nginx/conf/conf.d/$vhostname.conf" ]; then
+      sed -i "s|^  #include \/usr\/local\/nginx\/conf\/cloudflare.conf;|  include \/usr\/local\/nginx\/conf\/cloudflare.conf;|g" "/usr/local/nginx/conf/conf.d/$vhostname.conf"
+    fi
+    if [ -f "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf" ]; then
+      sed -i "s|^  #include \/usr\/local\/nginx\/conf\/cloudflare.conf;|  include \/usr\/local\/nginx\/conf\/cloudflare.conf;|g" "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
+    fi
+  fi
+  # whether autoprotect-$vhostname.conf include file is uncommented (enabled) or commented out (disabled)
+  if [[ "$VHOSTCTRL_AUTOPROTECTINC" = [nN] ]]; then
+    if [ -f "/usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf" ]; then
+      if [ -f "/usr/local/nginx/conf/conf.d/$vhostname.conf" ]; then
+        sed -i "s|^  include \/usr\/local\/nginx\/conf\/autoprotect\/$vhostname\/autoprotect-$vhostname.conf;|  #include \/usr\/local\/nginx\/conf\/autoprotect\/$vhostname\/autoprotect-$vhostname.conf;|g" "/usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf"
+      fi
+      if [ -f "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf" ]; then
+        sed -i "s|^  include \/usr\/local\/nginx\/conf\/autoprotect\/$vhostname\/autoprotect-$vhostname.conf;|  #include \/usr\/local\/nginx\/conf\/autoprotect\/$vhostname\/autoprotect-$vhostname.conf;|g" "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
+      fi
+    fi
+  fi
 
 else
 

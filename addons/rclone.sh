@@ -34,6 +34,7 @@ CENTOSVER=$(awk '{ print $3 }' /etc/redhat-release)
 
 if [ -f "/etc/centminmod/custom_config.inc" ]; then
   # default is at /etc/centminmod/custom_config.inc
+  dos2unix -q "/etc/centminmod/custom_config.inc"
   . "/etc/centminmod/custom_config.inc"
 fi
 
@@ -173,7 +174,7 @@ csf_port() {
   if [[ -f /etc/csf/csf.allow && -z "$(grep "tcp|in|d=53682|s=$SSH_CLIENTIPADDR" /etc/csf/csf.allow)" ]]; then
     echo "open port 53682 for rclone web server"
     echo "tcp|in|d=53682|s=$SSH_CLIENTIPADDR" >> /etc/csf/csf.allow
-    csf -r >/dev/null 2>&1
+    csf -ra >/dev/null 2>&1
     tail -1 /etc/csf/csf.allow
   fi
 }

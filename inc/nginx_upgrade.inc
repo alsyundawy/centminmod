@@ -121,15 +121,15 @@ fi
 MAPCHECK=$(grep '/usr/local/nginx/conf/fastcgi_param_https_map.conf' /usr/local/nginx/conf/nginx.conf)
 
 if [[ -z "$MAPCHECK" ]]; then
-	sed -i 's/http {/http { \ninclude \/usr\/local\/nginx\/conf\/fastcgi_param_https_map.conf;/g' /usr/local/nginx/conf/nginx.conf
+  sed -i 's/http {/http { \ninclude \/usr\/local\/nginx\/conf\/fastcgi_param_https_map.conf;/g' /usr/local/nginx/conf/nginx.conf
 fi
 
 if [[ ! -f /usr/local/nginx/conf/fastcgi_param_https_map.conf ]]; then
-	\cp "$CUR_DIR/config/nginx/fastcgi_param_https_map.conf" /usr/local/nginx/conf/fastcgi_param_https_map.conf
+  \cp "$CUR_DIR/config/nginx/fastcgi_param_https_map.conf" /usr/local/nginx/conf/fastcgi_param_https_map.conf
 fi
 
 if [[ -z "$(grep 'fastcgi_param HTTPS $server_https;' /usr/local/nginx/conf/php.conf)" ]]; then
-	replace -s '#fastcgi_param HTTPS on;' 'fastcgi_param HTTPS $server_https;' -- /usr/local/nginx/conf/php.conf
+  replace -s '#fastcgi_param HTTPS on;' 'fastcgi_param HTTPS $server_https;' -- /usr/local/nginx/conf/php.conf
 fi
 }
 
@@ -142,10 +142,12 @@ fi
 
 if [ -f "${CONFIGSCANBASE}/custom_config.inc" ]; then
     # default is at /etc/centminmod/custom_config.inc
+    dos2unix -q "${CONFIGSCANBASE}/custom_config.inc"
     source "${CONFIGSCANBASE}/custom_config.inc"
 fi
 
 if [ -f "${CM_INSTALLDIR}/inc/z_custom.inc" ]; then
+    dos2unix -q "${CM_INSTALLDIR}/inc/z_custom.inc"
     source "${CM_INSTALLDIR}/inc/z_custom.inc"
 fi
 
@@ -182,22 +184,6 @@ fi
         # remove patches meant for 1.9.11 dynamic module support
         rm -rf "${DIR_TMP}lua-nginx-module-${ORESTY_LUANGINXVER}"
         rm -rf "${DIR_TMP}/${NGX_LUANGINXLINKFILE}"
-    fi
-
-    if [[ "$NGINX_RTMP" = [yY] ]]; then
-        if [[ ! -d "${DIR_TMP}/nginx-rtmp-module" ]]; then
-            echo
-            echo "download nginx-rtmp-module from github"
-            cd "$DIR_TMP"
-            time git clone git://github.com/arut/nginx-rtmp-module.git
-        elif [[ -d "${DIR_TMP}/nginx-rtmp-module" && -d "${DIR_TMP}/nginx-rtmp-module/.git" ]]; then
-            echo
-            echo "get latest updates nginx-rtmp-module from github"
-            cd "$DIR_TMP"
-            git stash
-            git pull
-            git log -3
-        fi
     fi
 
 cecho "Check for old ngx_pagespeed master branch existence" $boldyellow
@@ -431,14 +417,14 @@ gethtpasswdsh
 
 # Backup Nginx CONF
 if [ "$NGINXBACKUP" == 'y' ]; then
-	nginxbackup
+  nginxbackup
 fi
 
 # Backup ngx_pagespeed pagespeed.conf
 if [[ "$NGINX_PAGESPEED" = [yY] ]]; then
-	if [[ -f /usr/local/nginx/conf/pagespeed.conf ]]; then
-		pagespeedbackup
-	fi
+  if [[ -f /usr/local/nginx/conf/pagespeed.conf ]]; then
+    pagespeedbackup
+  fi
 fi
 
 # tasks for updated ngx_pagespeed module parity
@@ -451,64 +437,11 @@ pagespeeduptasks
     cd "$DIR_TMP"
 
     # nginx Modules / Prerequisites
-	cecho "Installing nginx Modules / Prerequisites..." $boldgreen
+  cecho "Installing nginx Modules / Prerequisites..." $boldgreen
 
 checknginxmodules
 nginxzlib_install
-
-if [[ "$GPERFTOOLS_SOURCEINSTALL" = [yY] ]]; 
-then
-    echo "*************************************************"
-    cecho "* Source Upgrade Google Perftools" $boldgreen
-    echo "*************************************************"
-
-    if [[ "$(uname -m)" = 'x86_64' ]]; then
-    # Install libunwind
-    echo "Compiling libunwind..."
-    if [ -s "${LIBUNWIND_LINKFILE}" ]; then
-        cecho "libunwind ${LIBUNWIND_VERSION} Archive found, skipping download..." $boldgreen 
-    else
-        download_cmd "${LIBUNWIND_LINK}" $WGETRETRY
-    fi
-
-    tar xvzf "${LIBUNWIND_LINKFILE}"
-    cd "libunwind-${LIBUNWIND_VERSION}"
-    if [[ "$INITIALINSTALL" != [yY] ]]; then
-        make clean
-    fi
-    ./configure
-    make${MAKETHREADS}
-    make install
-    fi
-
-    # Install google-perftools
-    cd "$DIR_TMP"
-
-    echo "Compiling google-perftools..."
-    if [ -s "${GPERFTOOL_LINKFILE}" ]; then
-        cecho "google-perftools ${GPERFTOOLS_VERSION} Archive found, skipping download..." $boldgreen
-    else
-        download_cmd "${GPERFTOOL_LINK}" $WGETRETRY
-    fi
-
-    tar xvzf "${GPERFTOOL_LINKFILE}"
-    cd "${GPERFTOOL_LINKDIR}"
-    if [[ "$INITIALINSTALL" != [yY] ]]; then
-        make clean
-    fi
-    if [[ "$(uname -m)" = 'x86_64' ]]; then
-        ./configure --with-tcmalloc-pagesize=$TCMALLOC_PAGESIZE
-    else
-        ./configure --enable-frame-pointers --with-tcmalloc-pagesize=$TCMALLOC_PAGESIZE
-    fi
-    make${MAKETHREADS}
-    make install
-    if [ ! -f /etc/ld.so.conf.d/wget.conf ]; then
-        echo "/usr/local/lib" > /etc/ld.so.conf.d/usr_local_lib.conf
-        /sbin/ldconfig
-    fi
-
-fi # GPERFTOOL_SOURCEINSTALL
+install_gperftools
 
 # echo ""
 # read -ep "Do you want to recompile OpenSSL ? Only needed if you updated OpenSSL version in centmin.sh [y/n]: " recompileopenssl 
@@ -590,7 +523,12 @@ fi
         git clone --depth=1 https://github.com/nginx/nginx nginx-master
         mv nginx-master/auto/configure nginx-master/configure
     fi
-    if [[ -s "nginx-${ngver}.tar.gz" || "$ngver" = 'master' ]]; then
+    if [[ "$ngver" = 'master-google' ]]; then
+        rm -rf nginx-${ngver}*
+        git clone --depth=1 https://nginx.googlesource.com/nginx nginx-master-google
+        mv nginx-master-google/auto/configure nginx-master-google/configure
+    fi
+    if [[ -s "nginx-${ngver}.tar.gz" || "$ngver" = 'master' || "$ngver" = 'master-google' ]]; then
         cecho "nginx ${ngver} download found, skipping download..." $boldgreen
     else
         download_cmd "http://nginx.org/download/nginx-${ngver}.tar.gz" $WGETRETRY
@@ -632,7 +570,7 @@ fi
         fi
     fi
 
-    if [[ "$ngver" != 'master' ]]; then
+    if [[ ! "$(echo $ngver | grep 'master')" ]]; then
         tar xvfz "nginx-${ngver}.tar.gz"
         NGINXTAREXTRACT_CHECK=$?
         if [[ "$NGINXTAREXTRACT_CHECK" != '0' ]]; then
@@ -694,9 +632,9 @@ fi
 ################
 # error check
 
-	ERR=$?
-	if [ $ERR != 0 ]; then
-    	echo -e "\n`date`\nError: $ERR, Nginx configure failed\n"
+  ERR=$?
+  if [ $ERR != 0 ]; then
+      echo -e "\n`date`\nError: $ERR, Nginx configure failed\n"
         echo "report errors on the forums at community.centminmod.com/forums/8/"
         echo
         free -m
@@ -715,9 +653,9 @@ fi
             popd
         fi
         exit
-	else
-    	echo -e "\n`date`\nSuccess: Nginx configure ok\n"
-	fi
+  else
+      echo -e "\n`date`\nSuccess: Nginx configure ok\n"
+  fi
 
 # error check
 ################
@@ -756,8 +694,8 @@ fi
 ################
 # error check
 
-	if [ $ERR != 0 ]; then
-    	echo -e "\n`date`\nError: $ERR, Nginx make failed\n"
+  if [ $ERR != 0 ]; then
+      echo -e "\n`date`\nError: $ERR, Nginx make failed\n"
         echo "report errors on the forums at community.centminmod.com/forums/8/"
         echo
         free -m
@@ -775,10 +713,10 @@ fi
             git log --numstat --pretty="%n%h %an %aD %n%s" --shortstat -1
             popd
         fi
-    	exit
-	else
-	   echo -e "\n`date`\nSuccess: Nginx make ok\n"
-	fi
+      exit
+  else
+     echo -e "\n`date`\nSuccess: Nginx make ok\n"
+  fi
 
 # error check
 ################
@@ -845,8 +783,8 @@ fi
     if [ $ERR = 0 ]; then
         detect_tlsonethree
     fi
-	if [ $ERR != 0 ]; then
-    	echo -e "\n`date`\nError: $ERR, Nginx wasn't installed properly\n"
+  if [ $ERR != 0 ]; then
+      echo -e "\n`date`\nError: $ERR, Nginx wasn't installed properly\n"
         echo "report errors on the forums at community.centminmod.com/forums/8/"
         echo
         free -m
@@ -868,12 +806,12 @@ fi
         if [ -f objs/autoconf.err ]; then
             cat objs/autoconf.err > "${CENTMINLOGDIR}/nginx_autoconf.err.${DT}.log"
         fi
-    	exit
-	else
+      exit
+  else
         if [ -f objs/autoconf.err ]; then
             cat objs/autoconf.err > "${CENTMINLOGDIR}/nginx_autoconf.err.${DT}.log"
         fi
-    	echo -e "\n`date`\nSuccess: Nginx was installed properly\n"
+      echo -e "\n`date`\nSuccess: Nginx was installed properly\n"
 
     if [[ "$NGINX_HTTP2" = [yY] && "$NGINX_SPDYPATCHED" = [yY] ]] && [[ "$NGX_VEREVAL" -ge '10907' ]]; then
         # only apply auto vhost changes forNginx HTTP/2 
@@ -1042,6 +980,7 @@ fi
             ls -lah /usr/local/nginx/modules.copy
         fi
 
+        echo
         echo "log files saved at ${CENTMINLOGDIR}"
         ls -lAhrt "${CENTMINLOGDIR}" | grep $DT
         echo
@@ -1054,6 +993,12 @@ fi
             echo
         fi
         cecho "* nginx updated" $boldgreen
+        if [[ "$ngver" = 'master' ]]; then
+            cecho "* nginx github master build" $boldgreen
+        fi
+        if [[ "$ngver" = 'master-google' ]]; then
+            cecho "* nginx google fork master build" $boldgreen
+        fi
         echo "*************************************************"
 
     # if you set /etc/centminmod/custom_config.inc file to
@@ -1071,7 +1016,7 @@ fi
         figlet -ckf standard "Nginx Updated"
     fi
 
-	fi
+  fi
 
 # error check
 ################

@@ -138,48 +138,9 @@ if [[ ! -f /proc/user_beancounters ]]; then
 fi
 
     # nginx Modules / Prerequisites
-	cecho "Installing nginx Modules / Prerequisites..." $boldgreen
+  cecho "Installing nginx Modules / Prerequisites..." $boldgreen
 
-if [[ "$GPERFTOOLS_SOURCEINSTALL" = [yY] ]]; 
-then
-    echo "*************************************************"
-    cecho "* Source Install Google Perftools" $boldgreen
-    echo "*************************************************"
-
-    if [[ "$(uname -m)" = 'x86_64' ]]; then
-    # Install libunwind
-    echo "Compiling libunwind..."
-#download libunwind tarball
-
-    #tar xvzf ${LIBUNWIND_LINKFILE}
-    cd ${LIBUNWIND_LINKDIR}
-    ./configure
-    make$MAKETHREADS
-    make install
-    fi
-
-    # Install google-perftools
-    cd $DIR_TMP
-
-    echo "Compiling google-perftools..."
-
-#download gperftool tarball 
-
-    #tar xvzf ${GPERFTOOL_LINKFILE}
-    cd ${GPERFTOOL_LINKDIR}
-    if [[ "$(uname -m)" = 'x86_64' ]]; then
-        ./configure --with-tcmalloc-pagesize=$TCMALLOC_PAGESIZE
-    else
-        ./configure --enable-frame-pointers --with-tcmalloc-pagesize=$TCMALLOC_PAGESIZE
-    fi
-    make$MAKETHREADS
-    make install
-    if [ ! -f /etc/ld.so.conf.d/wget.conf ]; then
-        echo "/usr/local/lib" > /etc/ld.so.conf.d/usr_local_lib.conf
-        /sbin/ldconfig
-    fi
-
-fi # GPERFTOOLS_SOURCE INSTALL
+install_gperftools
 
 pcredir_check
 
@@ -376,8 +337,8 @@ gethtpasswdsh
 
 funct_logrotate
 
-	if [[ "$NGINX_PAGESPEED" = [yY] ]]; then
-		ngxpagespeedinstall
+  if [[ "$NGINX_PAGESPEED" = [yY] ]]; then
+    ngxpagespeedinstall
     elif [[ "$NGINX_PAGESPEED" = [nN] ]]; then
         PSADMINCHECK=$(grep '^include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;' /usr/local/nginx/conf/nginx.conf)
         
@@ -385,7 +346,7 @@ funct_logrotate
         if [[ ! -z "$PSADMINCHECK" ]]; then
             sed -i 's/^include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;/#include \/usr\/local\/nginx\/conf\/pagespeedadmin.conf;/g' /usr/local/nginx/conf/nginx.conf
         fi
-	fi
+  fi
 
 geoinccheck
 geoipphp

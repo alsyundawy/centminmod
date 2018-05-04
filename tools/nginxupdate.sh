@@ -8,6 +8,7 @@ ngver=$1
 NGINX_IPV='n' #NGINX IPV6 compile support for unattended mode only
 UNATTENDED='y' # please leave at 'y' for best compatibility as at .07 release
 CMVERSION_CHECK='n'
+CMSDEBUG='n'
 ###################################################################################
 DT=$(date +"%d%m%y-%H%M%S")
 # for github support
@@ -78,41 +79,55 @@ if [ ! -d "$CENTMINLOGDIR" ]; then
 fi
 
 cmservice() {
-        servicename=$1
-        action=$2
-        if [[ "$CENTOS_SEVEN" != '7' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
-        echo "service ${servicename} $action"
-        if [[ "$CMSDEBUG" = [nN] ]]; then
-                service "${servicename}" "$action"
-        fi
-        else
-        echo "systemctl $action ${servicename}.service"
-        if [[ "$CMSDEBUG" = [nN] ]]; then
-                systemctl "$action" "${servicename}.service"
-        fi
-        fi
+  servicename=$1
+  action=$2
+  if [[ "$CENTOS_SEVEN" != '7' ]] && [[ "${servicename}" = 'haveged' || "${servicename}" = 'pure-ftpd' || "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
+    echo "service ${servicename} $action"
+    if [[ "$CMSDEBUG" = [nN] ]]; then
+      service "${servicename}" "$action"
+    fi
+  else
+    if [[ "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
+      echo "service ${servicename} $action"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        service "${servicename}" "$action"
+      fi
+    else
+      echo "systemctl $action ${servicename}.service"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        systemctl "$action" "${servicename}.service"
+      fi
+    fi
+  fi
 }
 
 cmchkconfig() {
-        servicename=$1
-        status=$2
-        if [[ "$CENTOS_SEVEN" != '7' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
-        echo "chkconfig ${servicename} $status"
-        if [[ "$CMSDEBUG" = [nN] ]]; then
-                chkconfig "${servicename}" "$status"
-        fi
-        else
-                if [ "$status" = 'on' ]; then
-                        status=enable
-                fi
-                if [ "$status" = 'off' ]; then
-                        status=disable
-                fi
-        echo "systemctl $status ${servicename}.service"
-        if [[ "$CMSDEBUG" = [nN] ]]; then
-                systemctl "$status" "${servicename}.service"
-        fi
-        fi
+  servicename=$1
+  status=$2
+  if [[ "$CENTOS_SEVEN" != '7' ]] && [[ "${servicename}" = 'haveged' || "${servicename}" = 'pure-ftpd' || "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
+    echo "chkconfig ${servicename} $status"
+    if [[ "$CMSDEBUG" = [nN] ]]; then
+      chkconfig "${servicename}" "$status"
+    fi
+  else
+    if [[ "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
+      echo "chkconfig ${servicename} $status"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        chkconfig "${servicename}" "$status"
+      fi
+    else
+      if [ "$status" = 'on' ]; then
+        status=enable
+      fi
+      if [ "$status" = 'off' ]; then
+        status=disable
+      fi
+      echo "systemctl $status ${servicename}.service"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        systemctl "$status" "${servicename}.service"
+      fi
+    fi
+  fi
 }
 
 if [ -f /proc/user_beancounters ]; then
@@ -296,7 +311,7 @@ NGINX_LIBATOMIC='y'          # Nginx configured with libatomic support
 NGINX_HTTPREDIS='y'          # Nginx redis http://wiki.nginx.org/HttpRedisModule
 NGINX_HTTPREDISVER='0.3.7'   # Nginx redis version
 NGINX_PCREJIT='y'            # Nginx configured with pcre & pcre-jit support
-NGINX_PCREVER='8.41'         # Version of PCRE used for pcre-jit support in Nginx
+NGINX_PCREVER='8.42'         # Version of PCRE used for pcre-jit support in Nginx
 NGINX_ZLIBCUSTOM='y'         # Use custom zlib instead of system version
 NGINX_ZLIBVER='1.2.11'       # http://www.zlib.net/
 ORESTY_HEADERSMORE='y'       # openresty headers more https://github.com/openresty/headers-more-nginx-module
@@ -312,36 +327,36 @@ ORESTY_MEMCVER='0.18'        # openresty memc module https://github.com/openrest
 ORESTY_SRCCACHEVER='0.31'    # openresty subrequest cache module https://github.com/openresty/srcache-nginx-module
 ORESTY_DEVELKITVER='0.3.0'  # openresty ngx_devel_kit module https://github.com/simpl/ngx_devel_kit
 ORESTY_SETMISCGIT='n'        # use git master instead of version specific
-ORESTY_SETMISCVER='0.31'     # openresty set-misc-nginx module https://github.com/openresty/set-misc-nginx-module
+ORESTY_SETMISCVER='0.32'     # openresty set-misc-nginx module https://github.com/openresty/set-misc-nginx-module
 ORESTY_ECHOGIT='n'           # use git master instead of version specific
 ORESTY_ECHOVER='0.61'     # openresty set-misc-nginx module https://github.com/openresty/echo-nginx-module
-ORESTY_REDISVER='0.14'       # openresty redis2-nginx-module https://github.com/openresty/redis2-nginx-module
+ORESTY_REDISVER='0.15'       # openresty redis2-nginx-module https://github.com/openresty/redis2-nginx-module
 
 LUAJIT_GITINSTALL='y'        # opt to install luajit 2.1 from dev branch http://repo.or.cz/w/luajit-2.0.git/shortlog/refs/heads/v2.1
 LUAJIT_GITINSTALLVER='2.1'   # branch version = v2.1 will override ORESTY_LUAGITVER if LUAJIT_GITINSTALL='y'
 
 ORESTY_LUANGINX='n'             # enable or disable or ORESTY_LUA* nginx modules below
-ORESTY_LUANGINXVER='0.10.11'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
+ORESTY_LUANGINXVER='0.10.13'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
 ORESTY_LUAGITVER='2.0.5'        # luagit http://luajit.org/
 ORESTY_LUAMEMCACHEDVER='0.14'   # openresty https://github.com/openresty/lua-resty-memcached
-ORESTY_LUAMYSQLVER='0.19'       # openresty https://github.com/openresty/lua-resty-mysql
+ORESTY_LUAMYSQLVER='0.21'    # openresty https://github.com/openresty/lua-resty-mysql
 ORESTY_LUAREDISVER='0.26'       # openresty https://github.com/openresty/lua-resty-redis
-ORESTY_LUADNSVER='0.20'         # openresty https://github.com/openresty/lua-resty-dns
+ORESTY_LUADNSVER='0.21'         # openresty https://github.com/openresty/lua-resty-dns
 ORESTY_LUAUPLOADVER='0.10'      # openresty https://github.com/openresty/lua-resty-upload
 ORESTY_LUAWEBSOCKETVER='0.05'   # openresty https://github.com/openresty/lua-resty-websocket
 ORESTY_LUALOCKVER='0.07'        # openresty https://github.com/openresty/lua-resty-lock
-ORESTY_LUASTRINGVER='0.10'      # openresty https://github.com/openresty/lua-resty-string
+ORESTY_LUASTRINGVER='0.11rc1'      # openresty https://github.com/openresty/lua-resty-string
 ORESTY_LUAREDISPARSERVER='0.13'    # openresty https://github.com/openresty/lua-redis-parser
 ORESTY_LUAUPSTREAMCHECKVER='0.04'  # openresty https://github.com/openresty/lua-resty-upstream-healthcheck
-ORESTY_LUALRUCACHEVER='0.07'       # openresty https://github.com/openresty/lua-resty-lrucache
-ORESTY_LUARESTYCOREVER='0.1.13' # openresty https://github.com/openresty/lua-resty-core
+ORESTY_LUALRUCACHEVER='0.08'       # openresty https://github.com/openresty/lua-resty-lrucache
+ORESTY_LUARESTYCOREVER='0.1.15' # openresty https://github.com/openresty/lua-resty-core
 ORESTY_LUAUPSTREAMVER='0.06'       # openresty https://github.com/openresty/lua-upstream-nginx-module
 NGX_LUAUPSTREAM='n'                # disable https://github.com/openresty/lua-upstream-nginx-module
 ORESTY_LUALOGGERSOCKETVER='0.1'    # cloudflare openresty https://github.com/cloudflare/lua-resty-logger-socket
 ORESTY_LUACOOKIEVER='master'       # cloudflare openresty https://github.com/cloudflare/lua-resty-cookie
 ORESTY_LUAUPSTREAMCACHEVER='0.1.1' # cloudflare openresty https://github.com/cloudflare/lua-upstream-cache-nginx-module
 NGX_LUAUPSTREAMCACHE='n'           # disable https://github.com/cloudflare/lua-upstream-cache-nginx-module
-LUACJSONVER='2.1.0.5'              # https://github.com/openresty/lua-cjson
+LUACJSONVER='2.1.0.6'              # https://github.com/openresty/lua-cjson
 
 STRIPPHP='y'                 # set 'y' to strip PHP binary to reduce size
 
@@ -355,8 +370,8 @@ NGINXBACKUPDIR='/usr/local/nginxbackup'
 ## Nginx SSL options
 # OpenSSL
 NOSOURCEOPENSSL='y'        # set to 'y' to disable OpenSSL source compile for system default YUM package setup
-OPENSSL_VERSION='1.1.0g'   # Use this version of OpenSSL http://openssl.org/
-OPENSSL_VERSIONFALLBACK='1.0.2n'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
+OPENSSL_VERSION='1.1.0h'   # Use this version of OpenSSL http://openssl.org/
+OPENSSL_VERSIONFALLBACK='1.0.2o'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
 OPENSSL_THREADS='y'        # control whether openssl 1.1 branch uses threading or not
 CLOUDFLARE_PATCHSSL='n'    # set 'y' to implement Cloudflare's chacha20 patch https://github.com/cloudflare/sslconfig
 CLOUDFLARE_ZLIB='n'        # use Cloudflare optimised zlib fork https://blog.cloudflare.com/cloudflare-fights-cancer/
@@ -370,7 +385,7 @@ OPENSSLEQUALCIPHER_PATCH='n' # https://community.centminmod.com/posts/57916/
 
 # LibreSSL
 LIBRESSL_SWITCH='y'        # if set to 'y' it overrides OpenSSL as the default static compiled option for Nginx server
-LIBRESSL_VERSION='2.6.4'   # Use this version of LibreSSL http://www.libressl.org/
+LIBRESSL_VERSION='2.7.2'   # Use this version of LibreSSL http://www.libressl.org/
 # BoringSSL
 # not working yet just prep work
 BORINGSSL_SWITCH='n'       # if set to 'y' it overrides OpenSSL as the default static compiled option for Nginx server
@@ -485,6 +500,10 @@ source "${SCRIPT_DIR}/inc/nginx_addvhost.inc"
 source "${SCRIPT_DIR}/inc/nginx_errorpage.inc"
 source "${SCRIPT_DIR}/inc/compress.inc"
 source "${SCRIPT_DIR}/inc/shortcuts_install.inc"
+source "${SCRIPT_DIR}/inc/pcre.inc"
+source "${SCRIPT_DIR}/inc/jemalloc.inc"
+source "${SCRIPT_DIR}/inc/zlib.inc"
+source "${SCRIPT_DIR}/inc/google_perftools.inc"
 source "${SCRIPT_DIR}/inc/updater_submenu.inc"
 source "${SCRIPT_DIR}/inc/centminfinish.inc"
 
@@ -500,11 +519,17 @@ else
 fi
 
 if [ -f "${CM_INSTALLDIR}/inc/custom_config.inc" ]; then
+  if [ -f /usr/bin/dos2unix ]; then
+    dos2unix -q "inc/custom_config.inc"
+  fi
     source "inc/custom_config.inc"
 fi
 
 if [ -f "${CONFIGSCANBASE}/custom_config.inc" ]; then
     # default is at /etc/centminmod/custom_config.inc
+  if [ -f /usr/bin/dos2unix ]; then
+    dos2unix -q "${CONFIGSCANBASE}/custom_config.inc"
+  fi
     source "${CONFIGSCANBASE}/custom_config.inc"
 fi
 
@@ -709,10 +734,12 @@ fi
 
 if [ -f "${CONFIGSCANBASE}/custom_config.inc" ]; then
     # default is at /etc/centminmod/custom_config.inc
+    dos2unix -q "${CONFIGSCANBASE}/custom_config.inc"
     source "${CONFIGSCANBASE}/custom_config.inc"
 fi
 
 if [ -f "${CM_INSTALLDIR}/inc/z_custom.inc" ]; then
+    dos2unix -q "${CM_INSTALLDIR}/inc/z_custom.inc"
     source "${CM_INSTALLDIR}/inc/z_custom.inc"
 fi
 

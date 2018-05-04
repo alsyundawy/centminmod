@@ -13,7 +13,7 @@ CENTMINLOGDIR='/root/centminlogs'
 DIR_TMP='/svr-setup'
 LOCALCENTMINMOD_MIRROR='https://centminmod.com'
 
-ALTPCRE_VERSION='8.41'
+ALTPCRE_VERSION='8.42'
 ALTPCRELINKFILE="pcre-${ALTPCRE_VERSION}.tar.gz"
 ALTPCRELINK="${LOCALCENTMINMOD_MIRROR}/centminmodparts/pcre/${ALTPCRELINKFILE}"
 
@@ -39,6 +39,7 @@ CENTOSVER=$(awk '{ print $3 }' /etc/redhat-release)
 
 if [ -f "/etc/centminmod/custom_config.inc" ]; then
   # default is at /etc/centminmod/custom_config.inc
+  dos2unix -q "/etc/centminmod/custom_config.inc"
   . "/etc/centminmod/custom_config.inc"
 fi
 
@@ -478,7 +479,8 @@ case $1 in
   install)
 starttime=$(TZ=UTC date +%s.%N)
 {
-  if [[ "$LOWMEM_INSTALL" != [yY] ]]; then
+  # devtoolset SCL repo only supports 64bit OSes
+  if [[ "$LOWMEM_INSTALL" != [yY] && "$(uname -m)" = 'x86_64' ]]; then
     source_pcreinstall
     source_wgetinstall
   fi
@@ -494,7 +496,8 @@ tail -1 "${CENTMINLOGDIR}/wget_source_install_${DT}.log"
   pcre)
 starttime=$(TZ=UTC date +%s.%N)
 {
-  if [[ "$LOWMEM_INSTALL" != [yY] ]]; then
+  # devtoolset SCL repo only supports 64bit OSes
+  if [[ "$LOWMEM_INSTALL" != [yY] && "$(uname -m)" = 'x86_64' ]]; then
     source_pcreinstall
   fi
 } 2>&1 | tee "${CENTMINLOGDIR}/wget_source_install_pcre_${DT}.log"

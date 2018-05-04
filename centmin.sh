@@ -13,16 +13,17 @@ PHPFPMCONFDIR='/usr/local/nginx/conf/phpfpmd'
 
 UNATTENDED='y' # please leave at 'y' for best compatibility as at .07 release
 CMVERSION_CHECK='n'
+CMSDEBUG='n'
 #####################################################
 DT=$(date +"%d%m%y-%H%M%S")
 # for github support
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='016'
+SCRIPT_INCREMENTVER='020'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
-SCRIPT_DATE='31/03/2018'
+SCRIPT_DATE='31/05/2018'
 SCRIPT_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_MODIFICATION_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_URL='https://centminmod.com'
@@ -158,41 +159,55 @@ source "inc/centos_seven.inc"
 seven_function
 
 cmservice() {
-        servicename=$1
-        action=$2
-        if [[ "$CENTOS_SEVEN" != '7' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
-        echo "service ${servicename} $action"
-        if [[ "$CMSDEBUG" = [nN] ]]; then
-                service "${servicename}" "$action"
-        fi
-        else
-        echo "systemctl $action ${servicename}.service"
-        if [[ "$CMSDEBUG" = [nN] ]]; then
-                systemctl "$action" "${servicename}.service"
-        fi
-        fi
+  servicename=$1
+  action=$2
+  if [[ "$CENTOS_SEVEN" != '7' ]] && [[ "${servicename}" = 'haveged' || "${servicename}" = 'pure-ftpd' || "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
+    echo "service ${servicename} $action"
+    if [[ "$CMSDEBUG" = [nN] ]]; then
+      service "${servicename}" "$action"
+    fi
+  else
+    if [[ "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
+      echo "service ${servicename} $action"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        service "${servicename}" "$action"
+      fi
+    else
+      echo "systemctl $action ${servicename}.service"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        systemctl "$action" "${servicename}.service"
+      fi
+    fi
+  fi
 }
 
 cmchkconfig() {
-        servicename=$1
-        status=$2
-        if [[ "$CENTOS_SEVEN" != '7' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
-        echo "chkconfig ${servicename} $status"
-        if [[ "$CMSDEBUG" = [nN] ]]; then
-                chkconfig "${servicename}" "$status"
-        fi
-        else
-                if [ "$status" = 'on' ]; then
-                        status=enable
-                fi
-                if [ "$status" = 'off' ]; then
-                        status=disable
-                fi
-        echo "systemctl $status ${servicename}.service"
-        if [[ "$CMSDEBUG" = [nN] ]]; then
-                systemctl "$status" "${servicename}.service"
-        fi
-        fi
+  servicename=$1
+  status=$2
+  if [[ "$CENTOS_SEVEN" != '7' ]] && [[ "${servicename}" = 'haveged' || "${servicename}" = 'pure-ftpd' || "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
+    echo "chkconfig ${servicename} $status"
+    if [[ "$CMSDEBUG" = [nN] ]]; then
+      chkconfig "${servicename}" "$status"
+    fi
+  else
+    if [[ "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
+      echo "chkconfig ${servicename} $status"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        chkconfig "${servicename}" "$status"
+      fi
+    else
+      if [ "$status" = 'on' ]; then
+        status=enable
+      fi
+      if [ "$status" = 'off' ]; then
+        status=disable
+      fi
+      echo "systemctl $status ${servicename}.service"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        systemctl "$status" "${servicename}.service"
+      fi
+    fi
+  fi
 }
 
 if [ -f /proc/user_beancounters ]; then
@@ -252,21 +267,21 @@ CONFIGSCANBASE='/etc/centminmod'
 CONFIGSCANDIR="${CONFIGSCANBASE}/php.d"
 
 if [ ! -d "$CONFIGSCANBASE" ]; then
-	mkdir -p "$CONFIGSCANBASE"
+  mkdir -p "$CONFIGSCANBASE"
 fi
 
 if [ ! -d "$CONFIGSCANDIR" ]; then
-	mkdir -p "$CONFIGSCANDIR"
-	if [ -d /root/centminmod/php.d/ ]; then
-    	cp -a /root/centminmod/php.d/* "${CONFIGSCANDIR}/"
+  mkdir -p "$CONFIGSCANDIR"
+  if [ -d /root/centminmod/php.d/ ]; then
+      cp -a /root/centminmod/php.d/* "${CONFIGSCANDIR}/"
     fi
 fi
 
 # MySQL non-tmpfs based tmpdir for MySQL temp files
 if [ ! -d "/home/mysqltmp" ]; then
-	mkdir -p /home/mysqltmp
-	chmod 1777 /home/mysqltmp
-	CHOWNMYSQL=y
+  mkdir -p /home/mysqltmp
+  chmod 1777 /home/mysqltmp
+  CHOWNMYSQL=y
 fi
 
 #####################################################
@@ -470,7 +485,7 @@ NGINX_LIBATOMIC='y'          # Nginx configured with libatomic support
 NGINX_HTTPREDIS='y'          # Nginx redis http://wiki.nginx.org/HttpRedisModule
 NGINX_HTTPREDISVER='0.3.7'   # Nginx redis version
 NGINX_PCREJIT='y'            # Nginx configured with pcre & pcre-jit support
-NGINX_PCREVER='8.41'         # Version of PCRE used for pcre-jit support in Nginx
+NGINX_PCREVER='8.42'         # Version of PCRE used for pcre-jit support in Nginx
 NGINX_ZLIBCUSTOM='y'         # Use custom zlib instead of system version
 NGINX_ZLIBVER='1.2.11'       # http://www.zlib.net/
 ORESTY_HEADERSMORE='y'       # openresty headers more https://github.com/openresty/headers-more-nginx-module
@@ -486,36 +501,36 @@ ORESTY_MEMCVER='0.18'        # openresty memc module https://github.com/openrest
 ORESTY_SRCCACHEVER='0.31'    # openresty subrequest cache module https://github.com/openresty/srcache-nginx-module
 ORESTY_DEVELKITVER='0.3.0'  # openresty ngx_devel_kit module https://github.com/simpl/ngx_devel_kit
 ORESTY_SETMISCGIT='n'        # use git master instead of version specific
-ORESTY_SETMISCVER='0.31'     # openresty set-misc-nginx module https://github.com/openresty/set-misc-nginx-module
+ORESTY_SETMISCVER='0.32'     # openresty set-misc-nginx module https://github.com/openresty/set-misc-nginx-module
 ORESTY_ECHOGIT='n'           # use git master instead of version specific
 ORESTY_ECHOVER='0.61'        # openresty set-misc-nginx module https://github.com/openresty/echo-nginx-module
-ORESTY_REDISVER='0.14'       # openresty redis2-nginx-module https://github.com/openresty/redis2-nginx-module
+ORESTY_REDISVER='0.15'       # openresty redis2-nginx-module https://github.com/openresty/redis2-nginx-module
 
 LUAJIT_GITINSTALL='y'        # opt to install luajit 2.1 from dev branch http://repo.or.cz/w/luajit-2.0.git/shortlog/refs/heads/v2.1
 LUAJIT_GITINSTALLVER='2.1'   # branch version = v2.1 will override ORESTY_LUAGITVER if LUAJIT_GITINSTALL='y'
 
 ORESTY_LUANGINX='n'             # enable or disable or ORESTY_LUA* nginx modules below
-ORESTY_LUANGINXVER='0.10.11'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
+ORESTY_LUANGINXVER='0.10.13'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
 ORESTY_LUAGITVER='2.0.5'        # luagit http://luajit.org/
 ORESTY_LUAMEMCACHEDVER='0.14'   # openresty https://github.com/openresty/lua-resty-memcached
-ORESTY_LUAMYSQLVER='0.20'    # openresty https://github.com/openresty/lua-resty-mysql
+ORESTY_LUAMYSQLVER='0.21'    # openresty https://github.com/openresty/lua-resty-mysql
 ORESTY_LUAREDISVER='0.26'       # openresty https://github.com/openresty/lua-resty-redis
-ORESTY_LUADNSVER='0.20'         # openresty https://github.com/openresty/lua-resty-dns
+ORESTY_LUADNSVER='0.21'         # openresty https://github.com/openresty/lua-resty-dns
 ORESTY_LUAUPLOADVER='0.10'      # openresty https://github.com/openresty/lua-resty-upload
 ORESTY_LUAWEBSOCKETVER='0.05'   # openresty https://github.com/openresty/lua-resty-websocket
 ORESTY_LUALOCKVER='0.07'        # openresty https://github.com/openresty/lua-resty-lock
-ORESTY_LUASTRINGVER='0.10'      # openresty https://github.com/openresty/lua-resty-string
+ORESTY_LUASTRINGVER='0.11rc1'      # openresty https://github.com/openresty/lua-resty-string
 ORESTY_LUAREDISPARSERVER='0.13'    # openresty https://github.com/openresty/lua-redis-parser
 ORESTY_LUAUPSTREAMCHECKVER='0.04'  # openresty https://github.com/openresty/lua-resty-upstream-healthcheck
-ORESTY_LUALRUCACHEVER='0.07'       # openresty https://github.com/openresty/lua-resty-lrucache
-ORESTY_LUARESTYCOREVER='0.1.13' # openresty https://github.com/openresty/lua-resty-core
+ORESTY_LUALRUCACHEVER='0.08'       # openresty https://github.com/openresty/lua-resty-lrucache
+ORESTY_LUARESTYCOREVER='0.1.15' # openresty https://github.com/openresty/lua-resty-core
 ORESTY_LUAUPSTREAMVER='0.06'       # openresty https://github.com/openresty/lua-upstream-nginx-module
 NGX_LUAUPSTREAM='n'                # disable https://github.com/openresty/lua-upstream-nginx-module
 ORESTY_LUALOGGERSOCKETVER='0.1'    # cloudflare openresty https://github.com/cloudflare/lua-resty-logger-socket
 ORESTY_LUACOOKIEVER='master'       # cloudflare openresty https://github.com/cloudflare/lua-resty-cookie
 ORESTY_LUAUPSTREAMCACHEVER='0.1.1' # cloudflare openresty https://github.com/cloudflare/lua-upstream-cache-nginx-module
 NGX_LUAUPSTREAMCACHE='n'           # disable https://github.com/cloudflare/lua-upstream-cache-nginx-module
-LUACJSONVER='2.1.0.5'              # https://github.com/openresty/lua-cjson
+LUACJSONVER='2.1.0.6'              # https://github.com/openresty/lua-cjson
 
 STRIPPHP='y'                 # set 'y' to strip PHP binary to reduce size
 PHP_INSTALL='y'              # Install PHP /w Fast Process Manager
@@ -549,7 +564,7 @@ POSTGRESQL='n'               # set to =y to install PostgreSQL 9.6 server, devel
 # YUM Repo will install whatever is latest MariaDB 5.2.x version available via the YUM REPO
 
 MDB_INSTALL='n'               # Install via RPM MariaDB MySQL Server replacement (Not recommended for VPS with less than 256MB RAM!)
-MDB_YUMREPOINSTALL='y'		  # Install MariaDB 5.5 via CentOS YUM Repo
+MDB_YUMREPOINSTALL='y'      # Install MariaDB 5.5 via CentOS YUM Repo
 
 # Define current MariaDB version
 MDB_VERONLY='5.2.14'
@@ -569,7 +584,7 @@ MYSQL_INSTALL='n'            # Install official Oracle MySQL Server (MariaDB alt
 SENDMAIL_INSTALL='n'         # Install Sendmail (and mailx) set to y and POSTFIX_INSTALL=n for sendmail
 POSTFIX_INSTALL=y            # Install Postfix (and mailx) set to n and SENDMAIL_INSTALL=y for sendmail
 # Nginx
-NGINX_VERSION='1.13.9'       # Use this version of Nginx
+NGINX_VERSION='1.13.12'       # Use this version of Nginx
 NGINX_VHOSTSSL='y'           # enable centmin.sh menu 2 prompt to create self signed SSL vhost 2nd vhost conf
 NGINXBACKUP='y'
 VHOST_PRESTATICINC='y'       # add pre-staticfiles-local.conf & pre-staticfiles-global.conf include files
@@ -577,12 +592,17 @@ NGINXDIR='/usr/local/nginx'
 NGINXCONFDIR="${NGINXDIR}/conf"
 NGINXBACKUPDIR='/usr/local/nginxbackup'
 
+# control variables post vhost creation
+# whether cloudflare.conf include file is uncommented (enabled) or commented out (disabled)
+VHOSTCTRL_CLOUDFLAREINC='n'
+# whether autoprotect-$vhostname.conf include file is uncommented (enabled) or commented out (disabled)
+VHOSTCTRL_AUTOPROTECTINC='y'
 ##################################
 ## Nginx SSL options
 # OpenSSL
 NOSOURCEOPENSSL='y'        # set to 'y' to disable OpenSSL source compile for system default YUM package setup
-OPENSSL_VERSION='1.1.0g'   # Use this version of OpenSSL http://openssl.org/
-OPENSSL_VERSIONFALLBACK='1.0.2n'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
+OPENSSL_VERSION='1.1.0h'   # Use this version of OpenSSL http://openssl.org/
+OPENSSL_VERSIONFALLBACK='1.0.2o'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
 OPENSSL_THREADS='y'        # control whether openssl 1.1 branch uses threading or not
 OPENSSL_CUSTOMPATH='/opt/openssl'  # custom directory path for OpenSSL 1.0.2+
 CLOUDFLARE_PATCHSSL='n'    # set 'y' to implement Cloudflare's chacha20 patch https://github.com/cloudflare/sslconfig
@@ -597,7 +617,7 @@ OPENSSLEQUALCIPHER_PATCH='n' # https://community.centminmod.com/posts/57916/
 
 # LibreSSL
 LIBRESSL_SWITCH='n'        # if set to 'y' it overrides OpenSSL as the default static compiled option for Nginx server
-LIBRESSL_VERSION='2.6.4'   # Use this version of LibreSSL http://www.libressl.org/
+LIBRESSL_VERSION='2.7.2'   # Use this version of LibreSSL http://www.libressl.org/
 
 # BoringSSL
 # not working yet just prep work
@@ -613,7 +633,7 @@ GPERFTOOLS_VERSION='2.6.3'        # Use this version of google-perftools
 
 # Choose whether to compile PCRE from source. Note PHP 5.3.8 already includes PCRE
 PCRE_SOURCEINSTALL='n'     
-PCRE_VERSION='8.41'          # PCRE version
+PCRE_VERSION='8.42'          # PCRE version
 
 # PHP and Cache/Acceleration
 IMAGICKPHP_VER='3.4.3'   # PHP extension for imagick
@@ -621,10 +641,10 @@ MAILPARSEPHP_VER='2.1.6'       # https://pecl.php.net/package/mailparse
 MAILPARSEPHP_COMPATVER='3.0.2' # For PHP 7
 MEMCACHED_INSTALL='y'          # Install Memcached
 LIBEVENT_VERSION='2.1.8'   # Use this version of Libevent
-MEMCACHED_VERSION='1.5.6'  # Use this version of Memcached server
+MEMCACHED_VERSION='1.5.7'  # Use this version of Memcached server
 MEMCACHE_VERSION='3.0.8'    # Use this version of Memcache
 MEMCACHEDPHP_VER='2.2.0'    # Memcached PHP extension not server
-MEMCACHEDPHP_SEVENVER='3.0.3' # Memcached PHP 7 only extension version
+MEMCACHEDPHP_SEVENVER='3.0.4' # Memcached PHP 7 only extension version
 LIBMEMCACHED_YUM='y'        # switch to YUM install instead of source compile
 LIBMEMCACHED_VER='1.0.18'   # libmemcached version for source compile
 TWEMPERF_VER='0.1.1'
@@ -633,12 +653,14 @@ REDISPHP_VER='3.1.6'        # redis PHP version for PHP <7.x
 REDISPHPSEVEN_VER='3.1.6'   # redis PHP version for PHP =>7.x
 REDISPHP_GIT='n'            # pull php 7 redis extension from git or pecl downloads
 PHPMONGODB='n'              # MongoDB PHP extension install
-MONGODBPHP_VER='1.4.0'      # MongoDB PHP version
+MONGODBPHP_VER='1.4.3'      # MongoDB PHP version
 MONGODB_SASL='n'            # SASL not working yet leave = n
 PDOPGSQL_PHPVER='9.6'       # pdo-pgsql PHP extension version for postgresql
-LIBSODIUM_VER='1.0.15'      # https://github.com/jedisct1/libsodium/releases
+PHP_LIBZIP='n'              # use newer libzip instead of PHP embedded zip
+LIBZIP_VER='1.5.0'          # required for PHP 7.2 + with libsodium & argon2
+LIBSODIUM_VER='1.0.16'      # https://github.com/jedisct1/libsodium/releases
 LIBSODIUM_NATIVE='n'        # optimise for specific cpu not portable between different cpu modules
-LIBARGON_VER='20161029'     # https://github.com/P-H-C/phc-winner-argon2
+LIBARGON_VER='20171227'     # https://github.com/P-H-C/phc-winner-argon2
 PHP_MCRYPTPECL='y'          # PHP 7.2 deprecated mcrypt support so this adds it back as PECL extension
 PHP_MCRYPTPECLVER='1.0.1'   # https://pecl.php.net/package/mcrypt
 
@@ -648,7 +670,7 @@ PHP_MEMCACHED='y'           # memcached PHP extension
 FFMPEGVER='0.6.0'
 SUHOSINVER='0.9.38'
 PHP_OVERWRITECONF='y'       # whether to show the php upgrade prompt to overwrite php-fpm.conf
-PHP_VERSION='5.6.34'        # Use this version of PHP
+PHP_VERSION='5.6.36'        # Use this version of PHP
 PHP_MIRRORURL='http://php.net'
 PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
 XCACHE_VERSION='3.2.0'      # Use this version of Xcache
@@ -682,6 +704,7 @@ RPMFORGEREPO_DISABLE='n'
 AXIVOREPO_DISABLE='y'
 REMIREPO_DISABLE='n'
 ATRPMSREPO_DISABLE='y'
+VARNISHREPO_DISABLE='y'
 
 # custom curl/libcurl RPM for 7.44 and higher
 # enable with CUSTOM_CURLRPM='y'
@@ -789,6 +812,7 @@ source "inc/downloads_centosfive.inc"
 source "inc/downloads_centossix.inc"
 source "inc/downloads_centosseven.inc"
 source "inc/downloadlinks.inc"
+source "inc/libzip.inc"
 source "inc/downloads.inc"
 source "inc/yumpriorities.inc"
 source "inc/yuminstall.inc"
@@ -881,6 +905,7 @@ source "inc/mysqlsecure.inc"
 source "inc/pcre.inc"
 source "inc/jemalloc.inc"
 source "inc/zlib.inc"
+source "inc/google_perftools.inc"
 source "inc/updater_submenu.inc"
 source "inc/centminfinish.inc"
 
@@ -899,17 +924,17 @@ fi
 if [ ! -f /etc/centminmod-release ];then
 echo "$SCRIPT_VERSION" > /etc/centminmod-release
 else
-	if [[ "$SCRIPT_VERSION" != "$(cat /etc/centminmod-release)" ]]; then
-	echo "$SCRIPT_VERSION" > /etc/centminmod-release
-	fi
+  if [[ "$SCRIPT_VERSION" != "$(cat /etc/centminmod-release)" ]]; then
+  echo "$SCRIPT_VERSION" > /etc/centminmod-release
+  fi
 fi
 
 if [ -f /etc/centminmod-versionlog ];then
-	if [[ "$SCRIPT_VERSION" != "$(cat /etc/centminmod-versionlog)" ]]; then
-	echo "$SCRIPT_VERSION #`date`" >> /etc/centminmod-versionlog
-	fi
+  if [[ "$SCRIPT_VERSION" != "$(cat /etc/centminmod-versionlog)" ]]; then
+  echo "$SCRIPT_VERSION #`date`" >> /etc/centminmod-versionlog
+  fi
 else
-	echo "$SCRIPT_VERSION #`date`" >> /etc/centminmod-versionlog
+  echo "$SCRIPT_VERSION #`date`" >> /etc/centminmod-versionlog
 fi
 
 if [ ! -f /usr/bin/cminfo_updater ]; then
@@ -941,9 +966,9 @@ fi
 #
 ###############################################################
 KEYPRESS_PARAM='-s -n1 -p'   # Read a keypress without hitting ENTER.
-		# -s means do not echo input.
-		# -n means accept only N characters of input.
-		# -p means echo the following prompt before reading input
+    # -s means do not echo input.
+    # -n means accept only N characters of input.
+    # -p means echo the following prompt before reading input
 ASKCMD="read $KEYPRESS_PARAM "
 # MACHINE_TYPE=`uname -m` # Used to detect if OS is 64bit or not.
 
@@ -955,6 +980,9 @@ CM_INSTALLDIR=$CUR_DIR
     # echo ${CM_INSTALLDIR}    
 
 if [ -f "${CM_INSTALLDIR}/inc/custom_config.inc" ]; then
+  if [ -f /usr/bin/dos2unix ]; then
+    dos2unix -q "inc/custom_config.inc"
+  fi
     source "inc/custom_config.inc"
     if [ -d "${CENTMINLOGDIR}" ]; then
         cat "inc/custom_config.inc" > "${CENTMINLOGDIR}/inc-custom-config-settings_${DT}.log"
@@ -963,6 +991,9 @@ fi
 
 if [ -f "${CONFIGSCANBASE}/custom_config.inc" ]; then
     # default is at /etc/centminmod/custom_config.inc
+  if [ -f /usr/bin/dos2unix ]; then
+    dos2unix -q "${CONFIGSCANBASE}/custom_config.inc"
+  fi
     source "${CONFIGSCANBASE}/custom_config.inc"
     if [ -d "${CENTMINLOGDIR}" ]; then
         cat "${CONFIGSCANBASE}/custom_config.inc" > "${CENTMINLOGDIR}/etc-centminmod-custom-config-settings_${DT}.log"
@@ -970,6 +1001,9 @@ if [ -f "${CONFIGSCANBASE}/custom_config.inc" ]; then
 fi
 
 if [ -f "${CM_INSTALLDIR}/inc/z_custom.inc" ]; then
+  if [ -f /usr/bin/dos2unix ]; then
+    dos2unix -q "${CM_INSTALLDIR}/inc/z_custom.inc"
+  fi
     source "${CM_INSTALLDIR}/inc/z_custom.inc"
     if [ -d "${CENTMINLOGDIR}" ]; then
         cat "${CM_INSTALLDIR}/inc/z_custom.inc" > "${CENTMINLOGDIR}/inc-zcustom-config-settings_${DT}.log"
@@ -1221,11 +1255,11 @@ fi
 
 if [ ${ARCH} == 'x86_64' ];
 then
-	if [ "$UNATTENDED" == 'n' ]; then
+  if [ "$UNATTENDED" == 'n' ]; then
         ASK "Would you like to exclude installation of 32bit Yum packages? (Recommended for 64bit CentOS) [y/n] "
-	else
-	   key='y'
-	fi #unattended
+  else
+     key='y'
+  fi #unattended
     if [[ "$key" = [yY] ]];
     then
         \cp -f /etc/yum.conf /etc/yum.bak
@@ -1249,17 +1283,17 @@ fi
     fi
 fi
 
-	if [ "$UNATTENDED" == 'n' ]; then
+  if [ "$UNATTENDED" == 'n' ]; then
 ASK "Would you like to secure /tmp and /var/tmp? (Highly recommended) [y/n] "   
-	else
-	key='y'
-	fi #unattended
+  else
+  key='y'
+  fi #unattended
 {
 if [[ "$key" = [yY] ]]; then
 echo "Centmin Mod secure /tmp # `date`"
-	echo "*************************************************"
-	cecho "* Secured /tmp and /var/tmp" $boldgreen
-	echo "*************************************************"
+  echo "*************************************************"
+  cecho "* Secured /tmp and /var/tmp" $boldgreen
+  echo "*************************************************"
 
 # account for /home free disk space as well
 if [[ "$CENTOS_SEVEN" = '7' ]]; then
@@ -1426,15 +1460,15 @@ elif [[ ! -f /proc/user_beancounters ]]; then
     # total memory size is greater than ~7.72GB
     # will give /tmp a size equal to 1/2 total memory
     if [[ "$TOTALMEM" -ge '8100001' ]]; then
-	   cp -ar /tmp /tmp_backup
+     cp -ar /tmp /tmp_backup
        rm -rf /tmp
-	   mkdir -p /tmp
-	   mount -t tmpfs -o rw,noexec,nosuid tmpfs /tmp
-	   chmod 1777 /tmp
+     mkdir -p /tmp
+     mount -t tmpfs -o rw,noexec,nosuid tmpfs /tmp
+     chmod 1777 /tmp
        cp -ar /tmp_backup/* /tmp
-	   echo "tmpfs /tmp tmpfs rw,noexec,nosuid 0 0" >> /etc/fstab
+     echo "tmpfs /tmp tmpfs rw,noexec,nosuid 0 0" >> /etc/fstab
        cp -ar /var/tmp /var/tmp_backup
-	   ln -s /tmp /var/tmp
+     ln -s /tmp /var/tmp
        cp -ar /var/tmp_backup/* /tmp
        rm -rf /tmp_backup
        rm -rf /var/tmp_backup
@@ -1516,11 +1550,11 @@ fi
 
 #yuminstall
 
-	if [ "$UNATTENDED" == 'n' ]; then
+  if [ "$UNATTENDED" == 'n' ]; then
 ASK "Would you like to set the server localtime? [y/n] "  
-	else
-	key='y'
-	fi #unattended 
+  else
+  key='y'
+  fi #unattended 
 if [[ "$key" = [yY] ]];
 then
     echo "*************************************************"
@@ -1553,13 +1587,13 @@ cecho "it for both personal and commercial use as licensed under the GPL." $bold
 echo " "
 cecho "Please read the included readme.txt before using this script." $boldmagenta
 echo " "
-	if [ "$UNATTENDED" == 'n' ]; then
+  if [ "$UNATTENDED" == 'n' ]; then
 ASK "Would you like to continue? [y/n] "   
 if [[ "$key" = [nN] ]];
 then
     exit 0
 fi
-	fi #unattended 
+  fi #unattended 
 
 # Set LIBDIR
 if [ ${ARCH} == 'x86_64' ];
@@ -1572,14 +1606,14 @@ fi
 #DIR_TMP="/svr-setup"
 #if [ -a "$DIR_TMP" ];
 #then
-#	ASK "It seems that you have run this script before, would you like to start from after setting the timezone? [y/n] "
-#	if [[ "$key" = [nN] ]];
-#	then
-#		run_once
-#	fi
+# ASK "It seems that you have run this script before, would you like to start from after setting the timezone? [y/n] "
+# if [[ "$key" = [nN] ]];
+# then
+#   run_once
+# fi
 #else
-#	mkdir $DIR_TMP
-#	run_once
+# mkdir $DIR_TMP
+# run_once
 #fi
 
 if [ ! -f "${DIR_TMP}/securedtmp.log" ]; then
@@ -1814,7 +1848,7 @@ xcacheinstall_ask
 #ASK "Install APC? (By default uses 32MB RAM) [y/n] "
 # if ZOPCACHEDFT override enabled = yY then skip APC Cache install
 if [[ "$APCINSTALL" = [yY] && "$ZOPCACHEDFT" = [nN] ]]; then
-	funct_apcsourceinstall
+  funct_apcsourceinstall
 fi
 
 # if ZOPCACHEDFT override enabled = yY and PHP_VERSION is not 5.5, 5.6 or 5.7
@@ -1826,12 +1860,12 @@ PHPMVER=$(echo "$PHP_VERSION" | cut -d . -f1,2)
 # ZOPCACHE_OVERRIDE=y allows you to override PHP 5.5-7.0's inbuilt included
 # Zend Opcache version with one available from pecl site
 if [[ "$ZOPCACHEDFT" = [yY] ]] && [[ "$PHPMVER" = 5.[234] || "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
-	zopcacheinstall
+  zopcacheinstall
 fi
 
 # if PHP_VERSION = 5.5 or newer will need to setup a zendopcache.ini settings file
 if [[ "$PHPMVER" > 5.4 && "$ZOPCACHE_OVERRIDE" != [yY] ]] && [[ "$APCINSTALL" = [nN] || "$ZOPCACHEDFT" = [yY] ]]; then
-	zopcache_initialini
+  zopcache_initialini
 fi
 
 phpsededit
@@ -1839,7 +1873,7 @@ phpsededit
 # igbinary still needed for libmemcached PHP extension if ZOPCACHE=yY
 # or for redis php extension
 if [[ "$APCINSTALL" = [nN] || "$ZOPCACHEDFT" = [yY] ]]; then
-	funct_igbinaryinstall
+  funct_igbinaryinstall
 fi
 
 postfix_presetup
@@ -1994,9 +2028,9 @@ phpiadmin
     echo "*************************************************"
 
 if [[ "$MDB_INSTALL" == [yY] || "$MYSQL_INSTALL" == [yY] || "$UNATTENDED" == [yY] ]]; then
-	securemysql
+  securemysql
 else
-	securemysql
+  securemysql
 fi
 
     echo "*************************************************"
@@ -2076,48 +2110,48 @@ funct_selinux() {
         SELINUXCHECK=$(grep '^SELINUX=' /etc/selinux/config | cut -d '=' -f2)
         
         if [[ "$SELINUXCHECK" == 'enforcing' ]]; then
-	       echo ""
+         echo ""
             cecho "---------------------------------------------" $boldyellow
-	       echo "Checking SELinux status...."
-	       echo "SELinux enabled"
-	       echo ""
-	       read -ep "Do you want to disable SELinux ? [y/n]: " disableselinux
+         echo "Checking SELinux status...."
+         echo "SELinux enabled"
+         echo ""
+         read -ep "Do you want to disable SELinux ? [y/n]: " disableselinux
             cecho "---------------------------------------------" $boldyellow
-	       echo ""
+         echo ""
         
-	       if [[ "$disableselinux" == [yY] ]]; then
+         if [[ "$disableselinux" == [yY] ]]; then
         
-	       echo ""
+         echo ""
             cecho "---------------------------------------------" $boldyellow
-	       echo "Disabling SELinux..."
+         echo "Disabling SELinux..."
         
-	       sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' $SELINUXCONFIGFILE
+         sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' $SELINUXCONFIGFILE
             sed -i 's/SELINUX=permissive/SELINUX=disabled/g' $SELINUXCONFIGFILE
-	       setenforce 0
+         setenforce 0
         
-	       echo ""
+         echo ""
             cecho "---------------------------------------------" $boldyellow
-	       echo "checking $SELINUXCONFIGFILE"
+         echo "checking $SELINUXCONFIGFILE"
         
-	       cat "$SELINUXCONFIGFILE" | grep '^SELINUX='
+         cat "$SELINUXCONFIGFILE" | grep '^SELINUX='
         
             cecho "---------------------------------------------" $boldyellow
-	       echo ""
+         echo ""
         
-	       exit
+         exit
         
-	       else
+         else
                 exit
-	       fi
+         fi
         else
-	       echo ""
+         echo ""
             cecho "---------------------------------------------" $boldyellow
-	       echo "checking $SELINUXCONFIGFILE"
-	       echo "SELinux already disabled"
-	       echo "SELINUX=$SELINUXCHECK"
+         echo "checking $SELINUXCONFIGFILE"
+         echo "SELinux already disabled"
+         echo "SELINUX=$SELINUXCHECK"
             cecho "---------------------------------------------" $boldyellow
-	       echo ""
-	       exit      
+         echo ""
+         exit      
         fi
     else
         echo ""
@@ -2132,7 +2166,7 @@ funct_selinux() {
 funct_showtempfile() {
 
     echo "*************************************************"
-	cat "$TMP_MSGFILE"
+  cat "$TMP_MSGFILE"
     echo "*************************************************"
 
 }
@@ -2150,8 +2184,8 @@ TMP_MSGFILE="$DIR_TMP/msglogs/$RANDOM.msg"
 }
 
 function cleanup_msg {
-	rm -f "$TMP_MSGFILE"
-	exit 1
+  rm -f "$TMP_MSGFILE"
+  exit 1
 }
 
 # http://linuxcommand.org/wss0160.php

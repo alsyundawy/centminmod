@@ -2,6 +2,62 @@
 opensslpatches() {
   {
 
+# Cache timing vulnerability in RSA Key Generation (CVE-2018-0737) patch
+# https://community.centminmod.com/threads/14584/
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.0.2o' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.0.2o"
+    echo "######################################################################"
+    echo "Cache timing vulnerability in RSA Key Generation (CVE-2018-0737) patch"
+    echo "https://community.centminmod.com/threads/14584/"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL1.0.2o-cache-timing-rsa-key-gen.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL1.0.2o-cache-timing-rsa-key-gen.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL1.0.2o-cache-timing-rsa-key-gen.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL1.0.2o-cache-timing-rsa-key-gen.patch"
+        cachersapatch_err=$?
+        if [[ "$cachersapatch_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL1.0.2o-cache-timing-rsa-key-gen.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
+
+# Cache timing vulnerability in RSA Key Generation (CVE-2018-0737) patch
+# https://community.centminmod.com/threads/14584/
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.1.0h' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.0h"
+    echo "######################################################################"
+    echo "Cache timing vulnerability in RSA Key Generation (CVE-2018-0737) patch"
+    echo "https://community.centminmod.com/threads/14584/"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL1.1h-cache-timing-rsa-key-gen.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL1.1h-cache-timing-rsa-key-gen.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL1.1h-cache-timing-rsa-key-gen.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL1.1h-cache-timing-rsa-key-gen.patch"
+        cachersapatch_err=$?
+        if [[ "$cachersapatch_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL1.1h-cache-timing-rsa-key-gen.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi 
+
 # Equal Cipher Preference Group patch for 64bit systems only
 # OpenSSL1.1g-equal-preference-cipher-groups.patch
 if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLEQUALCIPHER_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0g' ]]; then
@@ -40,7 +96,7 @@ if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLEQUALCIP
 fi
 
 # ECDSA performance patch https://community.centminmod.com/posts/57725/
-if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0g' ]]; then
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0g' ]] || [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0h' ]]; then
     echo
     echo  "######################################################################"
     echo "Patching OpenSSL 1.1.0g"
@@ -68,7 +124,7 @@ fi
 
 # ECDHX25519 performance patch for 64bit systems only
 # OpenSSL1.1g-double-performance-ecdhx-25519.patch
-if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDHX_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0g' ]]; then
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDHX_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0g' ]] || [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDHX_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0h' ]]; then
     echo
     echo  "######################################################################"
     echo "Patching OpenSSL 1.1.0g"
@@ -112,7 +168,7 @@ if [[ "${OPENSSL_VERSION}" = '1.0.1g' ]]; then
     echo  "######################################################################"
 fi
 
-if [[ "${OPENSSL_VERSION}" = '1.0.2i' || "${OPENSSL_VERSION}" = '1.0.2m' ]] || [[ "$TLSONETHREE" = [yY] ]] || [[ "$(grep -w 'tls1_3' Configure)" ]]; then
+if [[ "${OPENSSL_VERSION}" = '1.1.0xx' || "${OPENSSL_VERSION}" = '1.0.2i' || "${OPENSSL_VERSION}" = '1.0.2m' ]] || [[ "$TLSONETHREE" = [yY] ]] || [[ "$(grep -w 'tls1_3' Configure)" ]]; then
     # cloudflare patch chacha20 support does not seem to
     # work with openssl 1.0.2i
     # https://community.centminmod.com/posts/36691/
@@ -134,7 +190,7 @@ if [[ "$CLOUDFLARE_PATCHSSL" = [yY] && "$DETECTOPENSSL_ONEZERO" = '1.0' ]]; then
             figlet -ckf standard "Cloudflare Chacha20 Patch"
         fi
         echo  "######################################################################"
-        echo "Patching OpenSSL 1.0.2j"
+        echo "Patching OpenSSL 1.0.2o"
         echo  "######################################################################"
         echo "Cloudflare ChaCha20 patch"
         echo "https://github.com/cloudflare/sslconfig/blob/master/patches/openssl__chacha20_poly1305_draft_and_rfc_ossl102j.patch"
@@ -175,7 +231,7 @@ if [[ "$CLOUDFLARE_PATCHSSL" = [yY] && "$DETECTOPENSSL_ONEZERO" = '1.0' ]]; then
             # check /svr-setup/openssl-1.0.2g/crypto/chacha20_poly1305/chacha20.c exists
             OPEENSSL_CFPATCHED='y'
             echo  "######################################################################"
-            echo  "OpenSSL 1.0.2j patched"
+            echo  "OpenSSL 1.0.2o patched"
             echo  "######################################################################"
             if [ -f "$(which figlet)" ]; then
                 figlet -ckf standard "Cloudflare Chacha20 Patched"
@@ -192,7 +248,7 @@ if [[ "$CLOUDFLARE_PATCHSSL" = [yY] && "$DETECTOPENSSL_ONEZERO" = '1.0' ]]; then
     # fi
 fi # CLOUDFLARE_PATCHSSL
 
-if [[ "$CLOUDFLARE_PATCHSSL" = [yY] && "$DETECTOPENSSL_ONEZERO" = '1.1' ]]; then
+if [[ "$CLOUDFLARE_PATCHSSL" = [yY] && "$DETECTOPENSSL_ONEZERO" = '1.1' ]] && [[ "$DETECTOPENSSL_ONEONE" != '1.1.1' ]] ; then
     if [[ "$TLSONETHREE" != [yY] ]]; then
         if [ -f "$(which figlet)" ]; then
             figlet -ckf standard "Cloudflare OpenSSL 1.1 Smarter Chacha20 Patch"

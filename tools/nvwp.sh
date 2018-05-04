@@ -9,13 +9,14 @@ branchname='123.09beta01'
 CUR_DIR="/usr/local/src/centminmod"
 
 DEBUG='n'
+CMSDEBUG='n'
 CENTMINLOGDIR='/root/centminlogs'
 DT=$(date +"%d%m%y-%H%M%S")
 CURL_TIMEOUTS=' --max-time 5 --connect-timeout 5'
 DIR_TMP=/svr-setup
 OPENSSL_VERSION=$(awk -F "'" /'^OPENSSL_VERSION/ {print $2}' $CUR_DIR/centmin.sh)
 # CURRENTIP=$(echo $SSH_CLIENT | awk '{print $1}')
-# CURRENTCOUNTRY=$(curl -4s${CURL_TIMEOUTS} ipinfo.io/$CURRENTIP/country)
+# CURRENTCOUNTRY=$(curl -4s${CURL_TIMEOUTS} https://ipinfo.io/$CURRENTIP/country)
 SCRIPT_DIR=$(readlink -f $(dirname ${BASH_SOURCE[0]}))
 LOGPATH="${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nvwp.log"
 USE_NGINXMAINEXTLOGFORMAT='n'
@@ -209,19 +210,55 @@ if [[ -f /etc/system-release && "$(awk '{print $1,$2,$3}' /etc/system-release)" 
 fi
 
 cmservice() {
-        servicename=$1
-        action=$2
-        if [[ "$CENTOS_SEVEN" != '7' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
-        echo "service ${servicename} $action"
-        if [[ "$CMSDEBUG" = [nN] ]]; then
-                service ${servicename} $action
-        fi
-        else
-        echo "systemctl $action ${servicename}.service"
-        if [[ "$CMSDEBUG" = [nN] ]]; then
-                systemctl $action ${servicename}.service
-        fi
-        fi
+  servicename=$1
+  action=$2
+  if [[ "$CENTOS_SEVEN" != '7' ]] && [[ "${servicename}" = 'haveged' || "${servicename}" = 'pure-ftpd' || "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
+    echo "service ${servicename} $action"
+    if [[ "$CMSDEBUG" = [nN] ]]; then
+      service "${servicename}" "$action"
+    fi
+  else
+    if [[ "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
+      echo "service ${servicename} $action"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        service "${servicename}" "$action"
+      fi
+    else
+      echo "systemctl $action ${servicename}.service"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        systemctl "$action" "${servicename}.service"
+      fi
+    fi
+  fi
+}
+
+cmchkconfig() {
+  servicename=$1
+  status=$2
+  if [[ "$CENTOS_SEVEN" != '7' ]] && [[ "${servicename}" = 'haveged' || "${servicename}" = 'pure-ftpd' || "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
+    echo "chkconfig ${servicename} $status"
+    if [[ "$CMSDEBUG" = [nN] ]]; then
+      chkconfig "${servicename}" "$status"
+    fi
+  else
+    if [[ "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
+      echo "chkconfig ${servicename} $status"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        chkconfig "${servicename}" "$status"
+      fi
+    else
+      if [ "$status" = 'on' ]; then
+        status=enable
+      fi
+      if [ "$status" = 'off' ]; then
+        status=disable
+      fi
+      echo "systemctl $status ${servicename}.service"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        systemctl "$status" "${servicename}.service"
+      fi
+    fi
+  fi
 }
 
 dbsetup() {
@@ -1677,6 +1714,28 @@ cecho "$vhostname setup info log saved at: " $boldwhite
 cecho "$LOGPATH" $boldwhite
 cecho "-------------------------------------------------------------" $boldyellow
 echo ""
+
+  # control variables after vhost creation
+  # whether cloudflare.conf include file is uncommented (enabled) or commented out (disabled)
+  if [[ "$VHOSTCTRL_CLOUDFLAREINC" = [yY] ]]; then
+    if [ -f "/usr/local/nginx/conf/conf.d/$vhostname.conf" ]; then
+      sed -i "s|^  #include \/usr\/local\/nginx\/conf\/cloudflare.conf;|  include \/usr\/local\/nginx\/conf\/cloudflare.conf;|g" "/usr/local/nginx/conf/conf.d/$vhostname.conf"
+    fi
+    if [ -f "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf" ]; then
+      sed -i "s|^  #include \/usr\/local\/nginx\/conf\/cloudflare.conf;|  include \/usr\/local\/nginx\/conf\/cloudflare.conf;|g" "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
+    fi
+  fi
+  # whether autoprotect-$vhostname.conf include file is uncommented (enabled) or commented out (disabled)
+  if [[ "$VHOSTCTRL_AUTOPROTECTINC" = [nN] ]]; then
+    if [ -f "/usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf" ]; then
+      if [ -f "/usr/local/nginx/conf/conf.d/$vhostname.conf" ]; then
+        sed -i "s|^  include \/usr\/local\/nginx\/conf\/autoprotect\/$vhostname\/autoprotect-$vhostname.conf;|  #include \/usr\/local\/nginx\/conf\/autoprotect\/$vhostname\/autoprotect-$vhostname.conf;|g" "/usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf"
+      fi
+      if [ -f "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf" ]; then
+        sed -i "s|^  include \/usr\/local\/nginx\/conf\/autoprotect\/$vhostname\/autoprotect-$vhostname.conf;|  #include \/usr\/local\/nginx\/conf\/autoprotect\/$vhostname\/autoprotect-$vhostname.conf;|g" "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
+      fi
+    fi
+  fi
 
 else
 

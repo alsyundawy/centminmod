@@ -25,6 +25,7 @@ CENTMINLOGDIR='/root/centminlogs'
 ##########################################################################
 if [ -f "/etc/centminmod/custom_config.inc" ]; then
   # default is at /etc/centminmod/custom_config.inc
+  dos2unix -q "/etc/centminmod/custom_config.inc"
   . "/etc/centminmod/custom_config.inc"
 fi
 if [[ "$WHOIS_SHOWREGISTRANT" = [yY] ]]; then
@@ -49,7 +50,7 @@ if [[ ! "$(grep -w '43' /etc/csf/csf.conf)" ]]; then
     sed -i "s/TCP_OUT = \"/TCP_OUT = \"43,/g" /etc/csf/csf.conf
     sed -i "s/TCP6_OUT = \"/TCP6_OUT = \"43,/g" /etc/csf/csf.conf
   fi
-  csf -r >/dev/null 2>&1
+  csf -ra >/dev/null 2>&1
 fi
 
 if [[ "$CHECKDOMAINS_DEBUG" != [yY] ]]; then
@@ -131,7 +132,7 @@ for d in ${OTHERDOMAINS[@]}; do
     
     for ip in ${DOMAINIPS[@]}; do
       if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        curl -4s ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
+        curl -4s https://ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
         ipaddr=$(awk -F ": " '/ip:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
         country=$(awk -F ": " '/country:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
         org=$(awk -F ": " '/org:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
@@ -227,7 +228,7 @@ for d in ${OTHERDOMAINS[@]}; do
     
     for ip in ${DOMAINIPS[@]}; do
       if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        curl -4s ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
+        curl -4s https://ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
         ipaddr=$(awk -F ": " '/ip:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
         country=$(awk -F ": " '/country:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
         org=$(awk -F ": " '/org:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
@@ -323,7 +324,7 @@ for d in ${OTHERDOMAINS[@]}; do
     
     for ip in ${DOMAINIPS[@]}; do
       if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-        curl -4s ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
+        curl -4s https://ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
         ipaddr=$(awk -F ": " '/ip:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
         country=$(awk -F ": " '/country:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
         org=$(awk -F ": " '/org:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
@@ -426,7 +427,7 @@ if [[ "$CHECKDOMAINS_DEBUG" != [yY] ]]; then
       
       for ip in ${DOMAINIPS[@]}; do
         if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-          curl -4s ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
+          curl -4s https://ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
           ipaddr=$(awk -F ": " '/ip:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
           country=$(awk -F ": " '/country:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
           org=$(awk -F ": " '/org:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
@@ -522,7 +523,7 @@ if [[ "$CHECKDOMAINS_DEBUG" != [yY] ]]; then
       
       for ip in ${DOMAINIPS[@]}; do
         if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-          curl -4s ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
+          curl -4s https://ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
           ipaddr=$(awk -F ": " '/ip:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
           country=$(awk -F ": " '/country:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
           org=$(awk -F ": " '/org:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
@@ -618,7 +619,7 @@ if [[ "$CHECKDOMAINS_DEBUG" != [yY] ]]; then
       
       for ip in ${DOMAINIPS[@]}; do
         if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-          curl -4s ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
+          curl -4s https://ipinfo.io/$ip 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' > "${CTMPDIR}/${d}-ip.txt"
           ipaddr=$(awk -F ": " '/ip:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
           country=$(awk -F ": " '/country:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")
           org=$(awk -F ": " '/org:/ {print $2}' "${CTMPDIR}/${d}-ip.txt")

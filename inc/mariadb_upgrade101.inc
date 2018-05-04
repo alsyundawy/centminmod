@@ -186,7 +186,7 @@ mariadb101install() {
     fi
 
     echo "*************************************************"
-	cecho "MariaDB 10.1.x Repo setup..." $boldgreen
+    cecho "MariaDB 10.1.x Repo setup..." $boldgreen
    echo "*************************************************"
 echo ""
 
@@ -400,7 +400,7 @@ cecho "yum -q -y install MariaDB-client MariaDB-common MariaDB-compat MariaDB-de
 echo ""
 time yum -y install MariaDB-client MariaDB-common MariaDB-compat MariaDB-devel MariaDB-server MariaDB-shared --disablerepo=epel --disableplugin=priorities
 
-\cp -f /etc/my.cnf /etc/my.cnf-newold
+\cp -af /etc/my.cnf /etc/my.cnf-newold-mariadb10-1
 echo ""
     echo "*************************************************"
     cecho "* Adjust old MariaDB 10.x /etc/my.cnf " $boldyellow
@@ -421,6 +421,7 @@ cat >>/etc/my.cnf<<FFF
 
 [mariadb-10.1]
 innodb_file_format = Barracuda
+innodb_default_row_format = dynamic
 innodb_file_per_table = 1
 
 ## wsrep specific

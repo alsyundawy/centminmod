@@ -1,24 +1,11 @@
-From 781f7758f15fd636eb39fba79cd6be439411c61b Mon Sep 17 00:00:00 2001
-From: PikachuEXE <pikachuexe@gmail.com>
-Date: Wed, 14 Mar 2018 14:45:14 +0800
-Subject: [PATCH] HTTP/2: add support for HPACK encoding
+From: kn007 <kn007@126.com>
+Date: Fri, 23 Mar 2018 19:31:02 +0800
+Subject: Add HTTP2 HPACK Encoding Support
 
----
- auto/modules                            |   4 +
- auto/options                            |   3 +
- src/core/ngx_murmurhash.c               |  60 +++++
- src/core/ngx_murmurhash.h               |   2 +
- src/http/v2/ngx_http_v2.c               |  14 ++
- src/http/v2/ngx_http_v2.h               |  82 ++++++
- src/http/v2/ngx_http_v2_filter_module.c | 153 +++---------
- src/http/v2/ngx_http_v2_table.c         | 431 ++++++++++++++++++++++++++++++++
- 8 files changed, 632 insertions(+), 117 deletions(-)
-
-diff --git a/auto/modules b/auto/modules
-index b9fa3bbe..8a44766d 100644
---- a/auto/modules
-+++ b/auto/modules
-@@ -437,6 +437,10 @@ if [ $HTTP = YES ]; then
+diff -uNr a/auto/modules b/auto/modules
+--- a/auto/modules	2018-03-20 23:58:31.000000000 +0800
++++ b/auto/modules	2018-03-23 19:29:34.659933012 +0800
+@@ -438,6 +438,10 @@
          . auto/module
      fi
  
@@ -29,11 +16,10 @@ index b9fa3bbe..8a44766d 100644
      if :; then
          ngx_module_name=ngx_http_static_module
          ngx_module_incs=
-diff --git a/auto/options b/auto/options
-index 24c2618b..edcf9efc 100644
---- a/auto/options
-+++ b/auto/options
-@@ -59,6 +59,7 @@ HTTP_CHARSET=YES
+diff -uNr a/auto/options b/auto/options
+--- a/auto/options	2018-03-20 23:58:31.000000000 +0800
++++ b/auto/options	2018-03-23 19:29:34.659933012 +0800
+@@ -59,6 +59,7 @@
  HTTP_GZIP=YES
  HTTP_SSL=NO
  HTTP_V2=NO
@@ -41,7 +27,7 @@ index 24c2618b..edcf9efc 100644
  HTTP_SSI=YES
  HTTP_POSTPONE=NO
  HTTP_REALIP=NO
-@@ -222,6 +223,7 @@ $0: warning: the \"--with-ipv6\" option is deprecated"
+@@ -223,6 +224,7 @@
  
          --with-http_ssl_module)          HTTP_SSL=YES               ;;
          --with-http_v2_module)           HTTP_V2=YES                ;;
@@ -49,7 +35,7 @@ index 24c2618b..edcf9efc 100644
          --with-http_realip_module)       HTTP_REALIP=YES            ;;
          --with-http_addition_module)     HTTP_ADDITION=YES          ;;
          --with-http_xslt_module)         HTTP_XSLT=YES              ;;
-@@ -432,6 +434,7 @@ cat << END
+@@ -434,6 +436,7 @@
  
    --with-http_ssl_module             enable ngx_http_ssl_module
    --with-http_v2_module              enable ngx_http_v2_module
@@ -57,11 +43,10 @@ index 24c2618b..edcf9efc 100644
    --with-http_realip_module          enable ngx_http_realip_module
    --with-http_addition_module        enable ngx_http_addition_module
    --with-http_xslt_module            enable ngx_http_xslt_module
-diff --git a/src/core/ngx_murmurhash.c b/src/core/ngx_murmurhash.c
-index 5ade658d..4932f20d 100644
---- a/src/core/ngx_murmurhash.c
-+++ b/src/core/ngx_murmurhash.c
-@@ -50,3 +50,63 @@ ngx_murmur_hash2(u_char *data, size_t len)
+diff -uNr a/src/core/ngx_murmurhash.c b/src/core/ngx_murmurhash.c
+--- a/src/core/ngx_murmurhash.c	2018-03-20 23:58:31.000000000 +0800
++++ b/src/core/ngx_murmurhash.c	2018-03-23 19:29:34.660933011 +0800
+@@ -50,3 +50,63 @@
  
      return h;
  }
@@ -125,10 +110,9 @@ index 5ade658d..4932f20d 100644
 +
 +    return h;
 +}
-diff --git a/src/core/ngx_murmurhash.h b/src/core/ngx_murmurhash.h
-index 54e867d3..322b3df9 100644
---- a/src/core/ngx_murmurhash.h
-+++ b/src/core/ngx_murmurhash.h
+diff -uNr a/src/core/ngx_murmurhash.h b/src/core/ngx_murmurhash.h
+--- a/src/core/ngx_murmurhash.h	2018-03-20 23:58:31.000000000 +0800
++++ b/src/core/ngx_murmurhash.h	2018-03-23 19:29:34.660933011 +0800
 @@ -15,5 +15,7 @@
  
  uint32_t ngx_murmur_hash2(u_char *data, size_t len);
@@ -137,21 +121,20 @@ index 54e867d3..322b3df9 100644
 +
  
  #endif /* _NGX_MURMURHASH_H_INCLUDED_ */
-diff --git a/src/http/v2/ngx_http_v2.c b/src/http/v2/ngx_http_v2.c
-index 7bea204f..b6daa540 100644
---- a/src/http/v2/ngx_http_v2.c
-+++ b/src/http/v2/ngx_http_v2.c
-@@ -272,6 +272,8 @@ ngx_http_v2_init(ngx_event_t *rev)
+diff -uNr a/src/http/v2/ngx_http_v2.c b/src/http/v2/ngx_http_v2.c
+--- a/src/http/v2/ngx_http_v2.c	2018-03-20 23:58:32.000000000 +0800
++++ b/src/http/v2/ngx_http_v2.c	2018-03-23 19:29:34.660933011 +0800
+@@ -272,6 +272,8 @@
  
-     h2c->frame_size = NGX_HTTP_V2_DEFAULT_FRAME_SIZE;
+     h2c->table_update = 1;
  
 +    h2c->max_hpack_table_size = NGX_HTTP_V2_DEFAULT_HPACK_TABLE_SIZE;
 +
-     h2c->table_update = 1;
- 
      h2scf = ngx_http_get_module_srv_conf(hc->conf_ctx, ngx_http_v2_module);
-@@ -2053,6 +2055,18 @@ ngx_http_v2_state_settings_params(ngx_http_v2_connection_t *h2c, u_char *pos,
-             h2c->frame_size = value;
+ 
+     h2c->concurrent_pushes = h2scf->concurrent_pushes;
+@@ -2075,6 +2077,17 @@
+             h2c->concurrent_pushes = ngx_min(value, h2scf->concurrent_pushes);
              break;
  
 +        case NGX_HTTP_V2_HEADER_TABLE_SIZE_SETTING:
@@ -165,157 +148,73 @@ index 7bea204f..b6daa540 100644
 +            h2c->indicate_resize = 1;
 +            break;
 +
-+
-         case NGX_HTTP_V2_ENABLE_PUSH_SETTING:
- 
-             if (value > 1) {
-diff --git a/src/http/v2/ngx_http_v2.h b/src/http/v2/ngx_http_v2.h
-index d89e8fef..150889f8 100644
---- a/src/http/v2/ngx_http_v2.h
-+++ b/src/http/v2/ngx_http_v2.h
-@@ -51,6 +51,14 @@
- #define NGX_HTTP_V2_MAX_WINDOW           ((1U << 31) - 1)
- #define NGX_HTTP_V2_DEFAULT_WINDOW       65535
- 
-+#define HPACK_ENC_HTABLE_SZ              128 /* better to keep a PoT < 64k */
-+#define HPACK_ENC_HTABLE_ENTRIES         ((HPACK_ENC_HTABLE_SZ * 100) / 128)
-+#define HPACK_ENC_DYNAMIC_KEY_TBL_SZ     10  /* 10 is sufficient for most */
-+#define HPACK_ENC_MAX_ENTRY              512 /* longest header size to match */
-+
-+#define NGX_HTTP_V2_DEFAULT_HPACK_TABLE_SIZE     4096
-+#define NGX_HTTP_V2_MAX_HPACK_TABLE_SIZE         16384 /* < 64k */
-+
- #define NGX_HTTP_V2_DEFAULT_WEIGHT       16
+         default:
+             break;
+         }
+diff -uNr a/src/http/v2/ngx_http_v2_encode.c b/src/http/v2/ngx_http_v2_encode.c
+--- a/src/http/v2/ngx_http_v2_encode.c	2018-03-20 23:58:32.000000000 +0800
++++ b/src/http/v2/ngx_http_v2_encode.c	2018-03-23 19:29:34.660933011 +0800
+@@ -10,7 +10,7 @@
+ #include <ngx_http.h>
  
  
-@@ -114,6 +122,46 @@ typedef struct {
- } ngx_http_v2_hpack_t;
- 
- 
-+#if (NGX_HTTP_V2_HPACK_ENC)
-+typedef struct {
-+    uint64_t                         hash_val;
-+    uint32_t                         index;
-+    uint16_t                         pos;
-+    uint16_t                         klen, vlen;
-+    uint16_t                         size;
-+    uint16_t                         next;
-+} ngx_http_v2_hpack_enc_entry_t;
-+
-+
-+typedef struct {
-+    uint64_t                         hash_val;
-+    uint32_t                         index;
-+    uint16_t                         pos;
-+    uint16_t                         klen;
-+} ngx_http_v2_hpack_name_entry_t;
-+
-+
-+typedef struct {
-+    size_t                           size;    /* size as defined in RFC 7541 */
-+    uint32_t                         top;     /* the last entry */
-+    uint32_t                         pos;
-+    uint16_t                         n_elems; /* number of elements */
-+    uint16_t                         base;    /* index of the oldest entry */
-+    uint16_t                         last;    /* index of the newest entry */
-+
-+    /* hash table for dynamic entries, instead using a generic hash table,
-+       which would be too slow to process a significant amount of headers,
-+       this table is not determenistic, and might ocasionally fail to insert
-+       a value, at the cost of slightly worse compression, but significantly
-+       faster performance */
-+    ngx_http_v2_hpack_enc_entry_t    htable[HPACK_ENC_HTABLE_SZ];
-+    ngx_http_v2_hpack_name_entry_t   heads[HPACK_ENC_DYNAMIC_KEY_TBL_SZ];
-+    u_char                           storage[NGX_HTTP_V2_MAX_HPACK_TABLE_SIZE +
-+                                             HPACK_ENC_MAX_ENTRY];
-+} ngx_http_v2_hpack_enc_t;
-+#endif
-+
-+
- struct ngx_http_v2_connection_s {
-     ngx_connection_t                *connection;
-     ngx_http_connection_t           *http_connection;
-@@ -129,6 +177,8 @@ struct ngx_http_v2_connection_s {
- 
-     size_t                           frame_size;
- 
-+    size_t                           max_hpack_table_size;
-+
-     ngx_queue_t                      waiting;
- 
-     ngx_http_v2_state_t              state;
-@@ -156,6 +206,11 @@ struct ngx_http_v2_connection_s {
-     unsigned                         blocked:1;
-     unsigned                         goaway:1;
-     unsigned                         push_disabled:1;
-+    unsigned                         indicate_resize:1;
-+
-+#if (NGX_HTTP_V2_HPACK_ENC)
-+    ngx_http_v2_hpack_enc_t          hpack_enc;
-+#endif
- };
- 
- 
-@@ -357,4 +412,31 @@ size_t ngx_http_v2_huff_encode(u_char *src, size_t len, u_char *dst,
- 
- #define ngx_http_v2_write_sid  ngx_http_v2_write_uint32
- 
-+u_char *ngx_http_v2_string_encode(u_char *dst, u_char *src, size_t len,
-+    u_char *tmp, ngx_uint_t lower);
-+
-+u_char *
-+ngx_http_v2_write_int(u_char *pos, ngx_uint_t prefix, ngx_uint_t value);
-+
-+#define ngx_http_v2_write_name(dst, src, len, tmp)                            \
-+    ngx_http_v2_string_encode(dst, src, len, tmp, 1)
-+#define ngx_http_v2_write_value(dst, src, len, tmp)                           \
-+    ngx_http_v2_string_encode(dst, src, len, tmp, 0)
-+
-+u_char *
-+ngx_http_v2_write_header(ngx_http_v2_connection_t *h2c, u_char *pos,
-+    u_char *key, size_t key_len, u_char *value, size_t value_len,
-+    u_char *tmp);
-+
-+void
-+ngx_http_v2_table_resize(ngx_http_v2_connection_t *h2c);
-+
-+#define ngx_http_v2_write_header_str(key, value)                        \
-+    ngx_http_v2_write_header(h2c, pos, (u_char *) key, sizeof(key) - 1, \
-+    (u_char *) value, sizeof(value) - 1, tmp);
-+
-+#define ngx_http_v2_write_header_tbl(key, val)                          \
-+    ngx_http_v2_write_header(h2c, pos, (u_char *) key, sizeof(key) - 1, \
-+    val.data, val.len, tmp);
-+
- #endif /* _NGX_HTTP_V2_H_INCLUDED_ */
-diff --git a/src/http/v2/ngx_http_v2_filter_module.c b/src/http/v2/ngx_http_v2_filter_module.c
-index 44a0ac2f..adeac647 100644
---- a/src/http/v2/ngx_http_v2_filter_module.c
-+++ b/src/http/v2/ngx_http_v2_filter_module.c
-@@ -26,11 +26,6 @@
- #define ngx_http_v2_indexed(i)      (128 + (i))
- #define ngx_http_v2_inc_indexed(i)  (64 + (i))
- 
--#define ngx_http_v2_write_name(dst, src, len, tmp)                            \
--    ngx_http_v2_string_encode(dst, src, len, tmp, 1)
--#define ngx_http_v2_write_value(dst, src, len, tmp)                           \
--    ngx_http_v2_string_encode(dst, src, len, tmp, 0)
--
- #define NGX_HTTP_V2_ENCODE_RAW            0
- #define NGX_HTTP_V2_ENCODE_HUFF           0x80
- 
-@@ -93,10 +88,6 @@ static ngx_int_t ngx_http_v2_push_resources(ngx_http_request_t *r);
- static ngx_int_t ngx_http_v2_push_resource(ngx_http_request_t *r,
-     ngx_str_t *path, ngx_str_t *binary);
- 
--static u_char *ngx_http_v2_string_encode(u_char *dst, u_char *src, size_t len,
--    u_char *tmp, ngx_uint_t lower);
 -static u_char *ngx_http_v2_write_int(u_char *pos, ngx_uint_t prefix,
--    ngx_uint_t value);
- static ngx_http_v2_out_frame_t *ngx_http_v2_create_headers_frame(
-     ngx_http_request_t *r, u_char *pos, u_char *end, ngx_uint_t fin);
- static ngx_http_v2_out_frame_t *ngx_http_v2_create_push_frame(
-@@ -196,11 +187,9 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
++u_char *ngx_http_v2_write_int(u_char *pos, ngx_uint_t prefix,
+     ngx_uint_t value);
+ 
+ 
+@@ -40,7 +40,7 @@
+ }
+ 
+ 
+-static u_char *
++u_char *
+ ngx_http_v2_write_int(u_char *pos, ngx_uint_t prefix, ngx_uint_t value)
+ {
+     if (value < prefix) {
+diff -uNr a/src/http/v2/ngx_http_v2_filter_module.c b/src/http/v2/ngx_http_v2_filter_module.c
+--- a/src/http/v2/ngx_http_v2_filter_module.c	2018-03-20 23:58:32.000000000 +0800
++++ b/src/http/v2/ngx_http_v2_filter_module.c	2018-03-23 19:29:34.660933011 +0800
+@@ -23,6 +23,38 @@
+ #define ngx_http_v2_literal_size(h)                                           \
+     (ngx_http_v2_integer_octets(sizeof(h) - 1) + sizeof(h) - 1)
+ 
++#define ngx_http_v2_indexed(i)      (128 + (i))
++#define ngx_http_v2_inc_indexed(i)  (64 + (i))
++
++#define NGX_HTTP_V2_ENCODE_RAW            0
++#define NGX_HTTP_V2_ENCODE_HUFF           0x80
++
++#define NGX_HTTP_V2_AUTHORITY_INDEX       1
++#define NGX_HTTP_V2_METHOD_GET_INDEX      2
++#define NGX_HTTP_V2_PATH_INDEX            4
++
++#define NGX_HTTP_V2_SCHEME_HTTP_INDEX     6
++#define NGX_HTTP_V2_SCHEME_HTTPS_INDEX    7
++
++#define NGX_HTTP_V2_STATUS_INDEX          8
++#define NGX_HTTP_V2_STATUS_200_INDEX      8
++#define NGX_HTTP_V2_STATUS_204_INDEX      9
++#define NGX_HTTP_V2_STATUS_206_INDEX      10
++#define NGX_HTTP_V2_STATUS_304_INDEX      11
++#define NGX_HTTP_V2_STATUS_400_INDEX      12
++#define NGX_HTTP_V2_STATUS_404_INDEX      13
++#define NGX_HTTP_V2_STATUS_500_INDEX      14
++
++#define NGX_HTTP_V2_ACCEPT_ENCODING_INDEX 16
++#define NGX_HTTP_V2_ACCEPT_LANGUAGE_INDEX 17
++#define NGX_HTTP_V2_CONTENT_LENGTH_INDEX  28
++#define NGX_HTTP_V2_CONTENT_TYPE_INDEX    31
++#define NGX_HTTP_V2_DATE_INDEX            33
++#define NGX_HTTP_V2_LAST_MODIFIED_INDEX   44
++#define NGX_HTTP_V2_LOCATION_INDEX        46
++#define NGX_HTTP_V2_SERVER_INDEX          54
++#define NGX_HTTP_V2_USER_AGENT_INDEX      58
++#define NGX_HTTP_V2_VARY_INDEX            59
+ 
+ #define NGX_HTTP_V2_NO_TRAILERS           (ngx_http_v2_out_frame_t *) -1
+ 
+@@ -155,11 +187,9 @@
  #endif
  
      static size_t nginx_ver_len = ngx_http_v2_literal_size(NGINX_VER);
@@ -327,7 +226,7 @@ index 44a0ac2f..adeac647 100644
  
      stream = r->stream;
  
-@@ -476,7 +465,7 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
+@@ -435,7 +465,7 @@
      }
  
      tmp = ngx_palloc(r->pool, tmp_len);
@@ -336,18 +235,17 @@ index 44a0ac2f..adeac647 100644
  
      if (pos == NULL || tmp == NULL) {
          return NGX_ERROR;
-@@ -484,6 +473,7 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
+@@ -443,11 +473,16 @@
  
      start = pos;
  
+-    if (h2c->table_update) {
+-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, fc->log, 0,
+-                       "http2 table size update: 0");
+-        *pos++ = (1 << 5) | 0;
+-        h2c->table_update = 0;
++    h2c = r->stream->connection;
 +
-     if (h2c->table_update) {
-         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, fc->log, 0,
-                        "http2 table size update: 0");
-@@ -491,6 +481,16 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
-         h2c->table_update = 0;
-     }
- 
 +    if (h2c->indicate_resize) {
 +        *pos = 32;
 +        pos = ngx_http_v2_write_int(pos, ngx_http_v2_prefix(5),
@@ -356,12 +254,10 @@ index 44a0ac2f..adeac647 100644
 +#if (NGX_HTTP_V2_HPACK_ENC)
 +        ngx_http_v2_table_resize(h2c);
 +#endif
-+    }
-+
+     }
+ 
      ngx_log_debug1(NGX_LOG_DEBUG_HTTP, fc->log, 0,
-                    "http2 output header: \":status: %03ui\"",
-                    r->headers_out.status);
-@@ -499,67 +499,28 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
+@@ -458,67 +493,28 @@
          *pos++ = status;
  
      } else {
@@ -436,7 +332,7 @@ index 44a0ac2f..adeac647 100644
          if (r->headers_out.content_type_len == r->headers_out.content_type.len
              && r->headers_out.charset.len)
          {
-@@ -585,64 +546,36 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
+@@ -544,64 +540,36 @@
              r->headers_out.content_type.data = p - len;
          }
  
@@ -513,7 +409,7 @@ index 44a0ac2f..adeac647 100644
      }
  #endif
  
-@@ -665,23 +598,9 @@ ngx_http_v2_header_filter(ngx_http_request_t *r)
+@@ -624,23 +592,10 @@
              continue;
          }
  
@@ -531,38 +427,146 @@ index 44a0ac2f..adeac647 100644
 -
 -        pos = ngx_http_v2_write_name(pos, header[i].key.data,
 -                                     header[i].key.len, tmp);
--
--        pos = ngx_http_v2_write_value(pos, header[i].value.data,
--                                      header[i].value.len, tmp);
 +        pos = ngx_http_v2_write_header(h2c, pos, header[i].key.data,
 +                                       header[i].key.len, header[i].value.data,
 +                                       header[i].value.len, tmp);
+ 
+-        pos = ngx_http_v2_write_value(pos, header[i].value.data,
+-                                      header[i].value.len, tmp);
      }
  
-     frame = ngx_http_v2_create_headers_frame(r, start, pos, r->header_only);
-@@ -1111,7 +1030,7 @@ ngx_http_v2_push_resource(ngx_http_request_t *r, ngx_str_t *path,
- }
+     fin = r->header_only
+diff -uNr a/src/http/v2/ngx_http_v2.h b/src/http/v2/ngx_http_v2.h
+--- a/src/http/v2/ngx_http_v2.h	2018-03-20 23:58:32.000000000 +0800
++++ b/src/http/v2/ngx_http_v2.h	2018-03-23 19:29:34.661933010 +0800
+@@ -52,6 +52,14 @@
+ #define NGX_HTTP_V2_MAX_WINDOW           ((1U << 31) - 1)
+ #define NGX_HTTP_V2_DEFAULT_WINDOW       65535
+ 
++#define HPACK_ENC_HTABLE_SZ              128 /* better to keep a PoT < 64k */
++#define HPACK_ENC_HTABLE_ENTRIES         ((HPACK_ENC_HTABLE_SZ * 100) / 128)
++#define HPACK_ENC_DYNAMIC_KEY_TBL_SZ     10  /* 10 is sufficient for most */
++#define HPACK_ENC_MAX_ENTRY              512 /* longest header size to match */
++
++#define NGX_HTTP_V2_DEFAULT_HPACK_TABLE_SIZE     4096
++#define NGX_HTTP_V2_MAX_HPACK_TABLE_SIZE         16384 /* < 64k */
++
+ #define NGX_HTTP_V2_DEFAULT_WEIGHT       16
  
  
--static u_char *
+@@ -115,6 +123,46 @@
+ } ngx_http_v2_hpack_t;
+ 
+ 
++#if (NGX_HTTP_V2_HPACK_ENC)
++typedef struct {
++    uint64_t                         hash_val;
++    uint32_t                         index;
++    uint16_t                         pos;
++    uint16_t                         klen, vlen;
++    uint16_t                         size;
++    uint16_t                         next;
++} ngx_http_v2_hpack_enc_entry_t;
++
++
++typedef struct {
++    uint64_t                         hash_val;
++    uint32_t                         index;
++    uint16_t                         pos;
++    uint16_t                         klen;
++} ngx_http_v2_hpack_name_entry_t;
++
++
++typedef struct {
++    size_t                           size;    /* size as defined in RFC 7541 */
++    uint32_t                         top;     /* the last entry */
++    uint32_t                         pos;
++    uint16_t                         n_elems; /* number of elements */
++    uint16_t                         base;    /* index of the oldest entry */
++    uint16_t                         last;    /* index of the newest entry */
++
++    /* hash table for dynamic entries, instead using a generic hash table,
++       which would be too slow to process a significant amount of headers,
++       this table is not determenistic, and might ocasionally fail to insert
++       a value, at the cost of slightly worse compression, but significantly
++       faster performance */
++    ngx_http_v2_hpack_enc_entry_t    htable[HPACK_ENC_HTABLE_SZ];
++    ngx_http_v2_hpack_name_entry_t   heads[HPACK_ENC_DYNAMIC_KEY_TBL_SZ];
++    u_char                           storage[NGX_HTTP_V2_MAX_HPACK_TABLE_SIZE +
++                                             HPACK_ENC_MAX_ENTRY];
++} ngx_http_v2_hpack_enc_t;
++#endif
++
++
+ struct ngx_http_v2_connection_s {
+     ngx_connection_t                *connection;
+     ngx_http_connection_t           *http_connection;
+@@ -130,6 +178,8 @@
+ 
+     size_t                           frame_size;
+ 
++    size_t                           max_hpack_table_size;
++
+     ngx_queue_t                      waiting;
+ 
+     ngx_http_v2_state_t              state;
+@@ -157,6 +207,11 @@
+     unsigned                         blocked:1;
+     unsigned                         goaway:1;
+     unsigned                         push_disabled:1;
++    unsigned                         indicate_resize:1;
++
++#if (NGX_HTTP_V2_HPACK_ENC)
++    ngx_http_v2_hpack_enc_t          hpack_enc;
++#endif
+ };
+ 
+ 
+@@ -198,6 +253,8 @@
+ 
+     ngx_array_t                     *cookies;
+ 
++    size_t                           header_limit;
++
+     ngx_pool_t                      *pool;
+ 
+     unsigned                         waiting:1;
+@@ -410,4 +467,31 @@
+     u_char *tmp, ngx_uint_t lower);
+ 
+ 
++u_char *ngx_http_v2_string_encode(u_char *dst, u_char *src, size_t len,
++    u_char *tmp, ngx_uint_t lower);
++
 +u_char *
- ngx_http_v2_string_encode(u_char *dst, u_char *src, size_t len, u_char *tmp,
-     ngx_uint_t lower)
- {
-@@ -1137,7 +1056,7 @@ ngx_http_v2_string_encode(u_char *dst, u_char *src, size_t len, u_char *tmp,
- }
- 
- 
--static u_char *
++ngx_http_v2_write_int(u_char *pos, ngx_uint_t prefix, ngx_uint_t value);
++
++#define ngx_http_v2_write_name(dst, src, len, tmp)                            \
++    ngx_http_v2_string_encode(dst, src, len, tmp, 1)
++#define ngx_http_v2_write_value(dst, src, len, tmp)                           \
++    ngx_http_v2_string_encode(dst, src, len, tmp, 0)
++
 +u_char *
- ngx_http_v2_write_int(u_char *pos, ngx_uint_t prefix, ngx_uint_t value)
- {
-     if (value < prefix) {
-diff --git a/src/http/v2/ngx_http_v2_table.c b/src/http/v2/ngx_http_v2_table.c
-index 62025c42..4ccaa4a8 100644
---- a/src/http/v2/ngx_http_v2_table.c
-+++ b/src/http/v2/ngx_http_v2_table.c
-@@ -347,3 +347,434 @@ ngx_http_v2_table_size(ngx_http_v2_connection_t *h2c, size_t size)
++ngx_http_v2_write_header(ngx_http_v2_connection_t *h2c, u_char *pos,
++    u_char *key, size_t key_len, u_char *value, size_t value_len,
++    u_char *tmp);
++
++void
++ngx_http_v2_table_resize(ngx_http_v2_connection_t *h2c);
++
++#define ngx_http_v2_write_header_str(key, value)                        \
++    ngx_http_v2_write_header(h2c, pos, (u_char *) key, sizeof(key) - 1, \
++    (u_char *) value, sizeof(value) - 1, tmp);
++
++#define ngx_http_v2_write_header_tbl(key, val)                          \
++    ngx_http_v2_write_header(h2c, pos, (u_char *) key, sizeof(key) - 1, \
++    val.data, val.len, tmp);
++
+ #endif /* _NGX_HTTP_V2_H_INCLUDED_ */
+diff -uNr a/src/http/v2/ngx_http_v2_table.c b/src/http/v2/ngx_http_v2_table.c
+--- a/src/http/v2/ngx_http_v2_table.c	2018-03-20 23:58:32.000000000 +0800
++++ b/src/http/v2/ngx_http_v2_table.c	2018-03-23 19:29:34.662933010 +0800
+@@ -361,3 +361,434 @@
  
      return NGX_OK;
  }
@@ -997,6 +1001,3 @@ index 62025c42..4ccaa4a8 100644
 +}
 +
 +#endif
--- 
-2.16.2
-

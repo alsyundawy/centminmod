@@ -61,7 +61,7 @@ if [[ "$AXIVOREPO_DISABLE" = [nN] ]]; then
 
 if [ ${MACHINE_TYPE} == 'x86_64' ]; then
 
-    cd $DIR_TMP	
+    cd $DIR_TMP 
 
 if [ -s "${CENTOSSIXAXIVOFILE}" ]; then
   echo "${CENTOSSIXAXIVOFILE} [found]"
@@ -70,24 +70,24 @@ if [ -s "${CENTOSSIXAXIVOFILE}" ]; then
   wget ${WGETOPT} ${CENTOSSIXAXIVO} --tries=3
   # wget ${WGETOPT} ${CENTOSSIXAXIVOLOCAL} --tries=3
 ERROR=$?
-	if [[ "$ERROR" != '0' ]]; then
-	cecho "Error: ${CENTOSSIXAXIVOFILE} download failed." $boldgreen
+  if [[ "$ERROR" != '0' ]]; then
+  cecho "Error: ${CENTOSSIXAXIVOFILE} download failed." $boldgreen
 FAILAXIVO='y'
 checklogdetails
-	# exit #$ERROR
+  # exit #$ERROR
 else 
-	cecho "Download done." $boldyellow
-	rpm -Uvh --nosignature ${CENTOSSIXAXIVOFILE}
-	ERR=$?
-	CCAXIVOCHECK="$ERR"
-		if [ "$CCAXIVOCHECK" == '0' ]; then
-			yumprioraxivo
-			echo ""
-		else
-			cecho "Error: problem with ${CENTOSSIXAXIVOFILE} install." $boldgreen
-			# exit $ERR
-		fi
-	fi
+  cecho "Download done." $boldyellow
+  rpm -Uvh --nosignature ${CENTOSSIXAXIVOFILE}
+  ERR=$?
+  CCAXIVOCHECK="$ERR"
+    if [ "$CCAXIVOCHECK" == '0' ]; then
+      yumprioraxivo
+      echo ""
+    else
+      cecho "Error: problem with ${CENTOSSIXAXIVOFILE} install." $boldgreen
+      # exit $ERR
+    fi
+  fi
 
 fi
 
@@ -106,49 +106,49 @@ if [[ "$REMIREPO_DISABLE" = [nN] ]]; then
 # if [ ${MACHINE_TYPE} == 'x86_64' ]; then
     cd $DIR_TMP
 
-	if [ -s "${CENTOSSIXREMIFILE}" ]; then
-  	echo "${CENTOSSIXREMIFILE} [found]"
+  if [ -s "${CENTOSSIXREMIFILE}" ]; then
+    echo "${CENTOSSIXREMIFILE} [found]"
     rpm --import http://rpms.remirepo.net/RPM-GPG-KEY-remi
     rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2017
     rpm -q gpg-pubkey --qf "%{summary} ->%{version}-%{release}\n"
-  	rpm -Uvh --nosignature ${CENTOSSIXREMIFILE}
-		ERR=$?
-		CCREMICHECK="$ERR"
-			if [ "$CCREMICHECK" == '0' ]; then
-				yumpriorremi
-				echo ""
-			else
-				cecho "Error: problem with ${CENTOSSIXREMIFILE} install." $boldgreen
-				# exit $ERR
-			fi  	
-  	else
-  	echo "Error: ${CENTOSSIXREMIFILE} not found !!! Downloading now......"
-  	wget ${WGETOPT} ${CENTOSSIXREMI} --tries=3
-  	# wget ${WGETOPT} ${CENTOSSIXREMILOCAL} --tries=3
-	ERROR=$?
-		if [[ "$ERROR" != '0' ]]; then
-		cecho "Error: ${CENTOSSIXREMIFILE} download failed." $boldgreen
-	FAILREMI='y'
-	checklogdetails
-		# exit #$ERROR
-	else 
-		cecho "Download done." $boldyellow
+    rpm -Uvh --nosignature ${CENTOSSIXREMIFILE}
+    ERR=$?
+    CCREMICHECK="$ERR"
+      if [ "$CCREMICHECK" == '0' ]; then
+        yumpriorremi
+        echo ""
+      else
+        cecho "Error: problem with ${CENTOSSIXREMIFILE} install." $boldgreen
+        # exit $ERR
+      fi    
+    else
+    echo "Error: ${CENTOSSIXREMIFILE} not found !!! Downloading now......"
+    wget ${WGETOPT} ${CENTOSSIXREMI} --tries=3
+    # wget ${WGETOPT} ${CENTOSSIXREMILOCAL} --tries=3
+  ERROR=$?
+    if [[ "$ERROR" != '0' ]]; then
+    cecho "Error: ${CENTOSSIXREMIFILE} download failed." $boldgreen
+  FAILREMI='y'
+  checklogdetails
+    # exit #$ERROR
+  else 
+    cecho "Download done." $boldyellow
     rpm --import http://rpms.remirepo.net/RPM-GPG-KEY-remi
     rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2017
     rpm -q gpg-pubkey --qf "%{summary} ->%{version}-%{release}\n"
-		rpm -Uvh --nosignature ${CENTOSSIXREMIFILE}
-		ERR=$?
-		CCREMICHECK="$ERR"
-			if [ "$CCREMICHECK" == '0' ]; then
-				yumpriorremi
-				echo ""
-			else
-				cecho "Error: problem with ${CENTOSSIXREMIFILE} install." $boldgreen
-				# exit $ERR
-			fi
-		fi
-	
-	fi
+    rpm -Uvh --nosignature ${CENTOSSIXREMIFILE}
+    ERR=$?
+    CCREMICHECK="$ERR"
+      if [ "$CCREMICHECK" == '0' ]; then
+        yumpriorremi
+        echo ""
+      else
+        cecho "Error: problem with ${CENTOSSIXREMIFILE} install." $boldgreen
+        # exit $ERR
+      fi
+    fi
+  
+  fi
 
 # fi # MACHINE_TYPE
 
@@ -177,90 +177,90 @@ echo "*************************************************"
     cd $DIR_TMP
 
 if [ -f /etc/yum.repos.d/epel.repo ]; then
-	yumpriorepel
+  yumpriorepel
 elif [ ! -f /etc/yum.repos.d/epel.repo ]; then
-	if [ -s "${CENTOSSIXEPELFILE}" ]; then
-  	echo "${CENTOSSIXEPELFILE} [found]"
-  	else
-  	echo "Error: ${CENTOSSIXEPELFILE} not found !!! Downloading now......"
-  	wget ${WGETOPT} ${CENTOSSIXEPEL} --tries=3
-  	# wget ${WGETOPT} ${CENTOSSIXEPELLOCAL} --tries=3
-	ERROR=$?
-		if [[ "$ERROR" != '0' ]]; then
-		cecho "Error: ${CENTOSSIXEPELFILE} download failed." $boldgreen
-	FAILEPEL='y'
-	checklogdetails
-		# exit #$ERROR
-	else 
-		cecho "Download done." $boldyellow
-		rpm --import http://epel.mirror.constant.com/RPM-GPG-KEY-EPEL-6
-		rpm -Uvh ${CENTOSSIXEPELFILE}
-		#yum${CACHESKIP} -q list ccache 2>&1 >/dev/null
-		ERR=$?
-		CCEPELCHECK="$ERR"
-			if [ "$CCEPELCHECK" == '0' ]; then
-				yumpriorepel
-				echo ""
-			else
-				cecho "Error: problem with ${CENTOSSIXEPELFILE} install." $boldgreen
-				# exit $ERR
-			fi
-		fi
-	
-	fi
+  if [ -s "${CENTOSSIXEPELFILE}" ]; then
+    echo "${CENTOSSIXEPELFILE} [found]"
+    else
+    echo "Error: ${CENTOSSIXEPELFILE} not found !!! Downloading now......"
+    wget ${WGETOPT} ${CENTOSSIXEPEL} --tries=3
+    # wget ${WGETOPT} ${CENTOSSIXEPELLOCAL} --tries=3
+  ERROR=$?
+    if [[ "$ERROR" != '0' ]]; then
+    cecho "Error: ${CENTOSSIXEPELFILE} download failed." $boldgreen
+  FAILEPEL='y'
+  checklogdetails
+    # exit #$ERROR
+  else 
+    cecho "Download done." $boldyellow
+    rpm --import http://epel.mirror.constant.com/RPM-GPG-KEY-EPEL-6
+    rpm -Uvh ${CENTOSSIXEPELFILE}
+    #yum${CACHESKIP} -q list ccache 2>&1 >/dev/null
+    ERR=$?
+    CCEPELCHECK="$ERR"
+      if [ "$CCEPELCHECK" == '0' ]; then
+        yumpriorepel
+        echo ""
+      else
+        cecho "Error: problem with ${CENTOSSIXEPELFILE} install." $boldgreen
+        # exit $ERR
+      fi
+    fi
+  
+  fi
 fi
 
 if [[ "$RPMFORGEREPO_DISABLE" = [nN] ]]; then
-	if [[ -f /etc/yum.repos.d/rpmforge.repo || -f /etc/yum.repos.d/rpmforge.OLD ]]; then
-		rm -rf /etc/yum.repos.d/rpmforge.repo
-		rm -rf /etc/yum.repos.d/rpmforge.OLD
-		# rm -rf ${DIR_TMP}/rpmforge-release*
-	
-		FORGERPM=$(rpm -qa | grep rpmforge-release)
-		rpm -e $FORGERPM
-	fi
+  if [[ -f /etc/yum.repos.d/rpmforge.repo || -f /etc/yum.repos.d/rpmforge.OLD ]]; then
+    rm -rf /etc/yum.repos.d/rpmforge.repo
+    rm -rf /etc/yum.repos.d/rpmforge.OLD
+    # rm -rf ${DIR_TMP}/rpmforge-release*
+  
+    FORGERPM=$(rpm -qa | grep rpmforge-release)
+    rpm -e $FORGERPM
+  fi
 
-	cd $DIR_TMP
-	
-	if [ -s "${CENTOSSIXRPMFORGEFILE}" ]; then
-  	echo "${CENTOSSIXRPMFORGEFILE} [found]"
-	rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt
-	rpm -Uvh ${CENTOSSIXRPMFORGEFILE}
-		ERR=$?
-		CCRPMFORGECHECK="$ERR"
-			if [ "$CCRPMFORGECHECK" == '0' ]; then
-				yumpriorrpmforge
-				echo ""
-			else
-				cecho "Error: problem with ${CENTOSSIXRPMFORGEFILE} install." $boldgreen
-				#exit $ERR
-			fi	 	
-  	else
-  	echo "Error: ${CENTOSSIXRPMFORGEFILE} not found !!! Downloading now......"
-  	wget ${WGETOPT} ${CENTOSSIXRPMFORGE} --tries=3 
-	ERROR=$?
-		if [[ "$ERROR" != '0' ]]; then
-		cecho "Error: ${CENTOSSIXRPMFORGEFILE} download failed." $boldgreen
-	FAILRPMFORGE='y'
-	checklogdetails
-		#exit #$ERROR
-	else 
-         	cecho "Download done." $boldyellow
-	rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt
-	rpm -Uvh ${CENTOSSIXRPMFORGEFILE}
-		# yum${CACHESKIP} -q list axel 2>&1 >/dev/null
-		ERR=$?
-		CCRPMFORGECHECK="$ERR"
-			if [ "$CCRPMFORGECHECK" == '0' ]; then
-				yumpriorrpmforge
-				echo ""
-			else
-				cecho "Error: problem with ${CENTOSSIXRPMFORGEFILE} install." $boldgreen
-				#exit $ERR
-			fi
-		fi
-	
-	fi
+  cd $DIR_TMP
+  
+  if [ -s "${CENTOSSIXRPMFORGEFILE}" ]; then
+    echo "${CENTOSSIXRPMFORGEFILE} [found]"
+  rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt
+  rpm -Uvh ${CENTOSSIXRPMFORGEFILE}
+    ERR=$?
+    CCRPMFORGECHECK="$ERR"
+      if [ "$CCRPMFORGECHECK" == '0' ]; then
+        yumpriorrpmforge
+        echo ""
+      else
+        cecho "Error: problem with ${CENTOSSIXRPMFORGEFILE} install." $boldgreen
+        #exit $ERR
+      fi    
+    else
+    echo "Error: ${CENTOSSIXRPMFORGEFILE} not found !!! Downloading now......"
+    wget ${WGETOPT} ${CENTOSSIXRPMFORGE} --tries=3 
+  ERROR=$?
+    if [[ "$ERROR" != '0' ]]; then
+    cecho "Error: ${CENTOSSIXRPMFORGEFILE} download failed." $boldgreen
+  FAILRPMFORGE='y'
+  checklogdetails
+    #exit #$ERROR
+  else 
+          cecho "Download done." $boldyellow
+  rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt
+  rpm -Uvh ${CENTOSSIXRPMFORGEFILE}
+    # yum${CACHESKIP} -q list axel 2>&1 >/dev/null
+    ERR=$?
+    CCRPMFORGECHECK="$ERR"
+      if [ "$CCRPMFORGECHECK" == '0' ]; then
+        yumpriorrpmforge
+        echo ""
+      else
+        cecho "Error: problem with ${CENTOSSIXRPMFORGEFILE} install." $boldgreen
+        #exit $ERR
+      fi
+    fi
+  
+  fi
 fi # RPMFORGEREPO_DISABLE = n
 
 if [[ "$CENTALTREPO_DISABLE" = [nN] ]]; then
@@ -271,68 +271,68 @@ if [ -s "${CENTOSSIXCENTALTFILE}" ]; then
   wget ${WGETOPT} ${CENTOSSIXCENTALT} --tries=3
   # wget ${WGETOPT} ${CENTOSSIXCENTALTLOCAL} --tries=3
 ERROR=$?
-	if [[ "$ERROR" != '0' ]]; then
-	cecho "Error: ${CENTOSSIXCENTALTFILE} download failed." $boldgreen
+  if [[ "$ERROR" != '0' ]]; then
+  cecho "Error: ${CENTOSSIXCENTALTFILE} download failed." $boldgreen
 FAILCENTALT='y'
 checklogdetails
-	# exit #$ERROR
+  # exit #$ERROR
 else 
          cecho "Download done." $boldyellow
 rpm --import http://centos.alt.ru/pub/repository/centos/RPM-GPG-KEY-CentALT
 rpm -Uvh ${CENTOSSIXCENTALTFILE}
 yumpriorcentalt
 echo ""
-	fi
+  fi
 
 fi
 fi # CENTALTREPO_DISABLE
 
-	cd $DIR_TMP
+  cd $DIR_TMP
 
 if [ -s "${CENTOSSIXPERCONALRELEASEFILE}" ]; then
   echo "${CENTOSSIXPERCONALRELEASEFILE} [found]"
-	rpm --import http://www.percona.com/downloads/RPM-GPG-KEY-percona
-	rpm -Uvh ${CENTOSSIXPERCONALRELEASEFILE}
-	ERR=$?
-	CCPERCONACHECK="$ERR"
-		if [ "$CCPERCONACHECK" == '0' ]; then
-			yumpriorpercona
-			echo ""
-		else
-			cecho "Error: problem with ${CENTOSSIXPERCONALRELEASEFILE} install." $boldgreen
-			exit $ERR
-		fi	
+  rpm --import http://www.percona.com/downloads/RPM-GPG-KEY-percona
+  rpm -Uvh ${CENTOSSIXPERCONALRELEASEFILE}
+  ERR=$?
+  CCPERCONACHECK="$ERR"
+    if [ "$CCPERCONACHECK" == '0' ]; then
+      yumpriorpercona
+      echo ""
+    else
+      cecho "Error: problem with ${CENTOSSIXPERCONALRELEASEFILE} install." $boldgreen
+      exit $ERR
+    fi  
   else
   echo "Error: ${CENTOSSIXPERCONALRELEASEFILE} not found !!! Downloading now......"
   wget ${WGETOPT} ${CENTOSSIXPERCONALRELEASE} --tries=3 
 ERROR=$?
-	if [[ "$ERROR" != '0' ]]; then
-	cecho "Error: ${CENTOSSIXPERCONALRELEASEFILE} download failed." $boldgreen
+  if [[ "$ERROR" != '0' ]]; then
+  cecho "Error: ${CENTOSSIXPERCONALRELEASEFILE} download failed." $boldgreen
 FAILPERCONA='y'
 checklogdetails
-	# exit #$ERROR
+  # exit #$ERROR
 else 
          cecho "Download done." $boldyellow
 rpm --import http://www.percona.com/downloads/RPM-GPG-KEY-percona
 rpm -Uvh ${CENTOSSIXPERCONALRELEASEFILE}
-	#yum -q list axel 2>&1 >/dev/null
-	ERR=$?
-	CCPERCONACHECK="$ERR"
-		if [ "$CCPERCONACHECK" == '0' ]; then
-			yumpriorpercona
-			echo ""
-		else
-			cecho "Error: problem with ${CENTOSSIXPERCONALRELEASEFILE} install." $boldgreen
-			exit $ERR
-		fi
-	fi
+  #yum -q list axel 2>&1 >/dev/null
+  ERR=$?
+  CCPERCONACHECK="$ERR"
+    if [ "$CCPERCONACHECK" == '0' ]; then
+      yumpriorpercona
+      echo ""
+    else
+      cecho "Error: problem with ${CENTOSSIXPERCONALRELEASEFILE} install." $boldgreen
+      exit $ERR
+    fi
+  fi
 
 fi
 
   if [[ "$(uname -m)" = 'x86_64' ]]; then
     varnishfour_setup
     yumpriorvarnish
-    if [[ "$INITIALINSTALL" = [yY] ]]; then
+    if [[ "$VARNISHREPO_DISABLE" = [nN] && "$INITIALINSTALL" = [yY] && -f "$VARNISH_REPOFILE" ]]; then
       # disable for install stage to speed up install
       yum-config-manager --disable varnishcache_varnish41 varnishcache_varnish41-source
     fi
@@ -342,9 +342,10 @@ fi
 # axivo centos 6.x 64bit only
 # axivosixyum
 ####
-remisixyum
-atrpmssixyum
-
+if [[ "$(uname -m)" != 'aarch64' ]]; then
+  remisixyum
+  atrpmssixyum
+fi
 
 # CentOS 6 repo mirrors aren't fully updated so need to specify actual kernel-headers version
 PACKAGEEXTRA='figlet moreutils libzip5 libzip5-devel nghttp2 libnghttp2 libnghttp2-devel clang clang-devel jemalloc jemalloc-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 libJudy axel glances bash-completion bash-completion-extras mlocate re2c libmcrypt libmcrypt-devel kernel-headers kernel-devel cmake28'
