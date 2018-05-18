@@ -20,7 +20,7 @@ DT=$(date +"%d%m%y-%H%M%S")
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='020'
+SCRIPT_INCREMENTVER='022'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
 SCRIPT_DATE='31/05/2018'
@@ -307,7 +307,7 @@ CMGIT='https://github.com/centminmod/centminmod.git'
 # http://centminmod.com/upgrade.html#persistent
 AUTO_GITUPDATE='n'
 #####################################################
-LOCALCENTMINMOD_MIRROR='https://centminmod.com'
+LOCALCENTMINMOD_MIRROR='https://centminmodparts.centminmod.com'
 #####################################################
 # Timestamp Install
 TS_INSTALL='y'
@@ -326,6 +326,24 @@ ENABLE_MENU='y'
 FIREWALLD_DISABLE='y'
 DNF_ENABLE='n'
 DNF_COPR='y'
+
+#####################################################
+# CSF FIREWALL
+# PORTFLOOD Configuration
+# https://community.centminmod.com/threads/14708/
+# Setting CSFPORTFLOOD_OVERRIDE='y' allows you to 
+# override default CSF Firewall PORTFLOOD values set
+# by Centmin Mod initial install. If end user made
+# custom changes to PORTFLOOD values, the override 
+# will not work. Override only works if end user has
+# not made custom changes to PORTFLOOD values to ensure
+# end users customisations do not get overwritten
+CSFPORTFLOOD_OVERRIDE='n'
+# max hit count value allowed is 20
+PORTFLOOD_COUNT=20
+# lowering interval in seconds allows for more
+# port flood hits against default TCP port 21
+PORTFLOOD_INTERVAL=300
 
 #####################################################
 # MariaDB Jemalloc
@@ -394,6 +412,7 @@ NGXDYNAMIC_XSLT='n'
 NGXDYNAMIC_PERL='n'
 NGXDYNAMIC_IMAGEFILTER='y'
 NGXDYNAMIC_GEOIP='n'
+NGXDYNAMIC_GEOIPTWOLITE='n'
 NGXDYNAMIC_STREAM='y'
 NGXDYNAMIC_STREAMGEOIP='n'  # nginx 1.11.3+ option http://hg.nginx.org/nginx/rev/558db057adaa
 NGXDYNAMIC_STREAMREALIP='n' # nginx 1.11.4+ option http://hg.nginx.org/nginx/rev/9cac11efb205
@@ -444,6 +463,7 @@ NGINX_RDNS='n'               # https://github.com/flant/nginx-http-rdns
 NGINX_NJS='n'                # nginScript https://www.nginx.com/blog/launching-nginscript-and-looking-ahead/
 NGINX_GEOIP='y'              # Nginx GEOIP module install
 NGINX_GEOIPMEM='y'           # Nginx caches GEOIP databases in memory (default), setting 'n' caches to disk instead
+NGINX_GEOIPTWOLITE='n'       # https://github.com/leev/ngx_http_geoip2_module
 NGINX_SPDY='n'               # Nginx SPDY support
 NGINX_SPDYPATCHED='n'        # Cloudflare HTTP/2 + SPDY patch https://github.com/cloudflare/sslconfig/blob/master/patches/nginx__http2_spdy.patch
 NGINX_STUBSTATUS='y'         # http://nginx.org/en/docs/http/ngx_http_stub_status_module.html required for nginx statistics
@@ -604,6 +624,7 @@ NOSOURCEOPENSSL='y'        # set to 'y' to disable OpenSSL source compile for sy
 OPENSSL_VERSION='1.1.0h'   # Use this version of OpenSSL http://openssl.org/
 OPENSSL_VERSIONFALLBACK='1.0.2o'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
 OPENSSL_THREADS='y'        # control whether openssl 1.1 branch uses threading or not
+OPENSSL_TLSONETHREE='y'    # whether OpenSSL 1.1.1 builds enable TLSv1.3
 OPENSSL_CUSTOMPATH='/opt/openssl'  # custom directory path for OpenSSL 1.0.2+
 CLOUDFLARE_PATCHSSL='n'    # set 'y' to implement Cloudflare's chacha20 patch https://github.com/cloudflare/sslconfig
 CLOUDFLARE_ZLIB='y'        # use Cloudflare optimised zlib fork https://blog.cloudflare.com/cloudflare-fights-cancer/

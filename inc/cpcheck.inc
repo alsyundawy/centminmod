@@ -1,7 +1,70 @@
+redetect_tlsonethree() {
+  # persistent config file /etc/centminmod/custom_config.inc
+  # variable OPENSSL_TLSONETHREE controls whether OpenSSL 1.1.1
+  # installed Nginx enables and supports TLSv1.3 or not
+  # OPENSSL_TLSONETHREE='y' enabled
+  # OPENSSL_TLSONETHREE='n' disabled
+  # https://community.centminmod.com/posts/63238/
+  if [ -f /usr/local/nginx/conf/ssl-include.conf ]; then
+    if [[ "$OPENSSL_TLSONETHREE" = [yY] ]]; then
+      # Nginx supports TLS 1.3 ssl_protocols directive
+      if [[ "$(grep -w 'ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;' /usr/local/nginx/conf/ssl-include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;|' /usr/local/nginx/conf/ssl-include.conf
+      elif [[ "$(grep -w 'ssl_protocols  TLSv1.1 TLSv1.2;' /usr/local/nginx/conf/ssl-include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1.1 TLSv1.2 TLSv1.3;|' /usr/local/nginx/conf/ssl-include.conf
+      elif [[ "$(grep -w 'ssl_protocols  TLSv1.2;' /usr/local/nginx/conf/ssl-include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1.2 TLSv1.3;|' /usr/local/nginx/conf/ssl-include.conf
+      fi
+    else
+      if [[ "$(grep -w 'ssl_protocols  TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;' /usr/local/nginx/conf/ssl-include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;|' /usr/local/nginx/conf/ssl-include.conf
+      elif [[ "$(grep -w 'ssl_protocols  TLSv1.1 TLSv1.2 TLSv1.3;' /usr/local/nginx/conf/ssl-include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1.1 TLSv1.2;|' /usr/local/nginx/conf/ssl-include.conf
+      elif [[ "$(grep -w 'ssl_protocols  TLSv1.2 TLSv1.3;' /usr/local/nginx/conf/ssl-include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1.2;|' /usr/local/nginx/conf/ssl-include.conf
+      fi
+    fi
+  elif [ -f /usr/local/nginx/conf/ssl_include.conf ]; then
+    if [[ "$OPENSSL_TLSONETHREE" = [yY] ]]; then
+      # Nginx supports TLS 1.3 ssl_protocols directive
+      if [[ "$(grep -w 'ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;' /usr/local/nginx/conf/ssl_include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;|' /usr/local/nginx/conf/ssl_include.conf
+      elif [[ "$(grep -w 'ssl_protocols  TLSv1.1 TLSv1.2;' /usr/local/nginx/conf/ssl_include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1.1 TLSv1.2 TLSv1.3;|' /usr/local/nginx/conf/ssl_include.conf
+      elif [[ "$(grep -w 'ssl_protocols  TLSv1.2;' /usr/local/nginx/conf/ssl_include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1.2 TLSv1.3;|' /usr/local/nginx/conf/ssl_include.conf
+      fi
+    else
+      if [[ "$(grep -w 'ssl_protocols  TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;' /usr/local/nginx/conf/ssl_include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1 TLSv1.1 TLSv1.2;|' /usr/local/nginx/conf/ssl_include.conf
+      elif [[ "$(grep -w 'ssl_protocols  TLSv1.1 TLSv1.2 TLSv1.3;' /usr/local/nginx/conf/ssl_include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1.1 TLSv1.2;|' /usr/local/nginx/conf/ssl_include.conf
+      elif [[ "$(grep -w 'ssl_protocols  TLSv1.2 TLSv1.3;' /usr/local/nginx/conf/ssl_include.conf)" ]]; then
+        sed -i 's|ssl_protocols .*|ssl_protocols  TLSv1.2;|' /usr/local/nginx/conf/ssl_include.conf
+      fi
+    fi
+  fi
+}
+
 pzcat_install() {
   if [[ "$(nproc)" -ge '2' && ! -f /usr/bin/pzcat && -f /usr/bin/zcat && -f /usr/bin/pigz ]]; then 
     \cp -af /usr/bin/zcat /usr/bin/pzcat
     sed -i 's|exec gzip -cd|exec pigz -cd|' /usr/bin/pzcat
+  fi
+}
+
+csf_portflood() {
+  # override default CSF Firewall PORTFLOOD values
+  # PORTFLOOD_COUNT=20
+  # PORTFLOOD_INTERVAL=300
+  if [[ "$CSFPORTFLOOD_OVERRIDE" = [yY] && -f /etc/csf/csf.conf ]]; then
+    # ensure only overriding PORTFLOOD Centmin Mod setup defaults
+    # if end user made custom changes to PORTFLOOD, DO NOT override those
+    if [[ "$(grep 'PORTFLOOD = "21;tcp;20;300"' /etc/csf/csf.conf)" ]]; then
+      csf --profile backup portflood_adjustment >/dev/null 2>&1
+      sed -i "s|PORTFLOOD = .*|PORTFLOOD = \"21;tcp;${PORTFLOOD_COUNT};${PORTFLOOD_INTERVAL}\"|" /etc/csf/csf.conf
+      csf -ra >/dev/null 2>&1
+    fi
   fi
 }
 
@@ -2243,6 +2306,7 @@ apache_protect
 setup_pwdh
 cmupdatecheck
 pzcat_install
+csf_portflood
 
 if [[ "$INITIALINSTALL" != [yY] ]]; then
   march_hostcheck
@@ -2261,6 +2325,7 @@ if [[ "$INITIALINSTALL" != [yY] ]]; then
   kernelchecks
   centaltoff
   csfipsetcheck
+  csf_portflood
   checkaliases
   checkcmdircmd
   # dmotdcheck
@@ -2328,6 +2393,7 @@ if [[ "$INITIALINSTALL" != [yY] ]]; then
   csf_loadalert
   disable_varnishrepo
   pzcat_install
+  redetect_tlsonethree
 fi
 
 }
