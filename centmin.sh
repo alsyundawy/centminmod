@@ -20,7 +20,7 @@ DT=$(date +"%d%m%y-%H%M%S")
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='022'
+SCRIPT_INCREMENTVER='025'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
 SCRIPT_DATE='31/05/2018'
@@ -307,7 +307,7 @@ CMGIT='https://github.com/centminmod/centminmod.git'
 # http://centminmod.com/upgrade.html#persistent
 AUTO_GITUPDATE='n'
 #####################################################
-LOCALCENTMINMOD_MIRROR='https://centminmodparts.centminmod.com'
+LOCALCENTMINMOD_MIRROR='https://centminmod.com'
 #####################################################
 # Timestamp Install
 TS_INSTALL='y'
@@ -583,8 +583,9 @@ POSTGRESQL='n'               # set to =y to install PostgreSQL 9.6 server, devel
 # number won't have any effect in determining version of MariaDB 5.2.x to install. 
 # YUM Repo will install whatever is latest MariaDB 5.2.x version available via the YUM REPO
 
-MDB_INSTALL='n'               # Install via RPM MariaDB MySQL Server replacement (Not recommended for VPS with less than 256MB RAM!)
+MDB_INSTALL='n'             # Install via RPM MariaDB MySQL Server replacement (Not recommended for VPS with less than 256MB RAM!)
 MDB_YUMREPOINSTALL='y'      # Install MariaDB 5.5 via CentOS YUM Repo
+MARIADB_INSTALLTENTHREE='n' # MariaDB 10.3 YUM default install if set to yes
 
 # Define current MariaDB version
 MDB_VERONLY='5.2.14'
@@ -662,7 +663,7 @@ MAILPARSEPHP_VER='2.1.6'       # https://pecl.php.net/package/mailparse
 MAILPARSEPHP_COMPATVER='3.0.2' # For PHP 7
 MEMCACHED_INSTALL='y'          # Install Memcached
 LIBEVENT_VERSION='2.1.8'   # Use this version of Libevent
-MEMCACHED_VERSION='1.5.7'  # Use this version of Memcached server
+MEMCACHED_VERSION='1.5.8'  # Use this version of Memcached server
 MEMCACHE_VERSION='3.0.8'    # Use this version of Memcache
 MEMCACHEDPHP_VER='2.2.0'    # Memcached PHP extension not server
 MEMCACHEDPHP_SEVENVER='3.0.4' # Memcached PHP 7 only extension version
@@ -872,6 +873,7 @@ source "inc/php_mssql.inc"
 source "inc/mysql_proclimit.inc"
 source "inc/mysqltmp.inc"
 source "inc/setmycnf.inc"
+source "inc/mariadb_install103.inc"
 source "inc/mariadb_install.inc"
 source "inc/mysql_install.inc"
 source "inc/mariadb_submenu.inc"
@@ -899,6 +901,7 @@ source "inc/mariadb_upgrade55.inc"
 source "inc/mariadb_upgrade10.inc"
 source "inc/mariadb_upgrade101.inc"
 source "inc/mariadb_upgrade102.inc"
+source "inc/mariadb_upgrade103.inc"
 source "inc/nginx_errorpage.inc"
 source "inc/sendmail.inc"
 source "inc/postfix.inc"
@@ -1706,7 +1709,12 @@ echo "" >> "${CENTMINLOGDIR}/centminmod_ngxinstalltime_${DT}.log"
 echo "Total Nginx First Time Install Time: $NGXINSTALLTIME seconds" >> "${CENTMINLOGDIR}/centminmod_ngxinstalltime_${DT}.log"
 ls -lah "${CENTMINLOGDIR}/centminmod_ngxinstalltime_${DT}.log"
 
-mariadbinstallfunct
+if [[ "$MARIADB_INSTALLTENTHREE" = [yY] ]]; then
+  mariadbtenthree_installfunct
+else
+  mariadbinstallfunct
+fi
+
 mysqlinstallfunct
 
 if [[ "$PHP_INSTALL" = [yY] ]]; then

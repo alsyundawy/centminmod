@@ -252,8 +252,8 @@ elif [[ "$CENTOS_SEVEN" = '7' ]]; then
     systemctl kill memcached
 fi
 sleep 2
-cmservice memcached stop
-cmservice memcached start
+service memcached stop
+service memcached start
 
 #############################################
     if [[ "$PHP_INSTALL" = [yY] ]]; then
@@ -383,7 +383,7 @@ if [[ "$PHPMUVER" > 7 || "$PHPSEVEN_CHECKVER" = '0' ]]; then
     MEMCACHEDPHP_VER="$MEMCACHEDPHP_SEVENVER"
     PHPEXT_MEMCACHEDLINKFILE="memcached-${MEMCACHEDPHP_VER}.tgz"
     PHPEXT_MEMCACHEDLINK="https://pecl.php.net/get/${PHPEXT_MEMCACHEDLINKFILE}"
-    PHPEXT_MEMCACHEDLINKLOCAL="${LOCALCENTMINMOD_MIRROR}/memcached/${PHPEXT_MEMCACHEDLINKFILE}"
+    PHPEXT_MEMCACHEDLINKLOCAL="${LOCALCENTMINMOD_MIRROR}/centminmodparts/memcached/${PHPEXT_MEMCACHEDLINKFILE}"
     echo
     echo "compiling memcached PHP extension for PHP 7.x ..."
     # rm -rf memcached-php7
@@ -517,9 +517,9 @@ elif [[ "$CENTOS_SEVEN" = '7' ]]; then
     systemctl kill memcached
 fi
 sleep 2
-cmservice memcached stop
-cmservice memcached start
-cmservice php-fpm restart
+service memcached stop
+service memcached start
+service php-fpm restart
 
 }
 

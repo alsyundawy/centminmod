@@ -10,7 +10,7 @@ DNF_ENABLE='n'
 DNF_COPR='y'
 branchname=123.09beta01
 DOWNLOAD="${branchname}.zip"
-LOCALCENTMINMOD_MIRROR='https://centminmodparts.centminmod.com'
+LOCALCENTMINMOD_MIRROR='https://centminmod.com'
 
 INSTALLDIR='/usr/local/src'
 DIR_TMP='/svr-setup'
@@ -30,13 +30,13 @@ CMGIT='https://gitlab.com/centminmod/centminmod.git'
 AXEL='n'
 AXEL_VER='2.6'
 AXEL_LINKFILE="axel-${AXEL_VER}.tar.gz"
-AXEL_LINK="${LOCALCENTMINMOD_MIRROR}/axel/v${AXEL_VER}.tar.gz"
+AXEL_LINK="${LOCALCENTMINMOD_MIRROR}/centminmodparts/axel/v${AXEL_VER}.tar.gz"
 AXEL_LINKLOCAL="https://github.com/axel-download-accelerator/axel/archive/v${AXEL_VER}.tar.gz"
 
 #######################################################
 ALTPCRE_VERSION='8.42'
 ALTPCRELINKFILE="pcre-${ALTPCRE_VERSION}.tar.gz"
-ALTPCRELINK="${LOCALCENTMINMOD_MIRROR}/pcre/${ALTPCRELINKFILE}"
+ALTPCRELINK="${LOCALCENTMINMOD_MIRROR}/centminmodparts/pcre/${ALTPCRELINKFILE}"
 
 WGET_VERSION='1.19.4'
 WGET_FILENAME="wget-${WGET_VERSION}.tar.gz"
@@ -172,7 +172,7 @@ fi
 if [[ "$CENTOS_SEVEN" = '7' ]]; then
   AXEL_VER='2.14.1'
   AXEL_LINKFILE="axel-${AXEL_VER}.tar.gz"
-  AXEL_LINK="${LOCALCENTMINMOD_MIRROR}/axel/v${AXEL_VER}.tar.gz"
+  AXEL_LINK="${LOCALCENTMINMOD_MIRROR}/centminmodparts/axel/v${AXEL_VER}.tar.gz"
   AXEL_LINKLOCAL="https://github.com/axel-download-accelerator/axel/archive/v${AXEL_VER}.tar.gz"
 
 fi
@@ -1143,7 +1143,8 @@ cd $INSTALLDIR
 #sed -i "s|PHPREDIS='y'|PHPREDIS='n'|" centmin.sh
 
 # switch from PHP 5.4.41 to 5.6.9 default with Zend Opcache
-sed -i "s|^PHP_VERSION='.*'|PHP_VERSION='7.1.17'|" centmin.sh
+PHPVERLATEST=$(curl -s http://php.net/downloads.php | egrep -o "php\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "php-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | uniq | grep '7.2' | head -n1)
+sed -i "s|^PHP_VERSION='.*'|PHP_VERSION='$PHPVERLATEST'|" centmin.sh
 sed -i "s|ZOPCACHEDFT='n'|ZOPCACHEDFT='y'|" centmin.sh
 
 # disable axivo yum repo
