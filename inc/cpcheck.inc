@@ -321,11 +321,11 @@ varnishfour_setup() {
       yum_repo_path=$VARNISH_REPOFILE
       yum_repo_config_url="https://packagecloud.io/install/repositories/varnishcache/varnish41/config_file.repo?os=${os}&dist=${dist}&source=script"
       if [[ "$CENTOS_SEVEN" -eq '7' || "$CENTOS_SIX" -eq '6' ]]; then
-          curl -4Is --connect-timeout 5 --max-time 5 "${yum_repo_config_url}" | grep 'HTTP\/' | grep '200' >/dev/null 2>&1
+          curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${yum_repo_config_url}" | grep 'HTTP\/' | grep '200' >/dev/null 2>&1
           VARNISHFOUR_CURLCHECK=$?
           if [[ "$VARNISHFOUR_CURLCHECK" = '0' ]]; then
             echo "update varnish cache 4.1 yum repo config"
-            curl -4sSf "${yum_repo_config_url}" > $yum_repo_path
+            curl -${ipv_forceopt}sSf "${yum_repo_config_url}" > $yum_repo_path
             # yum -q makecache -y --disablerepo='*' --enablerepo='varnishcache_varnish41'
             if [ -f /etc/yum.repos.d/varnish-4.1.repo ]; then
                 rm -rf /etc/yum.repos.d/varnish-4.1.repo
@@ -485,8 +485,8 @@ update_cmdshortcuts() {
 
 update_nginxconf() {
   if [[ -f /usr/local/nginx/conf/nginx.conf && "$NGINX_ALLOWOVERRIDE" = [yY] ]]; then
-    NGX_WRKCON=$(grep -w 'worker_connections' /usr/local/nginx/conf/nginx.conf | column -t| tr -s " " | sed -e 's|;||g' | awk '{print $2}')
-    NGX_KT=$(grep -w 'keepalive_timeout' /usr/local/nginx/conf/nginx.conf | column -t| tr -s " " | sed -e 's|;||g' | awk '{print $2}')
+    NGX_WRKCON=$(grep -w 'worker_connections' /usr/local/nginx/conf/nginx.conf | column -t| tr -s " " | sed -e 's|;||g' | awk '{print $2}' | grep -v 'worker_connections')
+    NGX_KT=$(grep -w 'keepalive_timeout' /usr/local/nginx/conf/nginx.conf | column -t| tr -s " " | sed -e 's|;||g' | awk '{print $2}'| grep -v keep)
     # adjust to new default higher values only if previous defaults are detected
     # do not adjust if end user has changed values from previous defaults
     if [[ "$NGX_WRKCON" -eq '4096' || "$NGX_WRKCON" -eq '10000' ]]; then
@@ -636,6 +636,24 @@ fixwp_updater() {
   # https://community.centminmod.com/posts/44969/
   if [ -d /root/tools ]; then
     for f in $(find /root/tools/ -type f -name "wp_updater_*"); do grep -w 'pure-pw' $f && sed -i "/pure-pw/d" $f; done
+  fi
+
+  # auto fix wp_updater cronjobs code only if 23rd line of file has expected bug
+  # and file has exactly 36 lines of code (to prevent messing up customized files)
+  # part 1 fix outlined at https://community.centminmod.com/threads/15123/
+  if [ -d /root/tools ]; then
+    find /root/tools -type f -name "wp_updater_*.sh" | while read w; do
+      if [[ "$(sed -n '23'p "$w" | grep 'if \[\[ -f .wpcli-status && ! "" \]\]; then')" && "$(wc -l < "$w")" -eq '36' ]]; then
+        echo
+        echo "updating wp updater code for $w"
+        echo "https://community.centminmod.com/threads/15123/"
+        DT=$(date +"%d%m%y-%H%M%S")
+        echo "cp -a "$w" "${w}.backup-$DT""
+        cp -a "$w" "${w}.backup-$DT"
+        sed -i "s| \"\"| \"\$(grep -w 'Plugin already updated' .wpcli-status)\"|" "$w"
+        cat "$w" | grep wpcli-status | grep then
+      fi
+    done
   fi
 }
 
@@ -845,9 +863,9 @@ gitenv_askupdate() {
       # https://github.com/centminmod/centminmod/raw/${branchname}/giturl.txt
       # check if you can properly resolve raw.githubusercontent.com first in case of dns outpages
       # issues at github end https://community.centminmod.com/threads/centmin-mod-github-com-repo-504-timeouts.9232/
-      CURL_GITURLCHECKER=$(curl -s4 https://raw.githubusercontent.com/centminmod/centminmod/${branchname}/giturl.txt >/dev/null 2>&1; echo $?)
+      CURL_GITURLCHECKER=$(curl -s${ipv_forceopt} https://raw.githubusercontent.com/centminmod/centminmod/${branchname}/giturl.txt >/dev/null 2>&1; echo $?)
       if [[ "$CURL_GITURLCHECKER" = '0' ]]; then
-        CURL_GITURL=$(curl -s4 https://raw.githubusercontent.com/centminmod/centminmod/${branchname}/giturl.txt)
+        CURL_GITURL=$(curl -s${ipv_forceopt} https://raw.githubusercontent.com/centminmod/centminmod/${branchname}/giturl.txt)
       else
         # just default to https://github.com/centminmod/centminmod.git if can not resolve the
         # https://raw.githubusercontent.com/centminmod/centminmod/${branchname}/giturl.txt
@@ -945,7 +963,7 @@ set_logdate() {
 
 ngxver_checker() {
   if [[ "$(which nginx >/dev/null 2>&1; echo $?)" = '0' ]]; then
-    LASTEST_NGINXVERS=$(curl -4sL https://nginx.org/en/download.html 2>&1 | egrep -o "nginx\-[0-9.]+\.tar[.a-z]*" | awk -F "nginx-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | head -n 1 2>&1)
+    LASTEST_NGINXVERS=$(curl -${ipv_forceopt}sL https://nginx.org/en/download.html 2>&1 | egrep -o "nginx\-[0-9.]+\.tar[.a-z]*" | awk -F "nginx-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | head -n 1 2>&1)
     CURRENT_NGINXVERS=$(nginx -v 2>&1 | awk -F '/' '{print $2}')
     if [[ "$CURRENT_NGINXVERS" != "$LASTEST_NGINXVERS" ]]; then
       echo
@@ -997,7 +1015,7 @@ yumupdatechecker() {
     else
         VERSIONLOCK_REPO=""
     fi
-    if [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]] && [[ -f /usr/bin/php56 || -f /usr/bin/php70 || -f /usr/bin/php71 || -f /usr/bin/php72 ]]; then
+    if [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]] && [[ -f /usr/bin/php56 || -f /usr/bin/php70 || -f /usr/bin/php71 || -f /usr/bin/php72 || -f /usr/bin/php73 ]]; then
       YENABLEREPOS='remi,city-fan.org,remi-test'
       YEXCLUDE='nginx* mysql*'
     elif [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]]; then
@@ -1021,7 +1039,7 @@ yumupdatechecker() {
     fi
     if [[ "$UPDATE_CHECK" = '100' ]]; then
       echo
-      if [[ "$(hostname -f 2>&1 | grep -w 'Unknown host')" ]]; then
+      if [[ "$(hostname -f 2>&1 | grep -w 'Unknown host')" || "$(hostname -f 2>&1 | grep -w 'service not known')" ]]; then
         SERVERHOSTNAME=$(hostname)
       else
         SERVERHOSTNAME=$(hostname -f)
@@ -1031,7 +1049,7 @@ yumupdatechecker() {
       cecho "-------------------------------------------------------------" $boldgreen
       cecho "  To list available YUM Updates type: " $boldyellow
       cecho "-------------------------------------------------------------" $boldgreen
-      if [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]] && [[ -f /usr/bin/php56 || -f /usr/bin/php70 || -f /usr/bin/php71 || -f /usr/bin/php72 ]]; then
+      if [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]] && [[ -f /usr/bin/php56 || -f /usr/bin/php70 || -f /usr/bin/php71 || -f /usr/bin/php72 || -f /usr/bin/php73 ]]; then
         echo "  yum list updates $YYUM_PARAMETER --enablerepo=$YENABLEREPOS --disableexcludes=main,remi"
       elif [[ -f /etc/yum.repos.d/remi.repo || -f /etc/yum.repos.d/city-fan.org.repo ]]; then
         echo "  yum list updates $YYUM_PARAMETER --enablerepo=$YENABLEREPOS"
@@ -1041,7 +1059,7 @@ yumupdatechecker() {
       cecho "-------------------------------------------------------------" $boldgreen
       cecho "  Following Updates are available: " $boldyellow
       cecho "-------------------------------------------------------------" $boldgreen
-      if [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]] && [[ -f /usr/bin/php56 || -f /usr/bin/php70 || -f /usr/bin/php71 || -f /usr/bin/php72 ]]; then
+      if [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]] && [[ -f /usr/bin/php56 || -f /usr/bin/php70 || -f /usr/bin/php71 || -f /usr/bin/php72 || -f /usr/bin/php73 ]]; then
         yum -q list updates $YYUM_PARAMETER --enablerepo=$YENABLEREPOS --disableexcludes=main,remi | grep -v 'Updated Packages' | tee "/root/centminlogs/yumcheck-imagemagick6-$DT.txt"
         IMAGEMAGICK_UPDATECHECK=$(grep ImageMagick6 "/root/centminlogs/yumcheck-imagemagick6-$DT.txt" >/dev/null 2>&1; echo $?)
         rm -rf "/root/centminlogs/yumcheck-imagemagick6-$DT.txt"
@@ -1059,7 +1077,7 @@ yumupdatechecker() {
       cecho "-------------------------------------------------------------" $boldgreen
       cecho "  To update type these commands: " $boldyellow
       cecho "-------------------------------------------------------------" $boldgreen
-      if [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]] && [[ -f /usr/bin/php56 || -f /usr/bin/php70 || -f /usr/bin/php71 || -f /usr/bin/php72 ]]; then
+      if [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]] && [[ -f /usr/bin/php56 || -f /usr/bin/php70 || -f /usr/bin/php71 || -f /usr/bin/php72 || -f /usr/bin/php73 ]]; then
         if [ "$IMAGEMAGICK_UPDATECHECK" -eq '0' ]; then
           echo "  run centmin.sh menu option 15 to update imagick PHP ext then run: "
           echo
@@ -1237,7 +1255,7 @@ fi
 }
 
 kernelchecks() {
-  if [[ "$(uname -r | cut -d . -f1)" = '4' ]]; then
+  if [[ "$(uname -r | cut -d . -f1)" = '4' && "$CHECK_LXD" != [yY] ]]; then
     if [[ "$(cat /proc/sys/net/netfilter/nf_conntrack_helper)" != '0' ]]; then
       echo "linux 4.x kernel related adjustments"
       echo "cat /proc/sys/net/netfilter/nf_conntrack_helper"
@@ -1856,7 +1874,7 @@ ovhkernelcheck() {
     # Intel Xeon D-15xx Broadwell-DE processors which need
     # OVH custom kernel for the newer Intel network NIC support
     # Intel Corporation Ethernet Connection X552/X557-AT 10GBASE-T
-    OVHASNCHECK=$(curl -4s${CURL_TIMEOUTS} https://ipinfo.io/org | grep -o 'OVH' >/dev/null 2>&1; echo $?)
+    OVHASNCHECK=$(curl -${ipv_forceopt}s${CURL_TIMEOUTS} https://ipinfo.io/org | grep -o 'OVH' >/dev/null 2>&1; echo $?)
     OVHKERNEL_CHECK=$(uname -r | grep '\-grs' >/dev/null 2>&1; echo $?)
     BROADWELLDE_CHECK=$(grep 'Xeon(R) CPU D-15' /proc/cpuinfo >/dev/null 2>&1; echo $?)
     # more sure way to check for OVH custom kernel if /root/.ovhrc file exists
@@ -2232,6 +2250,14 @@ setup_pwdh() {
 }
 
 cpcheck() {
+  if [[ -f /usr/bin/systemd-detect-virt && "$(/usr/bin/systemd-detect-virt)" = 'lxc' ]] || [[ -f $(which virt-what) && $(virt-what | head -n1) = 'lxc' ]]; then
+    CHECK_LXD='y'
+    if [[ -d /etc/profile.d && ! -f /etc/profile.d/locale.sh ]]; then
+      echo "export LANG=en_US.UTF-8" >> /etc/profile.d/locale.sh
+      echo "export LANGUAGE=en_US.UTF-8" >> /etc/profile.d/locale.sh
+      source /etc/profile.d/locale.sh
+    fi
+  fi
   FIRSTINSTALL=$1
   if [[ "$FIRSTINSTALL" = 'initialinstall' ]]; then
     INITIALINSTALL='y'

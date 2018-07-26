@@ -73,6 +73,12 @@ elif [[ "$AUTODETECPHP_OVERRIDE" = [yY] ]]; then
     DETECTMONGODB=y
 fi
 
+if [[ -f "${CONFIGSCANDIR}/zopfli.ini" || "$PHPZOPFLI" = [yY] ]]; then
+    DETECTZOPFLI=y
+elif [[ "$AUTODETECPHP_OVERRIDE" = [yY] ]]; then
+    DETECTZOPFLI=y
+fi
+
 if [ -f "${CONFIGSCANDIR}/zendopcache.ini" ]; then
     DETECTOPCACHE=y
 elif [[ "$AUTODETECPHP_OVERRIDE" = [yY] ]]; then
@@ -162,6 +168,11 @@ if [[ "$DETECTMONGODB" = [yY] ]] || [[ "$DETECTMONGODB" = [yY] && ! -f "$PHPEXTD
     mongodbinstall
 fi
 
+if [[ "$DETECTZOPFLI" = [yY] ]] || [[ "$DETECTZOPFLI" = [yY] && ! -f "$PHPEXTDIR_AUTODETECT/zopfli.so" ]]; then
+    cecho "Auto reinstalling previously detected Zopfli PHP extension" $boldyellow
+    zopfliinstall
+fi
+
 if [[ "$DETECTOPCACHE" = [yY] ]]; then
   # ZOPCACHE_OVERRIDE=y allows you to override PHP 5.5-7.x's inbuilt included
   # Zend Opcache version with one available from pecl site
@@ -249,7 +260,7 @@ if [[ "$UALL" = 'y' ]]; then
 else
     echo
     echo "----------------------------------------------------------------"
-    echo "Install which version of PHP? (version i.e. ${PHP_VERSION}, 7.0.26, NGDEBUG)"
+    echo "Install which version of PHP? (version i.e. ${PHP_VERSION}, 7.0.30, NGDEBUG)"
     echo "PHP 7.x/7.1.x/7.2.x is GA Stable but still may have broken PHP extensions."
     echo "NGDEBUG is PHP 7.3.0 dev builds minus incompatible PHP extensions"
     echo "----------------------------------------------------------------"
@@ -313,8 +324,16 @@ PHPMU_ALPHAVER=$(echo "$phpver")
 
 funct_centos6check
 
+  if [[ "$PHPMUVER" = 5.3 ]]; then
+    if [ ! -f /usr/bin/autoconf-2.13 ]; then
+        yum -y -q install autoconf213
+    fi
+    export PHP_AUTOCONF=/usr/bin/autoconf-2.13
+    export PHP_AUTOHEADER=/usr/bin/autoheader-2.13
+  else
     export PHP_AUTOCONF=/usr/bin/autoconf
     export PHP_AUTOHEADER=/usr/bin/autoheader
+  fi
 
     cd "$DIR_TMP"
 
@@ -330,7 +349,7 @@ fi
             figlet -ckf standard "PHP: Download"
         fi
     
-        curl -4Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/get/php-${phpver}.tar.${PHPEXTSION}/from/this/mirror" | grep 'HTTP\/' | grep '404'
+        curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/get/php-${phpver}.tar.${PHPEXTSION}/from/this/mirror" | grep 'HTTP\/' | grep '404'
         PHPGEO_CURLCHECK=$?
         if [[ "$PHPGEO_CURLCHECK" = '0' ]]; then
             PHP_MIRRORURL="http://php.net"
@@ -407,6 +426,18 @@ fi # PHPDIFF
 ##############################################
 
     make clean
+
+  if [[ "$PHPMUVER" = 5.3 ]]; then
+    # patch PHP 5.3 source tarballs
+    # https://bugs.php.net/bug.php?id=48795
+    # https://community.centminmod.com/posts/63882/
+    # pushd ../
+    if [ ! -f php53.patch ]; then
+        cp -a $CUR_DIR/patches/php/php53.patch php53.patch
+        patch < php53.patch
+    fi
+    # popd
+  fi
 
     ./buildconf --force
     
@@ -500,7 +531,7 @@ fi
     fi
     echo "PHPMUVER = $PHPMUVER"
     echo "PHP_PGO = $PHP_PGO"
-    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' ]]; then
+    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' ]]; then
         echo "make${MAKETHREADS_PHP} prof-gen"
         time make${MAKETHREADS_PHP} prof-gen
         if [ ! -d "$DIR_TMP/php_pgo_training_scripts" ]; then
@@ -599,10 +630,20 @@ if [[ "$STRIPPHP" = [yY] ]]; then
     echo "strip PHP binary..."
     ls -lah /usr/local/bin/php
     ls -lah /usr/local/bin/php-cgi
+    ls -lah /usr/local/sbin/php-fpm
+    echo
+    echo "backup before strip PHP binary..."
+    \cp -af /usr/local/bin/php /usr/local/bin/php-b4strip 
+    \cp -af /usr/local/bin/php-cgi /usr/local/bin/php-cgi-b4strip 
+    \cp -af /usr/local/sbin/php-fpm /usr/local/sbin/php-fpm-b4strip 
     strip -s /usr/local/bin/php
     strip -s /usr/local/bin/php-cgi
+    strip -s /usr/local/sbin/php-fpm
+    echo
+    echo "after strip PHP binary..."
     ls -lah /usr/local/bin/php
     ls -lah /usr/local/bin/php-cgi
+    ls -lah /usr/local/sbin/php-fpm
     echo
 fi
 
@@ -763,6 +804,19 @@ if [[ "$PHPMONGODB" = [nN] ]]; then
     fi
 fi
 
+if [ ! -f "${CONFIGSCANDIR}/zopfli.ini" ]; then
+    # always install zopfli module
+    if [[ "$PHPZOPFLI_ALWAYS" = [yY] && "$PHP_MAJORUPGRADE" = [nN] ]]; then
+        zopfliinstall
+    fi
+elif [ -f "${CONFIGSCANDIR}/zopfli.ini" ]; then
+    if [[ "$PHPZOPFLI_ALWAYS" = [nN] ]]; then
+        rm -rf "${CONFIGSCANDIR}/zopfli.ini"
+    elif [[ "$PHPZOPFLI_ALWAYS" = [yY] && "$PHP_MAJORUPGRADE" = [nN] ]]; then
+        zopfliinstall  
+    fi
+fi
+
 if [[ "$PHP_MEMCACHE" = [nN] ]]; then
     if [ -f "${CONFIGSCANDIR}/memcache.ini" ]; then
         rm -rf "${CONFIGSCANDIR}/memcache.ini"
@@ -816,7 +870,14 @@ fi
 
 addmysql_legacyinstall
 
-if [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMUVER" = '7.2' ]]; then
+if [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMUVER" = '7.3' ]]; then
+    echo "PHP_MCRYPTPECL=$PHP_MCRYPTPECL"
+    echo "PHPMVER=$PHPMVER"
+    echo "PHPMUVER=$PHPMUVER"
+    if [ -f /usr/local/src/centminmod/addons/php73-mcrypt.sh ]; then
+        /usr/local/src/centminmod/addons/php73-mcrypt.sh menu
+    fi
+elif [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMUVER" = '7.2' ]]; then
     echo "PHP_MCRYPTPECL=$PHP_MCRYPTPECL"
     echo "PHPMVER=$PHPMVER"
     echo "PHPMUVER=$PHPMUVER"
@@ -831,6 +892,22 @@ else
         rm -rf "${CONFIGSCANDIR}/mcrypt.ini"
     fi
 fi
+
+if [[ "$PHPSEVENTHREE_EXTFIX" != [nN] && "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/mailparse.ini" ]]; then
+    cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
+    cecho "rm -rf ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
+    rm -rf "${CONFIGSCANDIR}/mailparse.ini"
+fi
+if [[ "$PHPSEVENTHREE_EXTFIX" != [nN] && "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/memcache.ini" ]]; then
+    cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcache.ini" $boldyellow
+    cecho "rm -rf ${CONFIGSCANDIR}/memcache.ini" $boldyellow
+    rm -rf "${CONFIGSCANDIR}/memcache.ini"
+fi
+# if [[ "$PHPSEVENTHREE_EXTFIX" != [nN] && "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/memcached.ini" ]]; then
+#     cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcached.ini" $boldyellow
+#     cecho "rm -rf ${CONFIGSCANDIR}/memcached.ini" $boldyellow
+#     rm -rf "${CONFIGSCANDIR}/memcached.ini"
+# fi
 
 echo
 php --ini
@@ -865,34 +942,46 @@ if [[ "$zendopcacheon" = [yY] && "$OLD_OPCACHEPHP" != [yY] ]]; then
 fi
 
 # notes for users if PHP 7.0 detected
-php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2'
+php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2|7.3'
 PHPSEVEN_CHECKVER=$?
 echo "$PHPSEVEN_CHECKVER"
 
 if [[ "$PHPSEVEN_CHECKVER" = '0' ]]; then
     cecho "***************************************************" $boldgreen
-    cecho "PHP 7.0/7.1/7.2 detected.. remove unsupported PHP extensions manually" $boldyellow
-    cecho "by removing their ini files:" $boldyellow
+    cecho "PHP 7.0/7.1/7.2/7.3 detected.. remove unsupported PHP extensions manually" $boldyellow
+    cecho "by removing their ini files listed below (if list is empty = nothing to do):" $boldyellow
     cecho "***************************************************" $boldgreen
     echo
-    # if [ -f /etc/centminmod/php.d/igbinary.ini ]; then
-    #     cecho "rm -rf /etc/centminmod/php.d/igbinary.ini" $boldyellow
+    # if [ -f ${CONFIGSCANDIR}/igbinary.ini ]; then
+    #     cecho "rm -rf ${CONFIGSCANDIR}/igbinary.ini" $boldyellow
     # fi
-    # if [ -f /etc/centminmod/php.d/imagick.ini ]; then
-    #     cecho "#rm -rf /etc/centminmod/php.d/imagick.ini" $boldyellow
+    # if [ -f ${CONFIGSCANDIR}/imagick.ini ]; then
+    #     cecho "#rm -rf ${CONFIGSCANDIR}/imagick.ini" $boldyellow
     # fi
-    # if [ -f /etc/centminmod/php.d/memcache.ini ]; then
-    #     cecho "#rm -rf /etc/centminmod/php.d/memcache.ini" $boldyellow
+    # if [ -f ${CONFIGSCANDIR}/memcache.ini ]; then
+    #     cecho "#rm -rf ${CONFIGSCANDIR}/memcache.ini" $boldyellow
     # fi
-    if [ -f /etc/centminmod/php.d/mongodb.ini ]; then
-        cecho "#rm -rf /etc/centminmod/php.d/mongodb.ini" $boldyellow
+    if [ -f "${CONFIGSCANDIR}/mongodb.ini" ]; then
+        cecho "#rm -rf ${CONFIGSCANDIR}/mongodb.ini" $boldyellow
     fi
-    # if [ -f /etc/centminmod/php.d/redis.ini ]; then
-    #     cecho "#rm -rf /etc/centminmod/php.d/redis.ini" $boldyellow
+    # if [ -f ${CONFIGSCANDIR}/redis.ini ]; then
+    #     cecho "#rm -rf ${CONFIGSCANDIR}/redis.ini" $boldyellow
     # fi
-    if [ -f /etc/centminmod/php.d/suhosin.ini ]; then
-        cecho "rm -rf /etc/centminmod/php.d/suhosin.ini" $boldyellow
+    if [ -f "${CONFIGSCANDIR}/suhosin.ini" ]; then
+        cecho "rm -rf ${CONFIGSCANDIR}/suhosin.ini" $boldyellow
     fi
+    if [[ "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/mailparse.ini" ]]; then
+        cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
+        cecho "rm -rf ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
+    fi
+    if [[ "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/memcache.ini" ]]; then
+        cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcache.ini" $boldyellow
+        cecho "rm -rf ${CONFIGSCANDIR}/memcache.ini" $boldyellow
+    fi
+    # if [[ "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/memcached.ini" ]]; then
+    #     cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcached.ini" $boldyellow
+    #     cecho "rm -rf ${CONFIGSCANDIR}/memcached.ini" $boldyellow
+    # fi
     echo
     cecho "then restart PHP-FPM again..." $boldyellow
     echo
@@ -900,7 +989,7 @@ fi
 
     echo "***************************************************"
     cecho "* PHP upgraded and auto reinstalled PHP extensions" $boldgreen
-    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' ]]; then
+    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' ]]; then
         cecho "* PHP_PGO='y' detected. PHP compiled with Profile Guided Optimizations" $boldgreen
         cecho "* https://software.intel.com/en-us/blogs/2015/10/09/pgo-let-it-go-php" $boldgreen
     fi

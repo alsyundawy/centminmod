@@ -1,6 +1,6 @@
 #!/bin/bash
 #############################################################
-# mcrypt PECL extension for PHP 7.2+ for
+# mcrypt PECL extension for PHP 7.3+ for
 # Centmin Mod centminmod.com
 # written by George Liu (eva2000)
 #############################################################
@@ -78,9 +78,9 @@ fi
 mcrypt_peclinstall() {
   checkmenu="$1"
 
-  if [[ "${PHPCURRENTVER}" != '7.2' && "$checkmenu" != 'menu' ]]; then
-    echo "Your current PHP version $PHPCURRENTVER is not PHP 7.2 branch"
-    echo "this addon is only for PHP 7.2 users"
+  if [[ "${PHPCURRENTVER}" != '7.3' && "$checkmenu" != 'menu' ]]; then
+    echo "Your current PHP version $PHPCURRENTVER is not PHP 7.3 branch"
+    echo "this addon is only for PHP 7.3 users"
     echo "aborting installation"
     exit
   fi
@@ -145,10 +145,10 @@ starttime=$(TZ=UTC date +%s.%N)
   else
     mcrypt_peclinstall
   fi
-} 2>&1 | tee ${CENTMINLOGDIR}/mcrypt-php72-pecl-install_${DT}.log
+} 2>&1 | tee ${CENTMINLOGDIR}/mcrypt-php73-pecl-install_${DT}.log
 
 endtime=$(TZ=UTC date +%s.%N)
 
 INSTALLTIME=$(echo "scale=2;$endtime - $starttime"|bc )
-echo "" >> ${CENTMINLOGDIR}/mcrypt-php72-pecl-install_${DT}.log
-echo "Total PHP 7.2 mcrypt PECL Install Time: $INSTALLTIME seconds" >> ${CENTMINLOGDIR}/mcrypt-php72-pecl-install_${DT}.log
+echo "" >> ${CENTMINLOGDIR}/mcrypt-php73-pecl-install_${DT}.log
+echo "Total PHP 7.3 mcrypt PECL Install Time: $INSTALLTIME seconds" >> ${CENTMINLOGDIR}/mcrypt-php73-pecl-install_${DT}.log

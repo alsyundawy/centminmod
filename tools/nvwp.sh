@@ -16,7 +16,7 @@ CURL_TIMEOUTS=' --max-time 5 --connect-timeout 5'
 DIR_TMP=/svr-setup
 OPENSSL_VERSION=$(awk -F "'" /'^OPENSSL_VERSION/ {print $2}' $CUR_DIR/centmin.sh)
 # CURRENTIP=$(echo $SSH_CLIENT | awk '{print $1}')
-# CURRENTCOUNTRY=$(curl -4s${CURL_TIMEOUTS} https://ipinfo.io/$CURRENTIP/country)
+# CURRENTCOUNTRY=$(curl -${ipv_forceopt}s${CURL_TIMEOUTS} https://ipinfo.io/$CURRENTIP/country)
 SCRIPT_DIR=$(readlink -f $(dirname ${BASH_SOURCE[0]}))
 LOGPATH="${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nvwp.log"
 USE_NGINXMAINEXTLOGFORMAT='n'
@@ -95,7 +95,18 @@ if [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module
   HTTPTWO_MAXHEADERSIZE='http2_max_header_size 32k;'  
 elif [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]]; then
   HTTPTWO=y
-  LISTENOPT='ssl http2'
+  if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep reuseport | awk -F ':  ' '{print $2}' | grep -o reuseport)" != 'reuseport' ]]; then
+    # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
+    NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
+    if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
+      ADD_REUSEPORT=' reuseport'
+    else
+      ADD_REUSEPORT=""
+    fi
+    LISTENOPT="ssl http2${ADD_REUSEPORT}"
+  else
+    LISTENOPT='ssl http2'
+  fi
   COMP_HEADER='#spdy_headers_comp 5'
   SPDY_HEADER='#add_header Alternate-Protocol  443:npn-spdy/3;'
   HTTPTWO_MAXFIELDSIZE='http2_max_field_size 16k;'
@@ -689,8 +700,8 @@ server {
 #include /usr/local/nginx/conf/pagespeedstatslog.conf;
 
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
 
   # limit_conn limit_per_ip 16;
@@ -785,8 +796,8 @@ server {
   # before enabling HSTS line below read centminmod.com/nginx_domain_dns_setup.html#hsts
   #add_header Strict-Transport-Security "max-age=31536000; includeSubdomains;";
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
   $COMP_HEADER;
   ssl_buffer_size 1369;
@@ -886,8 +897,8 @@ server {
 #include /usr/local/nginx/conf/pagespeedstatslog.conf;
 
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
 
   # limit_conn limit_per_ip 16;
@@ -1457,7 +1468,7 @@ if [[ -d "/home/nginx/domains/${vhostname}/public" ]]; then
 
   # download wordpress latest zip
   rm -rf latest.zip
-  wget -4 -cnv https://wordpress.org/latest.zip
+  wget -${ipv_forceopt}cnv https://wordpress.org/latest.zip
   unzip -q latest.zip
   cd wordpress
   \cp -Rf * /home/nginx/domains/${vhostname}/public

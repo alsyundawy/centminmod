@@ -8,6 +8,7 @@ LINFO_VER='2.0.3'
 LINFOBASE='/usr/local/nginx/html'	# DO NOT CHANGE
 LINFODIR='cinfo'
 LINFOPATH="${LINFOBASE}/${LINFODIR}"
+FORCE_IPVFOUR='y' # curl/wget commands through script force IPv4
 #################################################
 # Setup Colours
 black='\E[30;40m'
@@ -117,7 +118,7 @@ CSALT=$(openssl rand 6 -base64 | tr -dc 'a-zA-Z0-9')
 CUSER=$(echo "admin${CSALT}")
 CPASS=$(openssl rand 19 -base64 | tr -dc 'a-zA-Z0-9')
 
-    if [[ "$(hostname -f 2>&1 | grep -w 'Unknown host')" ]]; then
+    if [[ "$(hostname -f 2>&1 | grep -w 'Unknown host')" || "$(hostname -f 2>&1 | grep -w 'service not known')" ]]; then
       hname=$(hostname)
     else
       hname=$(hostname -f)

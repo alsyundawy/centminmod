@@ -190,7 +190,7 @@ if [[ "$FPMRPM_LIBEVENT" = [yY] && "$(uname -m)" = 'x86_64' ]]; then
     if [ -s libevent-2.0.21-1.x86_64.rpm ]; then
         cecho "libevent-2.0.21-1.x86_64.rpm found, skipping download..." $boldgreen
     else
-        wget -4 -cnv https://centminmod.com/centminmodparts/customrpms/fpm/libevent-2.0.21-1.x86_64.rpm --tries=3
+        wget -${ipv_forceopt}cnv https://centminmod.com/centminmodparts/customrpms/fpm/libevent-2.0.21-1.x86_64.rpm --tries=3
         rpm -Uvh libevent-2.0.21-1.x86_64.rpm
     fi
 else
@@ -219,7 +219,7 @@ if [[ "$FPMRPM_MEMCACHED" = [yY] && "$(uname -m)" = 'x86_64' ]]; then
     if [ -s memcached-1.4.18-1.x86_64.rpm ]; then
         cecho "memcached-1.4.18-1.x86_64.rpm found, skipping download..." $boldgreen
     else
-        wget -4 -cnv https://centminmod.com/centminmodparts/customrpms/fpm/memcached-1.4.18-1.x86_64.rpm --tries=3
+        wget -${ipv_forceopt}cnv https://centminmod.com/centminmodparts/customrpms/fpm/memcached-1.4.18-1.x86_64.rpm --tries=3
         rpm -Uvh memcached-1.4.18-1.x86_64.rpm
         cd "${DIR_TMP}/memcached-${MEMCACHED_VERSION}"
         cp -f "$DIR_TMP/memcached-${MEMCACHED_VERSION}/scripts/memcached-tool" /usr/local/bin
@@ -237,7 +237,7 @@ else
     if [[ "$INITIALINSTALL" != [yY] ]]; then
         make clean
     fi
-    ./configure --with-libevent="/usr/${LIBDIR} "--enable-sasl --enable-sasl-pwdb
+    ./configure --with-libevent="/usr/${LIBDIR}" --enable-sasl --enable-sasl-pwdb
     # ./configure --with-libevent=/usr/${LIBDIR} --enable-memcached --enable-memcached-igbinary --enable-memcached-json --with-php- config=/usr/local/bin/php-config
     make${MAKETHREADS}
     make install
@@ -259,7 +259,7 @@ service memcached start
     if [[ "$PHP_INSTALL" = [yY] ]]; then
 if [ "$PHP_MEMCACHE" == 'y' ]; then
     PHPCURRENTVER=$(php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2)
-    if [[ "$PHPCURRENTVER" = '7.0' || "$PHPMUVER" = '7.0' || "$PHPCURRENTVER" = '7.1' || "$PHPMUVER" = '7.1' || "$PHPCURRENTVER" = '7.2' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]]; then
+    if [[ "$PHPCURRENTVER" = '7.0' || "$PHPMUVER" = '7.0' || "$PHPCURRENTVER" = '7.1' || "$PHPMUVER" = '7.1' || "$PHPCURRENTVER" = '7.2' || "$PHPMUVER" = '7.2' || "$PHPCURRENTVER" = '7.3' || "$PHPMUVER" = '7.3' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]]; then
         echo
         echo "Compiling memcache PHP extension for PHP 7.x ..."
     
@@ -268,7 +268,7 @@ if [ "$PHP_MEMCACHE" == 'y' ]; then
                 rerpm
             fi
         fi
-    
+        pushd "$DIR_TMP"
         rm -rf memcache-php7
         time git clone -b NON_BLOCKING_IO_php7 https://github.com/websupport-sk/pecl-memcache.git memcache-php7
         cd memcache-php7
@@ -279,6 +279,7 @@ if [ "$PHP_MEMCACHE" == 'y' ]; then
         ./configure --enable-memcache --with-php-config=/usr/local/bin/php-config
         make${MAKETHREADS}
         make install
+        popd
     else
         cecho "Compiling PHP memcache extension..." $boldgreen
         pwd
@@ -375,7 +376,7 @@ if [ -f /usr/bin/re2c ]; then
     fi
 fi
 
-php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep '7.0|7.1|7.2'
+php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep '7.0|7.1|7.2|7.3'
 PHPSEVEN_CHECKVER=$?
 echo "$PHPSEVEN_CHECKVER"
 
@@ -386,14 +387,20 @@ if [[ "$PHPMUVER" > 7 || "$PHPSEVEN_CHECKVER" = '0' ]]; then
     PHPEXT_MEMCACHEDLINKLOCAL="${LOCALCENTMINMOD_MIRROR}/centminmodparts/memcached/${PHPEXT_MEMCACHEDLINKFILE}"
     echo
     echo "compiling memcached PHP extension for PHP 7.x ..."
-    # rm -rf memcached-php7
-    # time git clone -b php7 https://github.com/php-memcached-dev/php-memcached.git memcached-php7
-    # cd memcached-php7
-    if [ ! -d "${DIR_TMP}/memcached-${MEMCACHEDPHP_VER}" ]; then
-        rm -rf "${DIR_TMP}/memcached-${MEMCACHEDPHP_VER}*"
-        memcachedphplocaltarball
+    echo "PHPMUVER = $PHPMUVER"
+    if [[ "$PHPMUVER" = '7.3' || "$PHPCURRENTVER" = '7.3' ]]; then
+      pushd "$DIR_TMP"
+      rm -rf memcached-php7
+      time git clone --depth=1 https://github.com/php-memcached-dev/php-memcached.git memcached-php7
+      popd
+      cd "${DIR_TMP}/memcached-php7"
+    else
+      if [ ! -d "${DIR_TMP}/memcached-${MEMCACHEDPHP_VER}" ]; then
+          rm -rf "${DIR_TMP}/memcached-${MEMCACHEDPHP_VER}*"
+          memcachedphplocaltarball
+      fi
+      cd "${DIR_TMP}/memcached-${MEMCACHEDPHP_VER}"
     fi
-    cd "${DIR_TMP}/memcached-${MEMCACHEDPHP_VER}"
     if [[ "$INITIALINSTALL" != [yY] ]]; then
         make clean
     fi

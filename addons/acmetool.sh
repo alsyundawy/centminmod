@@ -4,7 +4,7 @@
 ###############################################################
 # variables
 ###############################################################
-ACMEVER='1.0.39'
+ACMEVER='1.0.43'
 DT=$(date +"%d%m%y-%H%M%S")
 ACMEDEBUG='n'
 ACMEDEBUG_LOG='y'
@@ -40,6 +40,7 @@ MAIN_HOSTNAMEVHOSTSSLFILE='/usr/local/nginx/conf/conf.d/virtual.ssl.conf'
 MAIN_HOSTNAME=$(awk '/server_name / {print $2}' "$MAIN_HOSTNAMEVHOSTFILE" | awk 'gsub(";$"," ")')
 OPENSSL_VERSION=$(ls -rt "$DIR_TMP" | awk '/openssl-1/' | grep -v 'tar.gz' | tail -1 | sed -e 's|openssl-||')
 CLOUDFLARE_AUTHORIGINPULLCERT='https://support.cloudflare.com/hc/en-us/article_attachments/201243967/origin-pull-ca.pem'
+FORCE_IPVFOUR='y' # curl/wget commands through script force IPv4
 ###############################################################
 # pushover API
 # to ensure these settings persist DO NOT change them in this
@@ -174,6 +175,12 @@ if [ -f "/etc/centminmod/custom_config.inc" ]; then
   . "/etc/centminmod/custom_config.inc"
 fi
 
+if [[ "$FORCE_IPVFOUR" != [yY] ]]; then
+  ipv_forceopt=""
+else
+  ipv_forceopt='4'
+fi
+
 ###############################################################
 # Setup Colours
 black='\E[30;40m'
@@ -286,8 +293,8 @@ check_domains() {
                   echo "AAAA record: ${domain_aaaarecord:-not found}"
                   if [[ "$domain_arecord" ]]; then
                       echo
-                      echo "curl -4Ivs https://${d} 2>&1 | egrep 'Connected to|SSL connection using|subject:|start date:|expire date:'"
-                      curl -4Ivs https://${d} 2>&1 | egrep 'Connected to|SSL connection using|subject:|start date:|expire date:' | sed -e 's|\*\s\s||g' -e 's|\*\s||g'
+                      echo "curl -${ipv_forceopt}Ivs https://${d} 2>&1 | egrep 'Connected to|SSL connection using|subject:|start date:|expire date:'"
+                      curl -${ipv_forceopt}Ivs https://${d} 2>&1 | egrep 'Connected to|SSL connection using|subject:|start date:|expire date:' | sed -e 's|\*\s\s||g' -e 's|\*\s||g'
                   fi
                   if [[ "$domain_aaaarecord" ]]; then
                       echo
@@ -676,7 +683,18 @@ fi
     HTTPTWO_MAXHEADERSIZE='http2_max_header_size 32k;'  
   elif [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]]; then
     HTTPTWO=y
+    if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep reuseport | awk -F ':  ' '{print $2}' | grep -o reuseport)" != 'reuseport' ]]; then
+    # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
+    NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
+    if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
+      ADD_REUSEPORT=' reuseport'
+    else
+      ADD_REUSEPORT=""
+    fi
+    LISTENOPT="ssl http2${ADD_REUSEPORT}"
+  else
     LISTENOPT='ssl http2'
+  fi
     COMP_HEADER='#spdy_headers_comp 5'
     SPDY_HEADER='#add_header Alternate-Protocol  443:npn-spdy/3;'
     HTTPTWO_MAXFIELDSIZE='http2_max_field_size 16k;'
@@ -739,7 +757,7 @@ sed -i '/^# redirect from www to non-www  forced SSL/d' "/usr/local/nginx/conf/c
 sed -i '/^# uncomment, save file and restart Nginx to enable/d' "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
 sed -i '/^# if unsure use return 302 before using return 301/d' "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
 sed -i '/^# server {/d' "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
-sed -i '/^#   server_name http2ssl.xyz www.http2ssl.xyz;/d' "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
+sed -i "/^#   server_name ${vhostname} www.${vhostname};/d" "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
 sed -i '/^#    return 302 https:\/\/$server_name$request_uri;/d' "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
 sed -i '/^# }/d' "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf"
 
@@ -951,8 +969,8 @@ server {
   # before enabling HSTS line below read centminmod.com/nginx_domain_dns_setup.html#hsts
   #add_header Strict-Transport-Security "max-age=31536000; includeSubdomains;";
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
   $COMP_HEADER;
   ssl_buffer_size 1369;
@@ -1291,8 +1309,8 @@ server {
   # before enabling HSTS line below read centminmod.com/nginx_domain_dns_setup.html#hsts
   #add_header Strict-Transport-Security "max-age=31536000; includeSubdomains;";
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
   $COMP_HEADER;
   ssl_buffer_size 1369;
@@ -1399,8 +1417,8 @@ server {
   # before enabling HSTS line below read centminmod.com/nginx_domain_dns_setup.html#hsts
   #add_header Strict-Transport-Security "max-age=31536000; includeSubdomains;";
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
   $COMP_HEADER;
   ssl_buffer_size 1369;

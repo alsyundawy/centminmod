@@ -12,6 +12,7 @@ branchname=123.09beta01
 DOWNLOAD="${branchname}.zip"
 LOCALCENTMINMOD_MIRROR='https://centminmod.com'
 
+FORCE_IPVFOUR='y' # curl/wget commands through script force IPv4
 INSTALLDIR='/usr/local/src'
 DIR_TMP='/svr-setup'
 #CUR_DIR="/usr/local/src/centminmod-${branchname}"
@@ -92,6 +93,10 @@ for g in "" e f; do
 done
 
 CENTOSVER=$(awk '{ print $3 }' /etc/redhat-release)
+CENTMINLOGDIR='/root/centminlogs'
+if [ ! -d "$CENTMINLOGDIR" ]; then
+  mkdir -p $CENTMINLOGDIR
+fi
 
 if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
@@ -170,7 +175,7 @@ else
 fi
 
 if [[ "$CENTOS_SEVEN" = '7' ]]; then
-  AXEL_VER='2.14.1'
+  AXEL_VER='2.16.1'
   AXEL_LINKFILE="axel-${AXEL_VER}.tar.gz"
   AXEL_LINK="${LOCALCENTMINMOD_MIRROR}/centminmodparts/axel/v${AXEL_VER}.tar.gz"
   AXEL_LINKLOCAL="https://github.com/axel-download-accelerator/axel/archive/v${AXEL_VER}.tar.gz"
@@ -179,6 +184,15 @@ fi
 
 if [ -f /etc/centminmod/custom_config.inc ]; then
   source /etc/centminmod/custom_config.inc
+fi
+if [[ "$FORCE_IPVFOUR" != [yY] ]]; then
+  ipv_forceopt=""
+else
+  ipv_forceopt='4'
+fi
+
+if [[ -f /usr/bin/systemd-detect-virt && "$(/usr/bin/systemd-detect-virt)" = 'lxc' ]] || [[ -f $(which virt-what) && $(virt-what | head -n1) = 'lxc' ]]; then
+  CHECK_LXD='y'
 fi
 
 if [[ "$(uname -m)" = 'x86_64' ]]; then
@@ -194,11 +208,19 @@ EOF
   fi
 fi
 
+# some centos images don't even install tar by default !
+if [[ "$CENTOS_SEVEN" = '7' && ! -f /usr/bin/tar ]]; then
+  yum -y -q install tar
+elif [[ "$CENTOS_SIX" = '6' && ! -f /bin/tar ]]; then
+  yum -y -q install tar
+fi
+
 if [[ "$CENTOS_SEVEN" = '7' && "$DNF_ENABLE" = [yY] ]]; then
   if [[ $(rpm -q epel-release >/dev/null 2>&1; echo $?) != '0' ]]; then
     yum -y -q install epel-release
     yum clean all
   fi
+
   if [[ "$DNF_COPR" = [yY] ]]; then
 cat > "/etc/yum.repos.d/dnf-centos.repo" <<EOF
 [dnf-centos]
@@ -285,6 +307,8 @@ fi
 
 if [ -f /proc/user_beancounters ]; then
     echo "OpenVZ system detected, NTP not installed"
+elif [[ "$CHECK_LXD" = [yY] ]]; then
+    echo "LXC/LXD container system detected, NTP not installed"
 else
   if [ ! -f /usr/sbin/ntpd ]; then
     echo "*************************************************"
@@ -381,7 +405,7 @@ systemstats() {
     sar -d > /root/centminlogs/sar-d-installstats.log
     fi
     sar -b > /root/centminlogs/sar-b-installstats.log
-    if [[ "$(hostname -f 2>&1 | grep -w 'Unknown host')" ]]; then
+    if [[ "$(hostname -f 2>&1 | grep -w 'Unknown host')" || "$(hostname -f 2>&1 | grep -w 'service not known')" ]]; then
       SERVERHOSTNAME=$(hostname)
     else
       SERVERHOSTNAME=$(hostname -f)
@@ -536,7 +560,7 @@ source_pcreinstall() {
   if [ -s "$ALTPCRELINKFILE" ]; then
     cecho "$ALTPCRELINKFILE Archive found, skipping download..." $boldgreen
   else
-    wget -c4 --progress=bar "$ALTPCRELINK" --tries=3 
+    wget -c${ipv_forceopt} --progress=bar "$ALTPCRELINK" --tries=3 
     ERROR=$?
     if [[ "$ERROR" != '0' ]]; then
       cecho "Error: $ALTPCRELINKFILE download failed." $boldgreen
@@ -573,7 +597,7 @@ source_wgetinstall() {
   if [ -s "$WGET_FILENAME" ]; then
     cecho "$WGET_FILENAME Archive found, skipping download..." $boldgreen
   else
-    wget -c4 --progress=bar "$WGET_LINK" -O "$WGET_FILENAME" --tries=3 
+    wget -c${ipv_forceopt} --progress=bar "$WGET_LINK" -O "$WGET_FILENAME" --tries=3 
     ERROR=$?
     if [[ "$ERROR" != '0' ]]; then
       cecho "Error: $WGET_FILENAME download failed." $boldgreen
@@ -1063,6 +1087,9 @@ install_axel() {
 
   cd axel-${AXEL_VER}
   if [ -f autogen.sh ]; then
+    if [ ! -f /usr/bin/autoreconf ]; then
+      yum -y -q install autoconf
+    fi
   ./autogen.sh
   fi
   ./configure
@@ -1095,7 +1122,7 @@ cd $INSTALLDIR
     if [[ -f /usr/local/bin/axel && $AXEL = [yY] ]]; then
       /usr/bin/axel https://github.com/centminmod/centminmod/archive/${DOWNLOAD}
     else
-      wget -c4 --no-check-certificate https://github.com/centminmod/centminmod/archive/${DOWNLOAD} --tries=3
+      wget -c${ipv_forceopt} --no-check-certificate https://github.com/centminmod/centminmod/archive/${DOWNLOAD} --tries=3
     fi
     getcmendtime=$(TZ=UTC date +%s.%N)
     rm -rf centminmod-*
@@ -1137,7 +1164,7 @@ cd $INSTALLDIR
 #sed -i "s|PHPREDIS='y'|PHPREDIS='n'|" centmin.sh
 
 # switch from PHP 5.4.41 to 5.6.9 default with Zend Opcache
-PHPVERLATEST=$(curl -s http://php.net/downloads.php | egrep -o "php\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "php-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | uniq | grep '5.6' | head -n1)
+PHPVERLATEST=$(curl -${ipv_forceopt}s http://php.net/downloads.php | egrep -o "php\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "php-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | uniq | grep '5.6' | head -n1)
 sed -i "s|^PHP_VERSION='.*'|PHP_VERSION='$PHPVERLATEST'|" centmin.sh
 sed -i "s|ZOPCACHEDFT='n'|ZOPCACHEDFT='y'|" centmin.sh
 
@@ -1182,14 +1209,26 @@ rm -rf /etc/centminmod/email-secondary.ini
 }
 
 if [[ "$DEF" = 'novalue' ]]; then
+  {
   # devtoolset SCL repo only supports 64bit OSes
   if [[ "$LOWMEM_INSTALL" != [yY] && "$(uname -m)" = 'x86_64' ]]; then
+    if [[ "$CHECK_LXD" = [yY] || ! -f /usr/bin/gcc ]]; then
+      # lxd containers have minimal default yum packages installed
+      $YUMDNFBIN -y install yum-utils cmake which e2fsprogs e2fsprogs-devel bc libuuid libuuid-devel openssl openssl-devel zlib zlib-devel gd gd-devel net-tools bzip2-devel gmp-devel libXext-devel libidn-devel libtool-ltdl-devel openldap-devel bluez-libs-devel gcc gcc-c++ automake libtool make
+      $YUMDNFBIN -y install libcurl libcurl-devel
+      yum -y reinstall bzip2 bzip2-devel
+      yum -y groupinstall "Development tools"
+      if [ -f /etc/yum.repos.d/jsynacek-systemd-centos-7.repo ]; then
+        SYSTEMD_FACEBOOKRPM='y'
+      fi
+    fi
     source_pcreinstall
     source_wgetinstall
   fi
   install_axel
   fileperm_fixes
   cminstall
+} 2>&1 | tee "/root/centminlogs/installer_${DT}.log"
   echo
   FIRSTYUMINSTALLTIME=$(echo "$firstyuminstallendtime - $firstyuminstallstarttime" | bc)
   FIRSTYUMINSTALLTIME=$(printf "%0.4f\n" $FIRSTYUMINSTALLTIME)
@@ -1239,6 +1278,8 @@ echo "--------------------------------------------------------------------------
   echo "$CPUMODEL"; echo "$CPUSPEED"
 echo "---------------------------------------------------------------------------"
 } 2>&1 | tee "/root/centminlogs/install_time_stats_${DT}.log"
+  cat "/root/centminlogs/install_time_stats_${DT}.log" >> "/root/centminlogs/installer_${DT}.log"
+  cat "/root/centminlogs/installer_${DT}.log" | egrep -v 'DOPENSSL_PIC|\/opt\/openssl\/share\/|fpm-build\/libtool|checking for |checking whether |make -f |make\[1\]|make\[2\]|make\[3\]|make\[4\]|make\[5\]' > "/root/centminlogs/installer_${DT}_minimal.log"
   systemstats
 fi
 

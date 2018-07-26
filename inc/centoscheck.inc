@@ -1,5 +1,5 @@
 grub_efi_fix() {
-    if [[ "$CENTOS_SEVEN" -eq '7' && "$(curl -4s${CURL_TIMEOUTS} https://ipinfo.io/org | grep -o 'OVH' >/dev/null 2>&1; echo $?)" -eq '0' && -d /boot/efi/EFI/centos && ! -f /boot/efi/EFI/centos/grub.cfg ]]; then
+    if [[ "$CENTOS_SEVEN" -eq '7' && "$(curl -${ipv_forceopt}s${CURL_TIMEOUTS} https://ipinfo.io/org | grep -o 'OVH' >/dev/null 2>&1; echo $?)" -eq '0' && -d /boot/efi/EFI/centos && ! -f /boot/efi/EFI/centos/grub.cfg ]]; then
         echo
         cecho "--------------------------------------------------------" $boldyellow
         cecho "Fix CentOS 7 EFI Bios based systems with missing" $boldyellow
@@ -60,7 +60,7 @@ sshdtweaks
   # non-openvz systems or if less than 1GB of memory and swap 
   # smaller than 512MB on non-openvz systems, create a 1GB additional
   # swap file
-  if [[ "$FINDSWAPSIZE" -eq '0' && ! -f /proc/user_beancounters && ! -f /swapfile ]] || [[ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -le '1048576' && "$FINDSWAPSIZE" -le '512' && ! -f /proc/user_beancounters && ! -f /swapfile ]]; then
+  if [[ "$FINDSWAPSIZE" -eq '0' && ! -f /proc/user_beancounters && "$CHECK_LXD" != [yY] && ! -f /swapfile ]] || [[ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -le '1048576' && "$FINDSWAPSIZE" -le '512' && ! -f /proc/user_beancounters && "$CHECK_LXD" != [yY] && ! -f /swapfile ]]; then
     {
     echo
     free -m

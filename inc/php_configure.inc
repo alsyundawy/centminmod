@@ -72,6 +72,13 @@ if [[ "$DEVTOOLSETEIGHT" = [yY] ]]; then
   DEVTOOLSETEIGHT='n'
 fi
 
+# If PHP 5.3 detected disable PHP EMBED SAPI
+# https://community.centminmod.com/posts/63877/
+if [[ "$PHPMVER" = 5.3 || "$PHPMUVER" = 5.3 ]]; then
+  PHPEMBED='n'
+  GCCINTEL_PHP='n'
+fi
+
 # separate make threads for PHP compiles
 if [ -f /proc/user_beancounters ]; then
     # CPUS='1'
@@ -294,13 +301,18 @@ else
   PDOSQLLITE_OPT=' --with-pdo-sqlite'
 fi
 
-# php 7.2 specific config options
+# php 7.2 & 7.3 specific config options
 # Argon2 passwords https://wiki.php.net/rfc/argon2_password_hash
 # libsodium https://wiki.php.net/rfc/libsodium
 # https://github.com/jedisct1/libsodium
 # disable temporarily for php 7.2.0 due to libzip compile errors
 # https://gist.github.com/centminmod/d1b48ef88bda29a7e352b90fd7111ac1
-if [[ "$PHP_LIBZIP" = [yY] ]] && [[ "$PHPMVER" = 7.2 || "$PHPMUVER" = 7.2 ]]; then
+
+if [[ "$PHPMUVER" = 7.3 ]]; then
+  # seems PHP 7.3 must use libzip unlike PHP 7.2 which can compile without it
+  PHP_LIBZIP='y'
+fi
+if [[ "$PHP_LIBZIP" = [yY] ]] && [[ "$PHPMVER" = 7.2 || "$PHPMUVER" = 7.2 || "$PHPMVER" = 7.3 || "$PHPMUVER" = 7.3 ]]; then
   ARGONTWO_OPT=' --with-password-argon2'
   LIBSODIUM_OPT=' --with-sodium'
   LIBZIP_OPT=' --with-libzip'
@@ -310,16 +322,18 @@ if [[ "$PHP_LIBZIP" = [yY] ]] && [[ "$PHPMVER" = 7.2 || "$PHPMUVER" = 7.2 ]]; th
   if [[ ! -f /usr/local/include/zip.h ]]; then
     libzip_install
   fi
-  # if [[ ! -f /usr/bin/zipcmp || ! -f /usr/include/zip.h ]]; then
-  #   time $YUMDNFBIN${CACHESKIP} -q -y install libzip libzip-devel
-  # fi
-  if [ ! -f /usr/local/lib/libsodium.so ]; then
+  if [[ "$(uname -m)" = 'x86_64' ]]; then
+    LIBDIR_ARGONSODIUM='lib64'
+  else
+    LIBDIR_ARGONSODIUM='lib'
+  fi
+  if [ ! -f "/usr/local/${LIBDIR_ARGONSODIUM}/libsodium.so" ]; then
     pushd "$DIR_TMP"
     if [ -s "libsodium-${LIBSODIUM_VER}.tar.gz" ]; then
         cecho "libsodium-${LIBSODIUM_VER}.tar.gz found, skipping download..." $boldgreen
     else
-        echo "wget -c4 "https://github.com/jedisct1/libsodium/releases/download/${LIBSODIUM_VER}/libsodium-${LIBSODIUM_VER}.tar.gz" --tries=3"
-        wget -c4 "https://github.com/jedisct1/libsodium/releases/download/${LIBSODIUM_VER}/libsodium-${LIBSODIUM_VER}.tar.gz" --tries=3
+        echo "wget -c${ipv_forceopt} "https://github.com/jedisct1/libsodium/releases/download/${LIBSODIUM_VER}/libsodium-${LIBSODIUM_VER}.tar.gz" --tries=3"
+        wget -c${ipv_forceopt} "https://github.com/jedisct1/libsodium/releases/download/${LIBSODIUM_VER}/libsodium-${LIBSODIUM_VER}.tar.gz" --tries=3
         ERROR=$?
         if [[ "$ERROR" != '0' ]]; then
             cecho "Error: libsodium-${LIBSODIUM_VER}.tar.gz download failed." $boldgreen
@@ -331,21 +345,21 @@ if [[ "$PHP_LIBZIP" = [yY] ]] && [[ "$PHPMVER" = 7.2 || "$PHPMUVER" = 7.2 ]]; th
     cd libsodium-${LIBSODIUM_VER}
     make clean
     if [[ "$LIBSODIUM_NATIVE" = [nN] ]]; then
-      ./configure
+      ./configure --prefix=/usr/local --libdir=/usr/local/${LIBDIR_ARGONSODIUM}
     elif [[ "$LIBSODIUM_NATIVE" = [yY] ]]; then
-      ./configure --enable-opt
+      ./configure --prefix=/usr/local --enable-opt --libdir=/usr/local/${LIBDIR_ARGONSODIUM}
     fi
     make${MAKETHREADS}
     make install
     popd
   fi
-  if [ ! -f /usr/local/lib/libargon2.so ]; then
+  if [ ! -f "/usr/local/${LIBDIR_ARGONSODIUM}/libargon2.so" ]; then
     pushd "$DIR_TMP"
     if [ -s "${LIBARGON_VER}.tar.gz" ]; then
         cecho "${LIBARGON_VER}.tar.gz found, skipping download..." $boldgreen
     else
-        echo "wget -c4 "https://github.com/P-H-C/phc-winner-argon2/archive/${LIBARGON_VER}.tar.gz" --tries=3"
-        wget -c4 "https://github.com/P-H-C/phc-winner-argon2/archive/${LIBARGON_VER}.tar.gz" --tries=3
+        echo "wget -c${ipv_forceopt} "https://github.com/P-H-C/phc-winner-argon2/archive/${LIBARGON_VER}.tar.gz" --tries=3"
+        wget -c${ipv_forceopt} "https://github.com/P-H-C/phc-winner-argon2/archive/${LIBARGON_VER}.tar.gz" --tries=3
         ERROR=$?
         if [[ "$ERROR" != '0' ]]; then
             cecho "Error: ${LIBARGON_VER}.tar.gz download failed." $boldgreen
@@ -357,11 +371,11 @@ if [[ "$PHP_LIBZIP" = [yY] ]] && [[ "$PHPMVER" = 7.2 || "$PHPMUVER" = 7.2 ]]; th
     cd phc-winner-argon2-${LIBARGON_VER}
     make clean
     make${MAKETHREADS}
-    make install PREFIX=/usr/local
+    make install PREFIX=/usr/local LIBRARY_REL=${LIBDIR_ARGONSODIUM}
     popd
   fi
   # if libzip, libsodium or libargon2 libraries still don't exit, disable from php configuration
-  if [[ ! -f /usr/local/lib/libargon2.so || ! -f /usr/local/lib/libsodium.so || ! -f /usr/local/include/zip.h ]]; then
+  if [[ ! -f "/usr/local/${LIBDIR_ARGONSODIUM}/libargon2.so" || ! -f "/usr/local/${LIBDIR_ARGONSODIUM}/libsodium.so" || ! -f /usr/local/include/zip.h ]]; then
     echo
     echo "disable libzip, libsodium or libargon2 libraries"
     echo
@@ -721,7 +735,7 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
 
   # PGO PHP7 on CentOS 6 might have GCC too old 4.4.7 so use devtoolset=3 GCC 4.9
   # initial php install
-  if [[ "$PHP_PGO_CENTOSSIX" = [yY] && "$PHP_PGO" = [yY] && "$PHPMVER" > 7 ]]; then
+  if [[ "$PHP_PGO_CENTOSSIX" = [yY] && "$PHP_PGO" = [yY] && "$PHPMVER" > 7 ]] || [[ "$CENTOS_SIX" = '6' && "$PHPMVER" = '7.3' ]] || [[ "$DEVTOOLSET_PHP" = [yY] ]]; then
     if [[ "$CENTOS_SIX" = '6' ]]; then
       if [[ ! -f /opt/rh/devtoolset-4/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-4/root/usr/bin/g++ ]] || [[ ! -f /opt/rh/devtoolset-6/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-6/root/usr/bin/g++ ]]; then
         scl_install
@@ -765,7 +779,7 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
     fi
   fi
   # php upgrades
-  if [[ "$PHP_PGO_CENTOSSIX" = [yY] && "$PHP_PGO" = [yY] && "$PHPMUVER" > 7 ]]; then
+  if [[ "$PHP_PGO_CENTOSSIX" = [yY] && "$PHP_PGO" = [yY] && "$PHPMUVER" > 7 ]] || [[ "$CENTOS_SIX" = '6' && "$PHPMUVER" = '7.3' ]] || [[ "$DEVTOOLSET_PHP" = [yY] ]]; then
     if [[ "$CENTOS_SIX" = '6' ]]; then
       if [[ ! -f /opt/rh/devtoolset-4/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-4/root/usr/bin/g++ ]] || [[ ! -f /opt/rh/devtoolset-6/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-6/root/usr/bin/g++ ]]; then
         scl_install
@@ -810,7 +824,7 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
   fi
   # CentOS 7 use devtoolset-4 GCC 5.2 if it's detected
   # initial php install
-  if [[ "$CENTOS_SEVEN" = '7' && "$PHP_PGO" = [yY] && "$PHPMVER" > 7 ]]; then
+  if [[ "$CENTOS_SEVEN" = '7' && "$PHP_PGO" = [yY] && "$PHPMVER" > 7 ]] || [[ "$CENTOS_SEVEN" = '7' && "$PHPMVER" = '7.3' ]] || [[ "$DEVTOOLSET_PHP" = [yY] ]]; then
     # if devtoolset-4 gcc and g++ exist use then instead of system versions regardless of CentOS version
     if [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]]; then
       DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
@@ -860,7 +874,7 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
     fi
   fi
   # php upgrades
-  if [[ "$CENTOS_SEVEN" = '7' && "$PHP_PGO" = [yY] && "$PHPMUVER" > 7 ]]; then
+  if [[ "$CENTOS_SEVEN" = '7' && "$PHP_PGO" = [yY] && "$PHPMUVER" > 7 ]] || [[ "$CENTOS_SEVEN" = '7' && "$PHPMUVER" = '7.3' ]] || [[ "$DEVTOOLSET_PHP" = [yY] ]]; then
     # if devtoolset-4 gcc and g++ exist use then instead of system versions regardless of CentOS version
     if [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]]; then
       DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
@@ -1115,32 +1129,47 @@ else
 
 fi
 sar_call
+  # only initial install needs to run make, make install
+  # via funct_phpconfigure function otherwise upgrade php
+  # routines do make, make install via inc/php_upgrade.inc
+  if [[ "$INITIALINSTALL" = [yY] ]]; then
     echo
     echo "php_configure.inc make${MAKETHREADS_PHP}"
     time make${MAKETHREADS_PHP}
     sar_call
     echo
-
-  if [[ "$PHPMAKETEST" = [yY] ]]; then
-    time make test
-    sar_call
-  fi
-
+    
+    if [[ "$PHPMAKETEST" = [yY] ]]; then
+      time make test
+      sar_call
+    fi
+    
     echo "php_configure.inc make install"
     time make install
     sar_call
-
-if [[ "$STRIPPHP" = [yY] ]]; then
-    echo
-    echo "strip PHP binary..."
-    ls -lah /usr/local/bin/php
-    ls -lah /usr/local/bin/php-cgi
-    strip -s /usr/local/bin/php
-    strip -s /usr/local/bin/php-cgi
-    ls -lah /usr/local/bin/php
-    ls -lah /usr/local/bin/php-cgi
-    echo
-fi
+    
+    if [[ "$STRIPPHP" = [yY] ]]; then
+        echo
+        echo "strip PHP binary..."
+        ls -lah /usr/local/bin/php
+        ls -lah /usr/local/bin/php-cgi
+        ls -lah /usr/local/sbin/php-fpm
+        echo
+        echo "backup before strip PHP binary..."
+        \cp -af /usr/local/bin/php /usr/local/bin/php-b4strip 
+        \cp -af /usr/local/bin/php-cgi /usr/local/bin/php-cgi-b4strip 
+        \cp -af /usr/local/sbin/php-fpm /usr/local/sbin/php-fpm-b4strip 
+        strip -s /usr/local/bin/php
+        strip -s /usr/local/bin/php-cgi
+        strip -s /usr/local/sbin/php-fpm
+        echo
+        echo "after strip PHP binary..."
+        ls -lah /usr/local/bin/php
+        ls -lah /usr/local/bin/php-cgi
+        ls -lah /usr/local/sbin/php-fpm
+        echo
+    fi
+  fi
 
 if [[ "$CLANG_PHP" = [yY] ]]; then
     unset CC

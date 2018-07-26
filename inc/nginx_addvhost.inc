@@ -225,46 +225,46 @@ fi
 openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
 openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt
 
-echo
-cecho "---------------------------------------------------------------" $boldyellow
-cecho "Generating backup CSR and private key for HTTP Public Key Pinning..." $boldgreen
-cecho "creating CSR File: ${vhostname}-backup.csr" $boldgreen
-cecho "creating private key: ${vhostname}-backup.key" $boldgreen
-sleep 5
+# echo
+# cecho "---------------------------------------------------------------" $boldyellow
+# cecho "Generating backup CSR and private key for HTTP Public Key Pinning..." $boldgreen
+# cecho "creating CSR File: ${vhostname}-backup.csr" $boldgreen
+# cecho "creating private key: ${vhostname}-backup.key" $boldgreen
+# sleep 5
 
-openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}-backup.csr -keyout ${vhostname}-backup.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
+# openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}-backup.csr -keyout ${vhostname}-backup.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
 
-echo
-cecho "---------------------------------------------------------------" $boldyellow
-cecho "Extracting Base64 encoded information for primary and secondary" $boldgreen
-cecho "private key's SPKI - Subject Public Key Information" $boldgreen
-cecho "Primary private key - ${vhostname}.key" $boldgreen
-cecho "Backup private key - ${vhostname}-backup.key" $boldgreen
-cecho "For HPKP - HTTP Public Key Pinning hash generation..." $boldgreen
-sleep 5
+# echo
+# cecho "---------------------------------------------------------------" $boldyellow
+# cecho "Extracting Base64 encoded information for primary and secondary" $boldgreen
+# cecho "private key's SPKI - Subject Public Key Information" $boldgreen
+# cecho "Primary private key - ${vhostname}.key" $boldgreen
+# cecho "Backup private key - ${vhostname}-backup.key" $boldgreen
+# cecho "For HPKP - HTTP Public Key Pinning hash generation..." $boldgreen
+# sleep 5
 
-echo
-cecho "extracting SPKI Base64 encoded hash for primary private key = ${vhostname}.key ..." $boldgreen
+# echo
+# cecho "extracting SPKI Base64 encoded hash for primary private key = ${vhostname}.key ..." $boldgreen
 
-openssl rsa -in ${vhostname}.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt
+# openssl rsa -in ${vhostname}.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt
 
-echo
-cecho "extracting SPKI Base64 encoded hash for backup private key = ${vhostname}-backup.key ..." $boldgreen
+# echo
+# cecho "extracting SPKI Base64 encoded hash for backup private key = ${vhostname}-backup.key ..." $boldgreen
 
-openssl rsa -in ${vhostname}-backup.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt
+# openssl rsa -in ${vhostname}-backup.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt
 
-echo
-cecho "HTTP Public Key Pinning Header for Nginx" $boldgreen
+# echo
+# cecho "HTTP Public Key Pinning Header for Nginx" $boldgreen
 
-echo
-cecho "for 7 days max-age including subdomains" $boldgreen
-echo
-echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=86400; includeSubDomains';"
+# echo
+# cecho "for 7 days max-age including subdomains" $boldgreen
+# echo
+# echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=86400; includeSubDomains';"
 
-echo
-cecho "for 7 days max-age excluding subdomains" $boldgreen
-echo
-echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=86400';"
+# echo
+# cecho "for 7 days max-age excluding subdomains" $boldgreen
+# echo
+# echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=86400';"
 
 if [[ ! -f "$(find /usr/local/nginx/conf/ssl -type f -name "dhparam.pem" | head -n1)" ]]; then
   echo
@@ -540,23 +540,23 @@ cat > "/home/nginx/domains/$vhostname/public/index.html" <<END
               <p>Welcome to ${vhostname}. This index.html page can be removed.</p>
               <p>Useful Centmin Mod info and links to bookmark.</p>
               <ul>
-                <li>Getting Started Guide - <a href="https://centminmod.com/getstarted.html" target="_blank">https://centminmod.com/getstarted.html</a>
+                <li>Getting Started Guide - <a href="https://centminmod.com/getstarted.html" target="_blank" rel="noopener">https://centminmod.com/getstarted.html</a>
                 </li>
-                <li>Latest Centmin Mod version - <a href="https://centminmod.com" target="_blank">https://centminmod.com</a>
+                <li>Latest Centmin Mod version - <a href="https://centminmod.com" target="_blank" rel="noopener">https://centminmod.com</a>
                 </li>
-                <li>Centmin Mod FAQ - <a href="https://centminmod.com/faq.html" target="_blank">https://centminmod.com/faq.html</a>
+                <li>Centmin Mod FAQ - <a href="https://centminmod.com/faq.html" target="_blank" rel="noopener">https://centminmod.com/faq.html</a>
                 </li>
-                <li>Change Log - <a href="https://centminmod.com/changelog.html" target="_blank">https://centminmod.com/changelog.html</a>
+                <li>Change Log - <a href="https://centminmod.com/changelog.html" target="_blank" rel="noopener">https://centminmod.com/changelog.html</a>
                 </li>
-                <li>Google+ Page latest news <a href="https://plus.google.com/u/0/b/104831941868856035845/104831941868856035845" target="_blank">Centmin Mod Google+</a>
+                <li>Google+ Page latest news <a href="https://plus.google.com/u/0/b/104831941868856035845/104831941868856035845" target="_blank" rel="noopener">Centmin Mod Google+</a>
                 </li>
-                <li>Centmin Mod Community Forum <a href="https://community.centminmod.com/" target="_blank">https://community.centminmod.com/</a>
+                <li>Centmin Mod Community Forum <a href="https://community.centminmod.com/" target="_blank" rel="noopener">https://community.centminmod.com/</a>
                 </li>
-                <li>Centmin Mod Twitter <a href="https://twitter.com/centminmod" target="_blank">https://twitter.com/centminmod</a>
+                <li>Centmin Mod Twitter <a href="https://twitter.com/centminmod" target="_blank" rel="noopener">https://twitter.com/centminmod</a>
                 </li>
-                <li>Centmin Mod Facebook Page <a href="https://www.facebook.com/centminmodcom" target="_blank">https://www.facebook.com/centminmodcom</a>
+                <li>Centmin Mod Facebook Page <a href="https://www.facebook.com/centminmodcom" target="_blank" rel="noopener">https://www.facebook.com/centminmodcom</a>
                 </li>
-                <li>Centmin Mod Medium <a href="https://medium.com/@centminmod" target="_blank">https://medium.com/@centminmod</a>
+                <li>Centmin Mod Medium <a href="https://medium.com/@centminmod" target="_blank" rel="noopener">https://medium.com/@centminmod</a>
                 </li>
               </ul>
               <p>For Centmin Mod LEMP stack hosting check out <a href="https://www.digitalocean.com/?refcode=c1cb367108e8" target="_blank">Digitalocean</a></p>
@@ -630,7 +630,18 @@ if [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module
   HTTPTWO_MAXHEADERSIZE='http2_max_header_size 32k;'  
 elif [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]]; then
   HTTPTWO=y
-  LISTENOPT='ssl http2'
+  if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep reuseport | awk -F ':  ' '{print $2}' | grep -o reuseport)" != 'reuseport' ]]; then
+    # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
+    NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
+    if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
+      ADD_REUSEPORT=' reuseport'
+    else
+      ADD_REUSEPORT=""
+    fi
+    LISTENOPT="ssl http2${ADD_REUSEPORT}"
+  else
+    LISTENOPT='ssl http2'
+  fi
   COMP_HEADER='#spdy_headers_comp 5'
   SPDY_HEADER='#add_header Alternate-Protocol  443:npn-spdy/3;'
   HTTPTWO_MAXFIELDSIZE='http2_max_field_size 16k;'
@@ -642,7 +653,13 @@ else
   SPDY_HEADER='add_header Alternate-Protocol  443:npn-spdy/3;'
 fi
 
-if [[ -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
+if [[ -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;
+  #include /usr/local/nginx/conf/php71-remi.conf;
+  #include /usr/local/nginx/conf/php70-remi.conf;
+  #include /usr/local/nginx/conf/php56-remi.conf;'
+elif [[ -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
   MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php72-remi.conf;
   #include /usr/local/nginx/conf/php71-remi.conf;
   #include /usr/local/nginx/conf/php70-remi.conf;
@@ -705,8 +722,8 @@ server {
 #include /usr/local/nginx/conf/pagespeedstatslog.conf;
 
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
 
   # limit_conn limit_per_ip 16;
@@ -790,8 +807,8 @@ server {
   # before enabling HSTS line below read centminmod.com/nginx_domain_dns_setup.html#hsts
   #add_header Strict-Transport-Security "max-age=31536000; includeSubdomains;";
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
   $COMP_HEADER;
   ssl_buffer_size 1369;
@@ -874,8 +891,8 @@ server {
 #include /usr/local/nginx/conf/pagespeedstatslog.conf;
 
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
 
   # limit_conn limit_per_ip 16;

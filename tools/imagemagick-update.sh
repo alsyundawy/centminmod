@@ -102,6 +102,15 @@ source "${SCRIPT_DIR}/inc/downloads.inc"
 source "${SCRIPT_DIR}/inc/yumpriorities.inc"
 source "${SCRIPT_DIR}/inc/yuminstall.inc"
 
+if [ -f /etc/centminmod/custom_config.inc ]; then
+  source /etc/centminmod/custom_config.inc
+fi
+if [[ "$FORCE_IPVFOUR" != [yY] ]]; then
+  ipv_forceopt=""
+else
+  ipv_forceopt='4'
+fi
+
 if [ -f /proc/user_beancounters ]; then
     # CPUS='1'
     # MAKETHREADS=" -j$CPUS"
@@ -308,14 +317,14 @@ imagickinstall() {
     echo "cd $DIR_TMP"
     cd $DIR_TMP
 
-php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2'
+php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2|7.3'
 PHPSEVEN_CHECKVER=$?
 echo $PHPSEVEN_CHECKVER
 
 if [[ "$PHPMUVER" > 7 || "$PHPSEVEN_CHECKVER" = '0' ]] && [[ "$(echo $IMAGICKPHP_VER | cut -d . -f1,2 | sed -e 's|\.||')" -le '33' ]]; then
     IMAGICKGITLINK='https://github.com/mkoppanen/imagick'
     # fallback mirror if official github is down, use gitlab mirror
-    curl -4Is --connect-timeout 5 --max-time 5 $IMAGICKGITLINK | grep 'HTTP\/' | grep '200' >/dev/null 2>&1
+    curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 $IMAGICKGITLINK | grep 'HTTP\/' | grep '200' >/dev/null 2>&1
     IMAGICKGITCURLCHECK=$?
     if [[ "$IMAGICKGITCURLCHECK" != '0' ]]; then
         IMAGICKGITLINK='https://gitlab.com/centminmod-github-mirror/imagick.git'

@@ -5,7 +5,8 @@ EMAIL=''          # Server notification email address enter only 1 address
 PUSHOVER_EMAIL='' # Signup pushover.net push email notifications to mobile & tablets
 ZONEINFO=Etc/UTC  # Set Timezone
 NGINX_IPV='n'     # option deprecated from 1.11.5+ IPV6 support
-USEEDITOR='nano' # choice between nano or vim text editors for cmd shortcuts
+USEEDITOR='nano'  # choice between nano or vim text editors for cmd shortcuts
+FORCE_IPVFOUR='y' # curl/wget commands through script force IPv4
 
 CUSTOMSERVERNAME='y'
 CUSTOMSERVERSTRING='nginx centminmod'
@@ -20,10 +21,10 @@ DT=$(date +"%d%m%y-%H%M%S")
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='025'
+SCRIPT_INCREMENTVER='039'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
-SCRIPT_DATE='31/05/2018'
+SCRIPT_DATE='31/07/2018'
 SCRIPT_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_MODIFICATION_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_URL='https://centminmod.com'
@@ -153,6 +154,14 @@ fi
 
 if [[ -f /etc/system-release && "$(awk '{print $1,$2,$3}' /etc/system-release)" = 'Amazon Linux AMI' ]]; then
     CENTOS_SIX='6'
+fi
+
+if [[ "$FORCE_IPVFOUR" != [yY] ]]; then
+  ipv_forceopt=""
+  ipv_forceopt_wget=""
+else
+  ipv_forceopt='4'
+  ipv_forceopt_wget=' -4'
 fi
 
 source "inc/centos_seven.inc"
@@ -383,6 +392,7 @@ CLANG_MEMCACHED='n'           # Memcached menu option 10 routine
 GCCINTEL_PHP='y'              # enable PHP-FPM GCC compiler with Intel cpu optimizations
 PHP_PGO='n'                   # Profile Guided Optimization https://software.intel.com/en-us/blogs/2015/10/09/pgo-let-it-go-php
 PHP_PGO_CENTOSSIX='n'         # CentOS 6 may need GCC >4.4.7 fpr PGO so use devtoolset-4 GCC 5.3
+DEVTOOLSET_PHP='n'            # use devtoolset GCC for GCCINTEL_PHP='y'
 DEVTOOLSETSIX='n'             # Enable or disable devtoolset-6 GCC 6.2 support instead of devtoolset-4 GCC 5.3 support
 DEVTOOLSETSEVEN='y'           # Enable or disable devtoolset-7 GCC 7.1 support instead of devtoolset-6 GCC 6.2 support
 DEVTOOLSETEIGHT='n'           # source compiled GCC 8 from latest snapshot builds
@@ -438,6 +448,7 @@ PHP_UPDATEMAINTENANCE='n'
 MARIADB_UPDATEMAINTENANCE='n'
 
 # General Configuration
+NGINXCOMPILE_PIE='n'         # build nginx with Position-independent code (PIC) / Position-indendendent executables (PIEs)
 NGINXUPGRADESLEEP='3'
 AUTOTUNE_CLIENTMAXBODY='y'   # auto tune client_max_body_size option in nginx.conf
 USE_NGINXMAINEXTLOGFORMAT='n' # use default combined nginx log format instead of main_ext custom format for nginx amplify
@@ -574,6 +585,31 @@ PHPIONCUBE='n'               # Disable or Enable Ioncube Loader via addons/ioncu
 PHPMSSQL='n'                 # Disable or Enable MSSQL server PHP extension
 PHPMSSQL_ALWAYS='n'          # mssql php extension always install on php recompiles
 PHPEMBED='y'                 # built php with php embed SAPI library support --enable-embed=shared
+
+PHP_FTPEXT='y'              # ftp PHP extension
+PHP_MEMCACHE='y'            # memcache PHP extension 
+PHP_MEMCACHED='y'           # memcached PHP extension
+FFMPEGVER='0.6.0'
+SUHOSINVER='0.9.38'
+
+PHPREDIS='y'                # redis PHP extension install
+REDISPHP_VER='3.1.6'        # redis PHP version for PHP <7.x
+REDISPHPSEVEN_VER='4.1.0'   # redis PHP version for PHP =>7.x
+REDISPHP_GIT='n'            # pull php 7 redis extension from git or pecl downloads
+PHPMONGODB='n'              # MongoDB PHP extension install
+MONGODBPHP_VER='1.5.1'      # MongoDB PHP version
+MONGODB_SASL='n'            # SASL not working yet leave = n
+PDOPGSQL_PHPVER='9.6'       # pdo-pgsql PHP extension version for postgresql
+PHP_LIBZIP='n'              # use newer libzip instead of PHP embedded zip
+LIBZIP_VER='1.5.0'          # required for PHP 7.2 + with libsodium & argon2
+LIBSODIUM_VER='1.0.16'      # https://github.com/jedisct1/libsodium/releases
+LIBSODIUM_NATIVE='n'        # optimise for specific cpu not portable between different cpu modules
+LIBARGON_VER='20171227'     # https://github.com/P-H-C/phc-winner-argon2
+PHP_MCRYPTPECL='y'          # PHP 7.2 deprecated mcrypt support so this adds it back as PECL extension
+PHP_MCRYPTPECLVER='1.0.1'   # https://pecl.php.net/package/mcrypt
+PHPZOPFLI='n'               # enable zopfli php extension https://github.com/kjdev/php-ext-zopfli
+PHPZOPFLI_ALWAYS='n'        # zopfli php extension always install on php recompiles
+
 SHORTCUTS='y'                # shortcuts
 
 POSTGRESQL='n'               # set to =y to install PostgreSQL 9.6 server, devel packages and pdo-pgsql PHP extension
@@ -605,7 +641,7 @@ MYSQL_INSTALL='n'            # Install official Oracle MySQL Server (MariaDB alt
 SENDMAIL_INSTALL='n'         # Install Sendmail (and mailx) set to y and POSTFIX_INSTALL=n for sendmail
 POSTFIX_INSTALL=y            # Install Postfix (and mailx) set to n and SENDMAIL_INSTALL=y for sendmail
 # Nginx
-NGINX_VERSION='1.13.12'       # Use this version of Nginx
+NGINX_VERSION='1.15.1'       # Use this version of Nginx
 NGINX_VHOSTSSL='y'           # enable centmin.sh menu 2 prompt to create self signed SSL vhost 2nd vhost conf
 NGINXBACKUP='y'
 VHOST_PRESTATICINC='y'       # add pre-staticfiles-local.conf & pre-staticfiles-global.conf include files
@@ -629,6 +665,8 @@ OPENSSL_TLSONETHREE='y'    # whether OpenSSL 1.1.1 builds enable TLSv1.3
 OPENSSL_CUSTOMPATH='/opt/openssl'  # custom directory path for OpenSSL 1.0.2+
 CLOUDFLARE_PATCHSSL='n'    # set 'y' to implement Cloudflare's chacha20 patch https://github.com/cloudflare/sslconfig
 CLOUDFLARE_ZLIB='y'        # use Cloudflare optimised zlib fork https://blog.cloudflare.com/cloudflare-fights-cancer/
+CLOUDFLARE_ZLIBRESET='y'   # if CLOUDFLARE_ZLIB='n' set, then revert gzip compression level from 9 to 5 automatically
+CLOUDFLARE_ZLIBRAUTOMAX='n' # don't auto raise nginx gzip compression level to 9 if using Cloudflare zlib
 CLOUDFLARE_ZLIBPHP='n'     # use Cloudflare optimised zlib fork for PHP-FPM zlib instead of system zlib
 CLOUDFLARE_ZLIBDEBUG='n'   # make install debug verbose mode
 CLOUDFLARE_ZLIBVER='1.3.0'
@@ -639,7 +677,7 @@ OPENSSLEQUALCIPHER_PATCH='n' # https://community.centminmod.com/posts/57916/
 
 # LibreSSL
 LIBRESSL_SWITCH='n'        # if set to 'y' it overrides OpenSSL as the default static compiled option for Nginx server
-LIBRESSL_VERSION='2.7.2'   # Use this version of LibreSSL http://www.libressl.org/
+LIBRESSL_VERSION='2.7.4'   # Use this version of LibreSSL http://www.libressl.org/
 
 # BoringSSL
 # not working yet just prep work
@@ -670,29 +708,9 @@ MEMCACHEDPHP_SEVENVER='3.0.4' # Memcached PHP 7 only extension version
 LIBMEMCACHED_YUM='y'        # switch to YUM install instead of source compile
 LIBMEMCACHED_VER='1.0.18'   # libmemcached version for source compile
 TWEMPERF_VER='0.1.1'
-PHPREDIS='y'                # redis PHP extension install
-REDISPHP_VER='3.1.6'        # redis PHP version for PHP <7.x
-REDISPHPSEVEN_VER='3.1.6'   # redis PHP version for PHP =>7.x
-REDISPHP_GIT='n'            # pull php 7 redis extension from git or pecl downloads
-PHPMONGODB='n'              # MongoDB PHP extension install
-MONGODBPHP_VER='1.4.3'      # MongoDB PHP version
-MONGODB_SASL='n'            # SASL not working yet leave = n
-PDOPGSQL_PHPVER='9.6'       # pdo-pgsql PHP extension version for postgresql
-PHP_LIBZIP='n'              # use newer libzip instead of PHP embedded zip
-LIBZIP_VER='1.5.0'          # required for PHP 7.2 + with libsodium & argon2
-LIBSODIUM_VER='1.0.16'      # https://github.com/jedisct1/libsodium/releases
-LIBSODIUM_NATIVE='n'        # optimise for specific cpu not portable between different cpu modules
-LIBARGON_VER='20171227'     # https://github.com/P-H-C/phc-winner-argon2
-PHP_MCRYPTPECL='y'          # PHP 7.2 deprecated mcrypt support so this adds it back as PECL extension
-PHP_MCRYPTPECLVER='1.0.1'   # https://pecl.php.net/package/mcrypt
 
-PHP_FTPEXT='y'              # ftp PHP extension
-PHP_MEMCACHE='y'            # memcache PHP extension 
-PHP_MEMCACHED='y'           # memcached PHP extension
-FFMPEGVER='0.6.0'
-SUHOSINVER='0.9.38'
 PHP_OVERWRITECONF='y'       # whether to show the php upgrade prompt to overwrite php-fpm.conf
-PHP_VERSION='5.6.36'        # Use this version of PHP
+PHP_VERSION='5.6.37'        # Use this version of PHP
 PHP_MIRRORURL='http://php.net'
 PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
 XCACHE_VERSION='3.2.0'      # Use this version of Xcache
@@ -708,7 +726,7 @@ PYTHON_VERSION='2.7.10'       # Use this version of Python
 SIEGE_VERSION='4.0.4'
 
 CURL_TIMEOUTS=' --max-time 5 --connect-timeout 5'
-WGETOPT='-cnv --no-dns-cache -4'
+WGETOPT="-cnv --no-dns-cache${ipv_forceopt_wget}"
 AXEL_VER='2.6'               # Axel source compile version https://github.com/axel-download-accelerator/axel/releases
 ###############################################################
 # experimental Intel compiled optimisations 
@@ -797,7 +815,7 @@ else
 fi
 
 if [[ "$CENTOS_SEVEN" = '7' ]]; then
-  AXEL_VER='2.14.1'
+  AXEL_VER='2.16.1'
 fi
 
 # ensure clang alternative to gcc compiler is used only for 64bit OS
@@ -869,6 +887,7 @@ source "inc/memcached_install.inc"
 source "inc/redis_submenu.inc"
 source "inc/redis.inc"
 source "inc/mongodb.inc"
+source "inc/zopfli.inc"
 source "inc/php_mssql.inc"
 source "inc/mysql_proclimit.inc"
 source "inc/mysqltmp.inc"
@@ -977,6 +996,15 @@ if [[ "$GPERFTOOLS_TMALLOCLARGEPAGES" = [yY] ]]; then
     TCMALLOC_PAGESIZE='32'
 else
     TCMALLOC_PAGESIZE='8'
+fi
+
+if [[ "$INITIALINSTALL" = [yY] && -f /usr/bin/systemd-detect-virt && "$(/usr/bin/systemd-detect-virt)" = 'lxc' ]] || [[ "$INITIALINSTALL" = [yY] && -f $(which virt-what) && $(virt-what | head -n1) = 'lxc' ]]; then
+  CHECK_LXD='y'
+  if [ -d /etc/profile.d ]; then
+    echo "export LANG=en_US.UTF-8" >> /etc/profile.d/locale.sh
+    echo "export LANGUAGE=en_US.UTF-8" >> /etc/profile.d/locale.sh
+    source /etc/profile.d/locale.sh
+  fi
 fi
 
 ###############################################################
@@ -1157,7 +1185,7 @@ sar_call() {
 
 download_cmd() {
   HTTPS_AXELCHECK=$(echo "$1" |awk -F '://' '{print $1}')
-  if [[ "$(curl -4Isv $1 2>&1 | egrep 'ECDSA')" ]]; then
+  if [[ "$(curl -${ipv_forceopt}Isv $1 2>&1 | egrep 'ECDSA')" ]]; then
     # axel doesn't natively support ECC 256bit ssl certs
     # with ECDSA ciphers due to CentOS system OpenSSL 1.0.2e
     echo "ECDSA SSL Cipher BASED HTTPS detected, switching from axel to wget"
@@ -1361,7 +1389,7 @@ if [[ -f /proc/user_beancounters && "$CENTOS_SEVEN" = '7' ]]; then
 # rm -rf /var/tmp
 # ln -s /tmp /var/tmp
 # mount -o remount /tmp
-elif [[ ! -f /proc/user_beancounters && "$CENTOS_SEVEN" = '7' ]]; then
+elif [[ ! -f /proc/user_beancounters && "$CENTOS_SEVEN" = '7' && "$CHECK_LXD" != [yY] ]]; then
     echo "CentOS 7 Setup /tmp"
     echo "CentOS 7 + non-OpenVZ virtualisation detected"
     systemctl is-enabled tmp.mount
@@ -1475,7 +1503,7 @@ elif [[ ! -f /proc/user_beancounters && "$CENTOS_SEVEN" = '7' ]]; then
        rm -rf /tmp_backup
        rm -rf /var/tmp_backup
     fi
-elif [[ ! -f /proc/user_beancounters ]]; then
+elif [[ ! -f /proc/user_beancounters && "$CHECK_LXD" != [yY] ]]; then
 
     # TOTALMEM=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
     CURRENT_TMPSIZE=$(df -P /tmp | awk '/tmp/ {print $3}')
@@ -1644,9 +1672,10 @@ if [ ! -f "${DIR_TMP}/securedtmp.log" ]; then
 run_once
 fi
 
-if [ -f /proc/user_beancounters ];
-then
+if [ -f /proc/user_beancounters ]; then
     cecho "OpenVZ system detected, NTP not installed" $boldgreen
+elif [[ "$CHECK_LXD" = [yY] ]]; then
+    cecho "LXC/LXD container system detected, NTP not installed" $boldgreen
 else
     if [[ "$NTP_INSTALL" = [yY] ]]; 
     then
@@ -1936,13 +1965,19 @@ fi
 echo "mongodbinstall"
 mongodbinstall
 
+echo "zopfliinstall"
+zopfliinstall
 
 if [[ "$PHPMSSQL" = [yY] ]]; then
   echo "php_mssqlinstall"
   php_mssqlinstall
 fi
 
-if [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMVER" = '7.2' ]]; then
+if [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMVER" = '7.3' ]]; then
+  if [ -f /usr/local/src/centminmod/addons/php73-mcrypt.sh ]; then
+    /usr/local/src/centminmod/addons/php73-mcrypt.sh menu
+  fi
+elif [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMVER" = '7.2' ]]; then
   if [ -f /usr/local/src/centminmod/addons/php72-mcrypt.sh ]; then
     /usr/local/src/centminmod/addons/php72-mcrypt.sh menu
   fi

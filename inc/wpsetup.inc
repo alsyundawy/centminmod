@@ -64,7 +64,7 @@ dbsetup() {
   DBPASS="wpdb${SALT}p${DBNC}"
   mysqladmin create $DB
   mysql -e "CREATE USER $DBUSER@'localhost' IDENTIFIED BY '$DBPASS';"
-  mysql -e "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, LOCK TABLES, CREATE TEMPORARY TABLES ON ${DB}.* TO ${DBUSER}@'localhost'; FLUSH PRIVILEGES;"
+  mysql -e "GRANT index, select, insert, delete, update, create, drop, alter, create temporary tables, execute, lock tables, create view, show view, create routine, alter routine, trigger ON ${DB}.* TO ${DBUSER}@'localhost'; FLUSH PRIVILEGES;"
 }
 
 wpinfo_notice() {
@@ -121,7 +121,18 @@ if [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module
   HTTPTWO_MAXHEADERSIZE='http2_max_header_size 32k;'  
 elif [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]]; then
   HTTPTWO=y
-  LISTENOPT='ssl http2'
+  if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep reuseport | awk -F ':  ' '{print $2}' | grep -o reuseport)" != 'reuseport' ]]; then
+    # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
+    NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
+    if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
+      ADD_REUSEPORT=' reuseport'
+    else
+      ADD_REUSEPORT=""
+    fi
+    LISTENOPT="ssl http2${ADD_REUSEPORT}"
+  else
+    LISTENOPT='ssl http2'
+  fi
   COMP_HEADER='#spdy_headers_comp 5'
   SPDY_HEADER='#add_header Alternate-Protocol  443:npn-spdy/3;'
   HTTPTWO_MAXFIELDSIZE='http2_max_field_size 16k;'
@@ -182,46 +193,46 @@ fi
 openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
 openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt
 
-echo
-cecho "---------------------------------------------------------------" $boldyellow
-cecho "Generating backup CSR and private key for HTTP Public Key Pinning..." $boldgreen
-cecho "creating CSR File: ${vhostname}-backup.csr" $boldgreen
-cecho "creating private key: ${vhostname}-backup.key" $boldgreen
-sleep 5
+# echo
+# cecho "---------------------------------------------------------------" $boldyellow
+# cecho "Generating backup CSR and private key for HTTP Public Key Pinning..." $boldgreen
+# cecho "creating CSR File: ${vhostname}-backup.csr" $boldgreen
+# cecho "creating private key: ${vhostname}-backup.key" $boldgreen
+# sleep 5
 
-openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}-backup.csr -keyout ${vhostname}-backup.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
+# openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}-backup.csr -keyout ${vhostname}-backup.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
 
-echo
-cecho "---------------------------------------------------------------" $boldyellow
-cecho "Extracting Base64 encoded information for primary and secondary" $boldgreen
-cecho "private key's SPKI - Subject Public Key Information" $boldgreen
-cecho "Primary private key - ${vhostname}.key" $boldgreen
-cecho "Backup private key - ${vhostname}-backup.key" $boldgreen
-cecho "For HPKP - HTTP Public Key Pinning hash generation..." $boldgreen
-sleep 5
+# echo
+# cecho "---------------------------------------------------------------" $boldyellow
+# cecho "Extracting Base64 encoded information for primary and secondary" $boldgreen
+# cecho "private key's SPKI - Subject Public Key Information" $boldgreen
+# cecho "Primary private key - ${vhostname}.key" $boldgreen
+# cecho "Backup private key - ${vhostname}-backup.key" $boldgreen
+# cecho "For HPKP - HTTP Public Key Pinning hash generation..." $boldgreen
+# sleep 5
 
-echo
-cecho "extracting SPKI Base64 encoded hash for primary private key = ${vhostname}.key ..." $boldgreen
+# echo
+# cecho "extracting SPKI Base64 encoded hash for primary private key = ${vhostname}.key ..." $boldgreen
 
-openssl rsa -in ${vhostname}.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt
+# openssl rsa -in ${vhostname}.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt
 
-echo
-cecho "extracting SPKI Base64 encoded hash for backup private key = ${vhostname}-backup.key ..." $boldgreen
+# echo
+# cecho "extracting SPKI Base64 encoded hash for backup private key = ${vhostname}-backup.key ..." $boldgreen
 
-openssl rsa -in ${vhostname}-backup.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt
+# openssl rsa -in ${vhostname}-backup.key -outform der -pubout | openssl dgst -sha256 -binary | openssl enc -base64 | tee -a /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt
 
-echo
-cecho "HTTP Public Key Pinning Header for Nginx" $boldgreen
+# echo
+# cecho "HTTP Public Key Pinning Header for Nginx" $boldgreen
 
-echo
-cecho "for 7 days max-age including subdomains" $boldgreen
-echo
-echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=86400; includeSubDomains';"
+# echo
+# cecho "for 7 days max-age including subdomains" $boldgreen
+# echo
+# echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=86400; includeSubDomains';"
 
-echo
-cecho "for 7 days max-age excluding subdomains" $boldgreen
-echo
-echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=86400';"
+# echo
+# cecho "for 7 days max-age excluding subdomains" $boldgreen
+# echo
+# echo "add_header Public-Key-Pins 'pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-primary-pin.txt)\"; pin-sha256=\"$(cat /usr/local/nginx/conf/ssl/${vhostname}/hpkp-info-secondary-pin.txt)\"; max-age=86400';"
 
 if [[ ! -f "$(find /usr/local/nginx/conf/ssl -type f -name "dhparam.pem" | head -n1)" ]]; then
   echo
@@ -902,7 +913,13 @@ else
   TLSONETHREE_CIPHERS=""
 fi
 
-if [[ -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
+if [[ -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;
+  #include /usr/local/nginx/conf/php71-remi.conf;
+  #include /usr/local/nginx/conf/php70-remi.conf;
+  #include /usr/local/nginx/conf/php56-remi.conf;'
+elif [[ -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
   MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php72-remi.conf;
   #include /usr/local/nginx/conf/php71-remi.conf;
   #include /usr/local/nginx/conf/php70-remi.conf;
@@ -965,8 +982,8 @@ server {
 #include /usr/local/nginx/conf/pagespeedstatslog.conf;
 
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
 
   # limit_conn limit_per_ip 16;
@@ -1091,8 +1108,8 @@ server {
   # before enabling HSTS line below read centminmod.com/nginx_domain_dns_setup.html#hsts
   #add_header Strict-Transport-Security "max-age=31536000; includeSubdomains;";
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
   $COMP_HEADER;
   ssl_buffer_size 1369;
@@ -1109,11 +1126,6 @@ server {
 #include /usr/local/nginx/conf/pagespeed.conf;
 #include /usr/local/nginx/conf/pagespeedhandler.conf;
 #include /usr/local/nginx/conf/pagespeedstatslog.conf;
-
-  #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
-  #add_header Referrer-Policy "strict-origin-when-cross-origin";
 
   # limit_conn limit_per_ip 16;
   # ssi  on;
@@ -1231,8 +1243,8 @@ server {
 #include /usr/local/nginx/conf/pagespeedstatslog.conf;
 
   #add_header X-Frame-Options SAMEORIGIN;
-  #add_header X-Xss-Protection "1; mode=block" always;
-  #add_header X-Content-Type-Options "nosniff" always;
+  add_header X-Xss-Protection "1; mode=block" always;
+  add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
 
   # limit_conn limit_per_ip 16;
@@ -2110,7 +2122,20 @@ if [[ "$wpscache" = [nN] ]]; then
   cecho "------------------------------------------------------------" $boldgreen
   \wp plugin install cache-enabler --activate --allow-root
   cecho "------------------------------------------------------------" $boldgreen 
-  \wp plugin install optimus --activate --allow-root
+  # \wp plugin install optimus --activate --allow-root
+  echo "configure cache-enabler"
+  \wp option update cache-enabler '{"expires":6,"new_post":1,"new_comment":1,"webp":0,"compress":1,"excl_ids":"","minify_html":0}' --format=json --allow-root
+  \wp option get cache-enabler --format=json --allow-root
+  cecho "------------------------------------------------------------" $boldgreen
+  \wp plugin install autoptimize --activate --allow-root
+  echo "configure autoptimize"
+  \wp option update autoptimize_css on --allow-root
+  \wp option update autoptimize_extra_settings '{"autoptimize_extra_checkbox_field_1":"1","autoptimize_extra_checkbox_field_0":"1","autoptimize_extra_radio_field_4":"4","autoptimize_extra_text_field_2":"https:\/\/ajax.googleapis.com, https:\/\/fonts.googleapis.com, https:\/\/fonts.gstatic.com, https:\/\/maps.googleapis.com","autoptimize_extra_text_field_3":""}' --format=json --allow-root
+  \wp option update autoptimize_html on --allow-root
+  \wp option update autoptimize_js on --allow-root
+  # \wp option update autoptimize_optimize_logged on --allow-root
+  \wp option update autoptimize_show_adv 1 --allow-root
+  \wp option list --search=autoptimize_* --allow-root
   cecho "------------------------------------------------------------" $boldgreen
 fi
 
@@ -2133,8 +2158,6 @@ cecho "------------------------------------------------------------" $boldgreen
 cecho "------------------------------------------------------------" $boldgreen
 
 if [[ "$WPPLUGINS_ALL" = [yY] ]]; then
-  \wp plugin install autoptimize --activate --allow-root
-  cecho "------------------------------------------------------------" $boldgreen
   \wp plugin install rocket-lazy-load --activate --allow-root
   cecho "------------------------------------------------------------" $boldgreen
   \wp plugin install wp-security-scan --activate --allow-root
@@ -2391,7 +2414,7 @@ echo "/home/nginx/domains/${vhostname}/public${WPSUBDIR}"
 #/usr/bin/wp cli update --allow-root
 echo "update wp-cli"
 rm -rf /usr/bin/wp
-wget -4 -cnv --no-check-certificate https://raw.github.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /usr/bin/wp --tries=3
+wget -${ipv_forceopt}cnv --no-check-certificate https://raw.github.com/wp-cli/builds/gh-pages/phar/wp-cli.phar -O /usr/bin/wp --tries=3
 chmod 0700 /usr/bin/wp
 /usr/bin/wp --info --allow-root
 /usr/bin/wp plugin status --allow-root
@@ -2401,10 +2424,14 @@ chmod 0700 /usr/bin/wp
 #/usr/bin/wp core update-db --allow-root
 #/usr/bin/wp core update --allow-root
 chown -R nginx:nginx /home/nginx/domains/${vhostname}/public${WPSUBDIR}
-if [[ -f .wpcli-status && ! "$(grep -w 'Plugin already updated' .wpcli-status)" ]]; then
+if [[ -f .wpcli-status && ! "\$(grep -w 'Plugin already updated' .wpcli-status)" ]]; then
   exec 99>/tmp/wp_updater_phpfpm.lock
   if flock -n -x 99; then
-  /usr/bin/nprestart
+    # only do nginx + php-fpm restarts when zend opcache caching is enabled and revalidation
+    # frequency is greater than 10 seconds set by opcache.revalidate_freq php setting
+    if [[ "\$(php --ri "Zend Opcache" >/dev/null 2>&1; echo \$?)" -eq '0' && "\$(php --ri "Zend Opcache" | awk '/opcache.revalidate_freq/ {print \$3}')" -gt '10' ]]; then
+      /usr/bin/nprestart
+    fi
   rm -rf /tmp/wp_updater_phpfpm.lock
   else
   echo "already detected running process"
@@ -2612,7 +2639,7 @@ elif [[ "$disablepwdprotect" = [yY] ]]; then
     sed -i "s|auth_basic \"Private\"|#auth_basic \"Private\"|" /usr/local/nginx/conf/conf.d/$vhostname.conf >/dev/null 2>&1
     sed -i "s|auth_basic_user_file \/home\/nginx\/domains\/$vhostname\/htpasswd_wplogin|#auth_basic_user_file \/home\/nginx\/domains\/$vhostname\/htpasswd_wplogin|" /usr/local/nginx/conf/conf.d/$vhostname.conf >/dev/null 2>&1
     if [[ "$vhostssl" = [yY] ]] || [[ "$vhostssl" = 'le' ]] || [[ "$vhostssl" = 'led' ]] || [[ "$vhostssl" = 'lelive' ]] || [[ "$vhostssl" = 'lelived' ]]; then
-      sed -i "s|auth_basic \"Private\"|#auth_basic \"Private\"|" /usr/local/nginx/conf/conf.d/$vhostname.conf >/dev/null 2>&1
+      sed -i "s|auth_basic \"Private\"|#auth_basic \"Private\"|" /usr/local/nginx/conf/conf.d/$vhostname.ssl.conf >/dev/null 2>&1
       sed -i "s|auth_basic_user_file \/home\/nginx\/domains\/$vhostname\/htpasswd_wplogin|#auth_basic_user_file \/home\/nginx\/domains\/$vhostname\/htpasswd_wplogin|" /usr/local/nginx/conf/conf.d/$vhostname.ssl.conf >/dev/null 2>&1
     fi
     /usr/bin/nprestart
@@ -2637,7 +2664,7 @@ cecho "------------------------------------------------------------" $boldgreen
 cecho "To complete setup:" $boldyellow
 if [[ "$wpscache" = [nN] ]]; then
   cecho "  1. Enable Permalinks (DO NOT use links with .html extensions for performance reasons) i.e. /%post_id%/%postname%/
-  2. Settings Menu > Cache Enabler set options and hit Save Changes
+  2. Settings Menu > Cache Enabler set options and hit Save Changes (https://community.centminmod.com/threads/15039/)
   3. Settings Menu > Optimus set options and hit Save Changes
   4. Appearance > Theme Options (Responsive theme) > Home Page nav bar > Uncheck Overrides Wordpress front page option"
   if [[ "$WPPLUGINS_ALL" = [yY] ]]; then

@@ -9,15 +9,16 @@
 # 
 ###########################################################
 DT=$(date +"%d%m%y-%H%M%S")
-USER=$(whoami)
-HOSTNAME=$(uname -n)
-RELEASE=$(cat /etc/redhat-release | sed -e 's| (Core)||' -e 's| release||')
+DMOTD_USER=$(whoami)
+DMOTD_HOSTNAME=$(uname -n)
+DMOTD_RELEASE=$(cat /etc/redhat-release | sed -e 's| (Core)||' -e 's| release||')
 PSA=$(ps -Afl | wc -l)
-CURRENTUSER=$(users | wc -w)
+DMOTD_CURRENTUSER=$(users | wc -w)
 CMSCRIPT_GITDIR='/usr/local/src/centminmod'
 CONFIGSCANBASE='/etc/centminmod'
 CENTMINLOGDIR='/root/centminlogs'
 SSHLOGIN_KERNELCHECK='n'
+FORCE_IPVFOUR='y' # curl/wget commands through script force IPv4
 ###########################################################
 # Setup Colours
 black='\E[30;40m'
@@ -57,6 +58,9 @@ if [ -f "${CONFIGSCANBASE}/custom_config.inc" ]; then
     dos2unix -q "${CONFIGSCANBASE}/custom_config.inc"
     source "${CONFIGSCANBASE}/custom_config.inc"
 fi
+if [ ! -d "$CENTMINLOGDIR" ]; then
+  mkdir -p $CENTMINLOGDIR
+fi
 
 # time of day
 HOUR=$(date +"%H")
@@ -87,8 +91,8 @@ DF=$(df -hT)
 motd_output() {
 echo "
 ===============================================================================
- - Hostname......: $HOSTNAME on $RELEASE
- - Users.........: Currently $CURRENTUSER user(s) logged on (includes: $USER)
+ - Hostname......: $DMOTD_HOSTNAME on $DMOTD_RELEASE
+ - Users.........: Currently $DMOTD_CURRENTUSER user(s) logged on (includes: $DMOTD_USER)
 ===============================================================================
  - CPU usage.....: $LOAD1, $LOAD5, $LOAD15 (1, 5, 15 min)
  - Processes.....: $PSA running
@@ -100,10 +104,10 @@ $DF
 "
 if [[ "$ENABLEMOTD_CSFMSG" != [nN] ]]; then
 echo "===============================================================================
-! This server maybe running CSF Firewall !  
-  DO NOT run the below command or you  will lock yourself out of the server: 
-
-  iptables -F 
+# ! This server maybe running CSF Firewall !  
+#   DO NOT run the below command or you  will lock yourself out of the server: 
+# 
+#   iptables -F 
 "
 fi
 if [[ "$ENABLEMOTD_LINKSMSG" != [nN] ]]; then
@@ -121,8 +125,8 @@ fi
 
 ngxver_checker() {
   if [[ "$(which nginx >/dev/null 2>&1; echo $?)" = '0' ]]; then
-    LASTEST_NGINXVERS=$(curl -4sL https://nginx.org/en/download.html 2>&1 | egrep -o "nginx\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "nginx-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | head -n1 2>&1)
-    LATEST_NGINXSTABLEVER=$(curl -4sL https://nginx.org/en/download.html 2>&1 | egrep -o "nginx\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "nginx-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | head -n2 | tail -1)
+    LASTEST_NGINXVERS=$(curl -${ipv_forceopt}sL https://nginx.org/en/download.html 2>&1 | egrep -o "nginx\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "nginx-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | head -n1 2>&1)
+    LATEST_NGINXSTABLEVER=$(curl -${ipv_forceopt}sL https://nginx.org/en/download.html 2>&1 | egrep -o "nginx\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "nginx-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | head -n2 | tail -1)
     CURRENT_NGINXVERS=$(nginx -v 2>&1 | awk '{print $3}' | awk -F '/' '{print $2}')
     if [[ "$CURRENT_NGINXVERS" != "$LASTEST_NGINXVERS" ]]; then
       echo
@@ -145,7 +149,7 @@ gitenv_askupdate() {
       # if git remote repo url is not same as one defined in giturl.txt then pull a new copy of
       # centmin mod code locally using giturl.txt defined git repo name
       GET_GITVER=$(git --version | awk '{print $3}' | sed -e 's|\.||g' | cut -c1,2)
-      CURL_GITURL=$(curl -s4 https://raw.githubusercontent.com/centminmod/centminmod/$(awk -F "=" '/branchname=/ {print $2}' ${CMSCRIPT_GITDIR}/centmin.sh | sed -e "s|'||g" )/giturl.txt)
+      CURL_GITURL=$(curl -s${ipv_forceopt} https://raw.githubusercontent.com/centminmod/centminmod/$(awk -F "=" '/branchname=/ {print $2}' ${CMSCRIPT_GITDIR}/centmin.sh | sed -e "s|'||g" )/giturl.txt)
       # if git version >1.8 use supported ls-remote --get-url flag otherwise use alternative
       if [[ -d "${CMSCRIPT_GITDIR}" ]]; then
         if [[ "$GET_GITVER" -ge '18' ]]; then
@@ -190,7 +194,7 @@ gitenv_askupdate() {
           if [[ "$GET_GITREMOTEURL" != "$CURL_GITURL" ]]; then
             cecho " to update re-run centmin.sh menu option 23 submenu option 1" $boldyellow
           else
-            cecho " to update re-run centmin.sh menu option 23 submenu option 2" $boldyellow
+            cecho " to update, run cmupdate command in SSH & re-run centmin.sh once & exit" $boldyellow
           fi
           cecho "===============================================================================" $boldgreen
         else
@@ -234,7 +238,12 @@ echo "Total Git & Nginx Check Time: $INSTALLTIME seconds" >> "${CENTMINLOGDIR}/c
   # logs older than 5 days will be removed
   if [ -d "${CENTMINLOGDIR}" ]; then
     # find "${CENTMINLOGDIR}" -type f -mtime +5 -name 'cmm-login-git-checks_*.log' -print
-    find "${CENTMINLOGDIR}" -type f -mtime +5 -name 'cmm-login-git-checks_*.log' -delete
+    find "${CENTMINLOGDIR}" -type f -mtime +5 -name 'cmm-login-git-checks_*.log' | while read f; do
+      if [ -f "$f" ]; then
+        # echo "removing $f"
+        rm -rf $f
+      fi
+    done
   fi
 
 fi
