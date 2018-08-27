@@ -32,7 +32,7 @@ done
 genprotect() {
   # need to restart to ensure all existing or recently 403 denied directory settings
   # are detected
-  /usr/bin/ngxrestart >/dev/null 2>&1
+  service nginx reload >/dev/null 2>&1
   sleep 2
 
 	# generate /usr/local/nginx/conf/autoprotect.conf include file
@@ -160,18 +160,18 @@ else
   if [[ "$DIFFCHECK" != '0' ]]; then
     echo "autoprotect.sh run completed..."
   else
-    echo "autoprotect.sh run completed skipped nginx restart..."
+    echo "autoprotect.sh run completed skipped nginx reload..."
   fi
   echo
 fi
 
-# only trigger nginx restart service when there are new differences detected
+# only trigger nginx reload service when there are new differences detected
 # in current and previous autoprotect include conf files
 NGX_RESTARTCMD=$(grep y /tmp/diffcheck.txt >/dev/null 2>&1; echo $?)
 if [[ -f /etc/init.d/nginx && "$NGX_RESTARTCMD" = '0' ]]; then
    # /etc/init.d/nginx restart >/dev/null 2>&1
    sleep 2
-   /etc/init.d/nginx restart
+   service nginx reload
    rm -rf /usr/local/nginx/conf/autoprotect/status-restart
 fi
   if [ -f /tmp/diffcheck.txt ]; then

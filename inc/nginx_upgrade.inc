@@ -275,7 +275,7 @@ if [[ "$NGINX_OPENRESTY" = [yY] ]]; then
 
     cecho "Check for openresty modules" $boldyellow    
     # if the tar.gz files don't exist first the tar test directory variables can not be populated
-    if [[ ! -f "${DIR_TMP}/${NGX_MEMCLINKFILE}" || ! -f "${DIR_TMP}/${NGX_SRCACHELINKFILE}"|| ! -f "${DIR_TMP}/${NGX_REDISLINKFILE}" || ! -f "${DIR_TMP}/${NGX_ECHOLINKFILE}" || ! -f "${DIR_TMP}/${NGX_SETMISCLINKFILE}" || ! -f "${DIR_TMP}/${NGX_DEVELKITLINKFILE}" ]]; then
+    if [[ ! -f "${DIR_TMP}/${NGX_MEMCLINKFILE}" || "$(tar -tzf ${DIR_TMP}/${NGX_MEMCLINKFILE} >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ ! -f "${DIR_TMP}/${NGX_SRCACHELINKFILE}" || "$(tar -tzf ${DIR_TMP}/${NGX_SRCACHELINKFILE} >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ ! -f "${DIR_TMP}/${NGX_REDISLINKFILE}" || "$(tar -tzf ${DIR_TMP}/${NGX_REDISLINKFILE} >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ ! -f "${DIR_TMP}/${NGX_ECHOLINKFILE}" || "$(tar -tzf ${DIR_TMP}/${NGX_ECHOLINKFILE} >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ ! -f "${DIR_TMP}/${NGX_SETMISCLINKFILE}" || "$(tar -tzf ${DIR_TMP}/${NGX_SETMISCLINKFILE} >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ ! -f "${DIR_TMP}/${NGX_DEVELKITLINKFILE}" || "$(tar -tzf ${DIR_TMP}/${NGX_DEVELKITLINKFILE} >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
         openrestytarball
     fi 
     
@@ -531,42 +531,39 @@ fi
     if [[ -s "nginx-${ngver}.tar.gz" || "$ngver" = 'master' || "$ngver" = 'master-google' ]]; then
         cecho "nginx ${ngver} download found, skipping download..." $boldgreen
     else
-        download_cmd "http://nginx.org/download/nginx-${ngver}.tar.gz" $WGETRETRY
+        download_cmd "https://nginx.org/download/nginx-${ngver}.tar.gz" $WGETRETRY
         NGINXDOWNLOAD_CHECK=$?
         if [[ "$NGINXDOWNLOAD_CHECK" != '0' ]]; then
-            if [ -f "$(which figlet)" ]; then
-                figlet -ckf standard "Nginx Failed Download"
+            wget -c${ipv_forceopt} "https://nginx.org/download/nginx-${ngver}.tar.gz" --tries=3
+            NGINXDOWNLOAD_CHECK=$?
+            if [[ "$NGINXDOWNLOAD_CHECK" != '0' ]]; then
+                if [ -f "$(which figlet)" ]; then
+                    figlet -ckf standard "Nginx Failed Download"
+                fi
+                echo
+                echo "!! Nginx Failed Download !!"
+                echo "try again by running centmin.sh menu option 4"
+                echo "make sure you type the correct nginx version"
+                echo "report errors on the forums at community.centminmod.com/forums/8/"
+            echo
+            free -m
+            echo
+            df -hT
+            echo
+            echo "CPU: $(awk -F ': ' '/^model name/ {print $2}' /proc/cpuinfo | head -n1) ($(grep -c "processor" /proc/cpuinfo))"
+            echo
+            echo "version increment history"
+            tail -5 /etc/centminmod-versionlog
+            if [ -d "${SCRIPT_DIR}/.git" ]; then
+                echo
+                echo "last Centmin Mod local git commit entry"
+                pushd "${SCRIPT_DIR}"
+                git log --numstat --pretty="%n%h %an %aD %n%s" --shortstat -1
+                popd
             fi
-            echo
-            echo "!! Nginx Failed Download !!"
-            echo "try again by running centmin.sh menu option 4"
-            echo "make sure you type the correct nginx version"
-            echo "report errors on the forums at community.centminmod.com/forums/8/"
-        echo
-        free -m
-        echo
-        df -hT
-        echo
-        echo "CPU: $(awk -F ': ' '/^model name/ {print $2}' /proc/cpuinfo | head -n1) ($(grep -c "processor" /proc/cpuinfo))"
-        echo
-        echo "version increment history"
-        tail -5 /etc/centminmod-versionlog
-        if [ -d "${SCRIPT_DIR}/.git" ]; then
-            echo
-            echo "last Centmin Mod local git commit entry"
-            pushd "${SCRIPT_DIR}"
-            git log --numstat --pretty="%n%h %an %aD %n%s" --shortstat -1
-            popd
-        fi
-        if [[ -d "${SCRIPT_DIR}/.git" ]]; then
-            echo
-            echo "last Centmin Mod local git commit entry"
-            pushd "${SCRIPT_DIR}"
-            git log --numstat --pretty="%n%h %an %aD %n%s" --shortstat -1
-            popd
-        fi
-            echo
-            exit
+                echo
+                exit
+            fi
         fi
     fi
 
@@ -652,6 +649,9 @@ fi
             git log --numstat --pretty="%n%h %an %aD %n%s" --shortstat -1
             popd
         fi
+        echo
+        echo "log files saved at ${CENTMINLOGDIR}"
+        ls -lAhrt "${CENTMINLOGDIR}" | grep $DT
         exit
   else
       echo -e "\n`date`\nSuccess: Nginx configure ok\n"
@@ -667,6 +667,12 @@ fi
     # detect OpenSSL 1.1.0 for make -jXX support
     DETECTOPENSSL_ONEZERO=$(echo $OPENSSL_VERSION  | cut -d . -f1-2)
     DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
+
+    if [[ "$BORINGSSL_SWITCH" = [yY] ]]; then
+      touch ${BORINGSSL_DIR}/boringssl/.openssl/include/openssl/ssl.h
+      ls -lah ${BORINGSSL_DIR}/boringssl/.openssl/include/openssl/ssl.h
+    fi
+
     if [[ "$LIBRESSL_SWITCH" = [yY] ]]; then
         time make${MAKETHREADS}
     else
@@ -713,6 +719,9 @@ fi
             git log --numstat --pretty="%n%h %an %aD %n%s" --shortstat -1
             popd
         fi
+        echo
+        echo "log files saved at ${CENTMINLOGDIR}"
+        ls -lAhrt "${CENTMINLOGDIR}" | grep $DT
       exit
   else
      echo -e "\n`date`\nSuccess: Nginx make ok\n"
@@ -806,6 +815,9 @@ fi
         if [ -f objs/autoconf.err ]; then
             cat objs/autoconf.err > "${CENTMINLOGDIR}/nginx_autoconf.err.${DT}.log"
         fi
+        echo
+        echo "log files saved at ${CENTMINLOGDIR}"
+        ls -lAhrt "${CENTMINLOGDIR}" | grep $DT
       exit
   else
         if [ -f objs/autoconf.err ]; then

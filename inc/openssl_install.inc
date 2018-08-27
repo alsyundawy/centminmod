@@ -99,7 +99,7 @@ fi
 if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0g' ]] || [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0h' ]]; then
     echo
     echo  "######################################################################"
-    echo "Patching OpenSSL 1.1.0g"
+    echo "Patching OpenSSL 1.1.0h"
     echo  "######################################################################"
     echo "30-40% performance improvement patch for ECDSA"
     echo "https://community.centminmod.com/posts/57725/"
@@ -122,9 +122,36 @@ if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PA
     echo
 fi
 
+# ECDSA performance patch https://community.centminmod.com/posts/57725/
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0i' ]]; then
+    echo
+    echo  "######################################################################"
+    echo "Patching OpenSSL 1.1.0i"
+    echo  "######################################################################"
+    echo "30-40% performance improvement patch for ECDSA"
+    echo "https://community.centminmod.com/posts/57725/"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL1.1i-improve-ECDSA-sign-30-40.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL1.1i-improve-ECDSA-sign-30-40.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL1.1i-improve-ECDSA-sign-30-40.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL1.1i-improve-ECDSA-sign-30-40.patch"
+        ecdsapatch_err=$?
+        if [[ "$ecdsapatch_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL1.1i-improve-ECDSA-sign-30-40.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
+
 # ECDHX25519 performance patch for 64bit systems only
 # OpenSSL1.1g-double-performance-ecdhx-25519.patch
-if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDHX_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0g' ]] || [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDHX_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0h' ]]; then
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDHX_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0g' ]] || [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDHX_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0h' ]] || [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDHX_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0i' ]]; then
     echo
     echo  "######################################################################"
     echo "Patching OpenSSL 1.1.0g"
@@ -281,7 +308,17 @@ fi # CLOUDFLARE_PATCHSSL
 
 crypto_gcc() {
     if [[ "$CRYPTO_DEVTOOLSETGCC" = [yY] ]]; then
-      if [[ "$DEVTOOLSETSEVEN" = [yY] ]] && [[ ! -f /opt/rh/devtoolset-7/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
+      if [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]]; then
+        source /opt/gcc8/enable
+        CRYPTODEVTOOLSETSEVEN_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+        CRYPTODEVTOOLSETSEVEN_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type'
+        which gcc
+        which g++
+        unset CC
+        unset CXX
+        export CC="ccache /opt/gcc8/bin/gcc"
+        export CXX="ccache /opt/gcc8/bin/g++"
+      elif [[ "$DEVTOOLSETSEVEN" = [yY] ]] && [[ ! -f /opt/rh/devtoolset-7/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
         scl_install
         source /opt/rh/devtoolset-7/enable
         CRYPTODEVTOOLSETSEVEN_FALLTHROUGH=' -Wimplicit-fallthrough=0'
@@ -413,11 +450,6 @@ installopenssl() {
     fi
     DETECTOPENSSL_ONEZERO=$(echo $OPENSSL_VERSION  | cut -d . -f1-2)
     DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
-    if [ ! -f /usr/local/go/bin/go ]; then
-        # if golang is not detected BoringSSL switch will be disabled
-        # and default to using OpenSSL 1.0.2+
-        BORINGSSL_SWITCH='n'
-    fi
     if [[ "$LIBRESSL_SWITCH" = [yY] ]] && [[ "$BORINGSSL_SWITCH" = [nN] ]]; then
         libresslinstallstarttime=$(TZ=UTC date +%s.%N)
 
@@ -508,6 +540,16 @@ installopenssl() {
         if [ ! -f /usr/bin/makedepend ]; then
             time $YUMDNFBIN -q -y install imake${DISABLEREPO_DNF}
         fi
+
+        if [[ "$CLOUDFLARE_ZLIB_OPENSSL" = [yY] && "$CLOUDFLARE_ZLIB" = [yY] && "$(cat /proc/cpuinfo | grep -o 'sse4_2' | uniq)" = 'sse4_2' && "$CHECK_PCLMUL" = 'enabled' && -d /usr/local/zlib-cf ]]; then
+            OPENSSL_CFZLIB_OPT=' -I/usr/local/zlib-cf/include -L/usr/local/zlib-cf/lib'
+            OPENSSL_CFZLIB_RPATH='/usr/local/zlib-cf:'
+            echo "OPENSSL_CFZLIB_OPT = $OPENSSL_CFZLIB_OPT"
+            echo "OPENSSL_CFZLIB_RPATH = $OPENSSL_CFZLIB_RPATH"
+        else
+            echo "OPENSSL_CFZLIB_OPT = $OPENSSL_CFZLIB_OPT"
+            echo "OPENSSL_CFZLIB_RPATH = $OPENSSL_CFZLIB_RPATH"
+        fi
     
         #-- Build static openssl
         if [[ "$TLSONETHREE" = [yY] && "$ORESTY_LUANGINX" != [yY] ]] && [[ "$DETECTOPENSSL_ONEONE" != '1.1.1' ]] ; then
@@ -515,7 +557,7 @@ installopenssl() {
             export STATICLIBSSL="${OPENSSL_CUSTOMPATH}"
             cd "$DIR_TMP"
             rm -rf ${DIR_TMP}/openssl-tls1.3
-            git clone -b tls1.3-draft-18 https://github.com/openssl/openssl/ openssl-tls1.3
+            git clone https://github.com/openssl/openssl/ openssl-tls1.3
             cd ${DIR_TMP}/openssl-tls1.3
         else
             export STATICLIBSSL="${OPENSSL_CUSTOMPATH}"
@@ -560,11 +602,11 @@ installopenssl() {
                 elif [[ ! "${OPENSSL_THREADS}" ]]; then
                     OPENSSL_THREADSOPT=""
                 fi
-                echo "./config -Wl,--enable-new-dtags,-rpath=${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared${ECNISTP_OPT}${TLSONETHREEOPT}${OPENSSL_THREADSOPT}"
-                ./config -Wl,--enable-new-dtags,-rpath=${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared${ECNISTP_OPT}${TLSONETHREEOPT}${OPENSSL_THREADSOPT}
+                echo "./config -Wl,--enable-new-dtags,-rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared${ECNISTP_OPT}${TLSONETHREEOPT}${OPENSSL_THREADSOPT}${OPENSSL_CFZLIB_OPT}"
+                ./config -Wl,--enable-new-dtags,-rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared${ECNISTP_OPT}${TLSONETHREEOPT}${OPENSSL_THREADSOPT}${OPENSSL_CFZLIB_OPT}
             else
-                echo "./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared enable-tlsext${ECNISTP_OPT}"
-                ./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared enable-tlsext${ECNISTP_OPT}
+                echo "./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared enable-tlsext${ECNISTP_OPT}${OPENSSL_CFZLIB_OPT} -Wl, -rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib"
+                ./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared enable-tlsext${ECNISTP_OPT}${OPENSSL_CFZLIB_OPT} -Wl, -rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib
             fi
         else
             if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
@@ -610,21 +652,33 @@ installopenssl() {
         ls -lah ${CENTMINLOGDIR}/centminmod_opensslinstalltime_${DT}.log
     elif [[ "$BORINGSSL_SWITCH" = [yY] ]]; then
         boringsslinstallstarttime=$(TZ=UTC date +%s.%N)
-
+        
         if [ -f "$(which figlet)" ]; then
             figlet -ckf standard "Compiling BoringSSL"
         fi
 
+        if [ ! -f /usr/local/go/bin/go ]; then
+            # if golang is not detected BoringSSL switch will be disabled
+            # and default to using OpenSSL 1.0.2+
+            # BORINGSSL_SWITCH='n'
+            if [ -f /usr/local/src/centminmod/addons/golang.sh ]; then
+                /usr/local/src/centminmod/addons/golang.sh install
+                . /root/.bashrc
+            fi
+        fi
+
         echo "Compiling BoringSSL..."
-        cd $DIR_TMP
+        # cd $DIR_TMP
+        pushd "${BORINGSSL_DIR}"
+        rm -rf ${BORINGSSL_DIR}/boringssl
         time git clone https://boringssl.googlesource.com/boringssl
+        # time git clone https://github.com/google/boringssl.git
         cd boringssl
         mkdir -p build
         cd build
         if [[ "$INITIALINSTALL" != [yY] ]]; then
             rm -rf CMakeCache.txt
         fi
-        cmake -DCMAKE_BUILD_TYPE=Release ..
         unset CC
         unset CXX
         unset CFLAGS
@@ -632,19 +686,39 @@ installopenssl() {
         export CMAKE_CXX_COMPILER="g++"
         export CC="gcc"
         export CXX="g++"
+        export GO_EXECUTABLE="/usr/local/go/bin/go"
+        mkdir -p /home/buildtmp
+        chmod 1777 /home/buildtmp
+        export TMPDIR=/home/buildtmp
+        # sed -i 's|set(GO_EXECUTABLE "go")|set(GO_EXECUTABLE "\/usr\/local\/go\/bin\/go")|' ${BORINGSSL_DIR}/boringssl/CMakeLists.txt
+        ln -s /usr/local/go/bin/go /usr/local/bin/go
+        if [[ "$BORINGSSL_SHARED" = [yY] ]]; then
+            cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE -DBUILD_SHARED_LIBS=1 ..
+        else
+            cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE ..
+        fi
+        # cmake -DCMAKE_BUILD_TYPE=Release ..
         make${MAKETHREADS}
-        mkdir -p /svr-setup/boringssl/.openssl/lib
-        cd /svr-setup/boringssl/.openssl
+        mkdir -p ${BORINGSSL_DIR}/boringssl/.openssl/lib
+        cd ${BORINGSSL_DIR}/boringssl/.openssl
         ln -s ../include
-        cp /svr-setup/boringssl/build/crypto/libcrypto.a /svr-setup/boringssl/build/ssl/libssl.a /svr-setup/boringssl/.openssl/lib
-        ls -lah /svr-setup/boringssl/.openssl/lib
-        ls -lah /svr-setup/boringssl/.openssl
-
+        cp ${BORINGSSL_DIR}/boringssl/build/crypto/libcrypto.a ${BORINGSSL_DIR}/boringssl/build/ssl/libssl.a ${BORINGSSL_DIR}/boringssl/.openssl/lib
+        cp ${BORINGSSL_DIR}/boringssl/build/crypto/libcrypto.so ${BORINGSSL_DIR}/boringssl/build/ssl/libssl.so ${BORINGSSL_DIR}/boringssl/.openssl/lib
+        ls -lah ${BORINGSSL_DIR}/boringssl/.openssl/lib
+        ls -lah ${BORINGSSL_DIR}/boringssl/.openssl
+        # symlink boringssl bssl binary for ease of use
+        if [ -f "${BORINGSSL_DIR}/boringssl/build/tool/bssl" ]; then
+            echo "ln -sf ${BORINGSSL_DIR}/boringssl/build/tool/bssl /usr/local/bin/bssl"
+            ln -sf "${BORINGSSL_DIR}/boringssl/build/tool/bssl" /usr/local/bin/bssl
+            ls -lah /usr/local/bin/bssl
+        fi
+        unset TMPDIR
         boringsslinstallendtime=$(TZ=UTC date +%s.%N)
         BORINGSSLINSTALLTIME=$(echo "scale=2;$boringsslinstallendtime - $boringsslinstallstarttime"|bc )
 
         echo "" >> ${CENTMINLOGDIR}/centminmod_boringsslinstalltime_${DT}.log
         echo "BoringSSL Install Time: $BORINGSSLINSTALLTIME seconds" >> ${CENTMINLOGDIR}/centminmod_boringsslinstalltime_${DT}.log
-        ls -lah ${CENTMINLOGDIR}/centminmod_boringsslinstalltime_${DT}.log 
+        ls -lah ${CENTMINLOGDIR}/centminmod_boringsslinstalltime_${DT}.log
+        popd 
     fi
 }
