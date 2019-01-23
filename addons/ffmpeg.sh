@@ -1,5 +1,12 @@
 #!/bin/bash
 ###############################################################################
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+###############################################################################
 # ffmpeg installer for centminmod.com LEMP stack
 # based on instructions at https://trac.ffmpeg.org/wiki/CompilationGuide/Centos
 # http://git.videolan.org/?p=ffmpeg.git;a=blob;f=doc/APIchanges;hb=HEAD
@@ -20,23 +27,27 @@ GCC_SEVEN='n'
 OPT_LEVEL='-O3'
 MARCH_TARGETNATIVE='n' # for intel 64bit only set march=native, if no set to x86-64
 ###############################################################################
+FFMPEG_DEBUG='n'
 DISABLE_NETWORKFFMPEG='n'
+ENABLE_FBTRANSFORM='n'
+ENABLE_AVONE='n'
 ENABLE_FPIC='n'
+ENABLE_FONTCONFIG='n'
+ENABLE_LIBASS='y'
+ENABLE_ZIMG='y'
+ENABLE_OPENCV='n'
 # http://downloads.xiph.org/releases/ogg/
 LIBOGG_VER='1.3.3'
 # http://downloads.xiph.org/releases/vorbis/
 LIBVORBIS_VER='1.3.6'
 GD_ENABLE='n'
 NASM_SOURCEINSTALL='n'
-NASM_VER='2.14rc15'
+NASM_VER='2.14rc16'
 YASM_VER='1.3.0'
+FDKAAC_VER='0.1.6'
+FONTCONFIG_VER='2.13.1'
+FREETYPE_VER='2.9'
 ###############################################################################
-# set locale temporarily to english
-# due to some non-english locale issues
-export LC_ALL=en_US.UTF-8
-export LANG=en_US.UTF-8
-export LANGUAGE=en_US.UTF-8
-export LC_CTYPE=en_US.UTF-8
 
 shopt -s expand_aliases
 for g in "" e f; do
@@ -65,6 +76,10 @@ if [ -f /proc/user_beancounters ]; then
             # 7401P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7401p
             # while greater than 12 cpu cores downclocks to 2.8Ghz
             CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7371' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7371' ]]; then
+            # 7371 at 8 cpu cores has 3.8Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7371
+            # while greater than 8 cpu cores downclocks to 3.6Ghz
+            CPUS=8
         else
             CPUS=$(echo $(($CPUS+2)))
         fi
@@ -88,6 +103,10 @@ else
             # 7401P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7401p
             # while greater than 12 cpu cores downclocks to 2.8Ghz
             CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7371' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7371' ]]; then
+            # 7371 at 8 cpu cores has 3.8Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7371
+            # while greater than 8 cpu cores downclocks to 3.6Ghz
+            CPUS=8
         else
             CPUS=$(echo $(($CPUS+4)))
         fi
@@ -99,14 +118,55 @@ else
     MAKETHREADS=" -j$CPUS"
 fi
 
+if [[ "$FFMPEG_DEBUG" = [Nn] ]]; then
+  FFMPEG_DEBUGOPT=' --disable-debug'
+else
+  FFMPEG_DEBUGOPT=""
+fi
+
 if [[ "$DISABLE_NETWORKFFMPEG" = [yY] ]]; then
 	DISABLE_FFMPEGNETWORK=' --disable-network'
 fi
 
-if [[ "$ENABLE_FPIC" = [yY] ]]; then
-	ENABLE_FPICOPT=' --enable-pic'
+if [[ "$ENABLE_ZIMG" = [yY] ]]; then
+  ENABLE_ZIMGOPT=' --enable-libzimg'
 else
-	ENABLE_FPICOPT=""
+  ENABLE_ZIMGOPT=""
+fi
+
+if [[ "$ENABLE_OPENCV" = [yY] ]]; then
+  ENABLE_OPENCVOPT=' --enable-libopencv'
+else
+  ENABLE_OPENCVOPT=""
+fi
+
+if [[ "$ENABLE_FONTCONFIG" = [yY] ]]; then
+  ENABLE_FONTCONFIGOPT=' --enable-fontconfig'
+else
+  ENABLE_FONTCONFIGOPT=""
+fi
+
+if [[ "$ENABLE_LIBASS" = [yY] ]]; then
+  ENABLE_LIBASSOPT=' --enable-libass'
+else
+  ENABLE_LIBASSOPT=""
+fi
+
+if [[ "$ENABLE_AVONE" = [yY] ]]; then
+  ENABLE_AVONEOPT=' --enable-libaom'
+  ENABLE_FPIC='y'
+else
+  ENABLE_AVONEOPT=""
+fi
+
+if [[ "$ENABLE_FPIC" = [yY] ]]; then
+  ENABLE_FPICOPT=' --enable-pic --extra-ldexeflags=-pie'
+  EXTRACFLAG_FPICOPTS='-fPIC'
+  LDFLAG_FPIC=' -Wl,-Bsymbolic'
+else
+  ENABLE_FPICOPT=""
+  EXTRACFLAG_FPICOPTS=""
+  LDFLAG_FPIC=""
 fi
 
 if [[ "$MARCH_TARGETNATIVE" = [yY] && "$(uname -m)" = 'x86_64' ]]; then
@@ -178,8 +238,31 @@ install_yasm() {
 	cd "yasm-${YASM_VER}"
 	make clean
 	./configure --prefix="${OPT}/ffmpeg" --bindir="${OPT}/bin"
-	make
+	make${MAKETHREADS}
 	make install
+}
+
+install_freetype() {
+  cd ${OPT}/ffmpeg_sources
+  curl -L -O "https://download.savannah.gnu.org/releases/freetype/freetype-${FREETYPE_VER}.tar.gz"
+  tar xvzf "freetype-${FREETYPE_VER}.tar.gz"
+  cd "freetype-${FREETYPE_VER}"
+  make clean
+  ./configure --prefix="${OPT}/ffmpeg" --bindir="${OPT}/bin"
+  make${MAKETHREADS}
+  make install
+}
+
+install_zimg() {
+  cd ${OPT}/ffmpeg_sources
+  rm -rf zimg
+  git clone --depth=1 https://github.com/sekrit-twc/zimg
+  cd zimg
+  make clean
+  ./autogen.sh
+  ./configure --prefix="${OPT}/ffmpeg" --bindir="${OPT}/bin" --enable-static  --enable-shared --with-pic
+  make${MAKETHREADS}
+  make install
 }
 
 install() {
@@ -189,9 +272,9 @@ echo "Installing FFMPEG..."
 
 # check if IUS Community git2u packages installed
 if [[ "$(rpm -ql git2u-core | grep '\/usr\/bin\/git$')" = '/usr/bin/git' ]]; then
-	yum -y install autoconf automake cmake freetype-devel gcc gcc-c++ libtool make mercurial pkgconfig zlib-devel numactl-devel
+	yum -y install gperf autoconf automake cmake freetype-devel gcc gcc-c++ libtool make mercurial pkgconfig zlib-devel numactl-devel libass libass-devel opencv opencv-devel
 else
-	yum -y install autoconf automake cmake freetype-devel gcc gcc-c++ git libtool make mercurial pkgconfig zlib-devel numactl-devel
+	yum -y install gperf autoconf automake cmake freetype-devel gcc gcc-c++ git libtool make mercurial pkgconfig zlib-devel numactl-devel libass libass-devel opencv opencv-devel
 fi
 
 echo
@@ -214,6 +297,36 @@ mkdir -p ${OPT}/ffmpeg_sources
 
 install_nasm
 install_yasm
+if [[ "$ENABLE_FONTCONFIG" = [yY] ]]; then
+  install_freetype
+fi
+if [[ "$ENABLE_ZIMG" = [yY] ]]; then
+  install_zimg
+fi
+
+if [[ "$ENABLE_FONTCONFIG" = [yY] ]]; then
+cd ${OPT}/ffmpeg_sources
+rm -rf fontconfig*
+# git clone --depth 1 https://gitlab.freedesktop.org/fontconfig/fontconfig
+curl -L -O https://www.freedesktop.org/software/fontconfig/release/fontconfig-${FONTCONFIG_VER}.tar.gz
+tar xvzf fontconfig-${FONTCONFIG_VER}.tar.gz
+cd fontconfig-${FONTCONFIG_VER}
+# autoreconf -ivf
+PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --bindir="${OPT}/bin" --enable-static  --enable-shared --with-pic
+make${MAKETHREADS}
+make install
+make distclean
+fi
+
+if [[ "$ENABLE_FBTRANSFORM" = [yY] ]]; then
+cd ${OPT}/ffmpeg_sources
+rm -rf transform360
+git clone --depth 1 https://github.com/facebook/transform360
+cd transform360/Transform360
+PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" cmake -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_SHARED_LIBS=ON .
+make${MAKETHREADS}
+make install
+fi
 
 cd ${OPT}/ffmpeg_sources
 rm -rf x264
@@ -235,8 +348,9 @@ make install
 
 cd ${OPT}/ffmpeg_sources
 rm -rf fdk-aac
-git clone --depth 1 git://git.code.sf.net/p/opencore-amr/fdk-aac
+git clone https://github.com/mstorsjo/fdk-aac
 cd fdk-aac
+git checkout v${FDKAAC_VER} -b v${FDKAAC_VER}
 autoreconf -fiv
 ./configure --prefix="${OPT}/ffmpeg" --enable-static --enable-shared
 make${MAKETHREADS}
@@ -284,16 +398,29 @@ cd ${OPT}/ffmpeg_sources
 rm -rf libvpx
 git clone --depth 1 https://chromium.googlesource.com/webm/libvpx.git
 cd libvpx
-./configure --prefix="${OPT}/ffmpeg" --disable-examples --enable-static --enable-shared
+./configure --prefix="${OPT}/ffmpeg" --disable-examples --enable-static --enable-shared --disable-unit-tests
 make${MAKETHREADS}
 make install
 make clean
+
+if [[ "$ENABLE_AVONE" = [yY] ]]; then
+cd ${OPT}/ffmpeg_sources
+rm -rf libaom
+rm -rf ${OPT}/ffmpeg_sources/aom_build
+git clone --depth 1 https://aomedia.googlesource.com/aom libaom
+mkdir -p ${OPT}/ffmpeg_sources/aom_build
+cd aom_build
+# build/cmake/aom_config_defaults.cmake
+cmake3 -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="${OPT}/ffmpeg" -DBUILD_SHARED_LIBS=1 -DENABLE_NASM=on -DENABLE_CCACHE=on ../libaom
+make${MAKETHREADS}
+make install
+fi
 
 cd ${OPT}/ffmpeg_sources
 rm -rf ffmpeg
 git clone --depth 1 git://source.ffmpeg.org/ffmpeg
 cd ffmpeg
-LD_LIBRARY_PATH=${OPT}/ffmpeg/lib PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --extra-cflags="-I${OPT}/ffmpeg/include" --extra-ldflags="-L${OPT}/ffmpeg/lib" --bindir="${OPT}/bin" --pkg-config-flags="--static" --extra-libs=-lpthread --extra-libs=-lm${ENABLE_FPICOPT} --enable-gpl --enable-nonfree --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265 --enable-swscale --enable-shared${DISABLE_FFMPEGNETWORK}
+LD_LIBRARY_PATH=${OPT}/ffmpeg/lib PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --extra-cflags="${EXTRACFLAG_FPICOPTS} -I${OPT}/ffmpeg/include" --extra-ldflags="-L${OPT}/ffmpeg/lib${LDFLAG_FPIC}" --bindir="${OPT}/bin" --pkg-config-flags="--static" --extra-libs=-lpthread --extra-libs=-lm --enable-gpl${FFMPEG_DEBUGOPT} --enable-nonfree --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265${ENABLE_AVONEOPT}${ENABLE_LIBASSOPT}${ENABLE_ZIMGOPT}${ENABLE_OPENCVOPT} --enable-swscale${ENABLE_FONTCONFIGOPT}${ENABLE_FPICOPT} --enable-shared${DISABLE_FFMPEGNETWORK}
 make${MAKETHREADS}
 make install
 make distclean
@@ -307,14 +434,19 @@ ldconfig
 
 echo
 echo "Installed FFMPEG binary at ${OPT}/bin/ffmpeg"
+if [[ "$ENABLE_AVONE" = [yY] ]]; then
+  echo
+  echo "ffmpeg -h encoder=libaom-av1"
+  ffmpeg -h encoder=libaom-av1
+fi
 echo
+"${OPT}/bin/ffmpeg" -formats
 
 echo
 "${OPT}/bin/ffmpeg" -version
 
 echo
-"${OPT}/bin/ffmpeg" -formats
-
+echo "Binaries installed at ${OPT}/bin"
 }
 
 update() {
@@ -341,6 +473,24 @@ install_yasm
 # make${MAKETHREADS}
 # make install
 # make distclean
+
+if [[ "$ENABLE_FONTCONFIG" = [yY] ]]; then
+cd ${OPT}/ffmpeg_sources/fontconfig-${FONTCONFIG_VER}
+make distclean
+# autoreconf -ivf
+PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --bindir="${OPT}/bin" --enable-static  --enable-shared --with-pic
+make${MAKETHREADS}
+make install
+make distclean
+fi
+
+if [[ "$ENABLE_FBTRANSFORM" = [yY] ]]; then
+cd ${OPT}/ffmpeg_sources/transform360/Transform360
+rm -rf CMakeCache.txt
+PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" cmake -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_SHARED_LIBS=ON .
+make${MAKETHREADS}
+make install
+fi
 
 cd ${OPT}/ffmpeg_sources/x264
 make distclean
@@ -370,15 +520,26 @@ make distclean
 cd ${OPT}/ffmpeg_sources/libvpx
 make clean
 git pull
-./configure --prefix="${OPT}/ffmpeg" --disable-examples --enable-static --enable-shared
+./configure --prefix="${OPT}/ffmpeg" --disable-examples --enable-static --enable-shared --disable-unit-tests --enable-vp9-highbitdepth --as=yasm
 make${MAKETHREADS}
 make install
 make clean
 
+if [[ "$ENABLE_AVONE" = [yY] ]]; then
+cd ${OPT}/ffmpeg_sources/libaom
+rm -rf CMakeCache.txt CMakeFiles
+rm -rf ${OPT}/ffmpeg_sources/aom_build
+mkdir -p ${OPT}/ffmpeg_sources/aom_build
+git pull
+cmake3 -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="${OPT}/ffmpeg" -DBUILD_SHARED_LIBS=1 -DENABLE_NASM=on -DENABLE_CCACHE=on ../libaom
+make${MAKETHREADS}
+make install
+fi
+
 cd ${OPT}/ffmpeg_sources/ffmpeg
 make distclean
 git pull
-LD_LIBRARY_PATH=${OPT}/ffmpeg/lib PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --extra-cflags="-I${OPT}/ffmpeg/include" --extra-ldflags="-L${OPT}/ffmpeg/lib" --bindir="${OPT}/bin" --pkg-config-flags="--static" --extra-libs=-lpthread --extra-libs=-lm${ENABLE_FPICOPT} --enable-gpl --enable-nonfree --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265 --enable-swscale --enable-shared
+LD_LIBRARY_PATH=${OPT}/ffmpeg/lib PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --extra-cflags="${EXTRACFLAG_FPICOPTS} -I${OPT}/ffmpeg/include" --extra-ldflags="-L${OPT}/ffmpeg/lib${LDFLAG_FPIC}" --bindir="${OPT}/bin" --pkg-config-flags="--static" --extra-libs=-lpthread --extra-libs=-lm --enable-gpl${FFMPEG_DEBUGOPT} --enable-nonfree --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265${ENABLE_AVONEOPT}${ENABLE_LIBASSOPT}${ENABLE_ZIMGOPT}${ENABLE_OPENCVOPT} --enable-swscale${ENABLE_FONTCONFIGOPT}${ENABLE_FPICOPT} --enable-shared
 make${MAKETHREADS}
 make install
 make distclean

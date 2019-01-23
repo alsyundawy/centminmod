@@ -24,7 +24,7 @@ server {
   $HTTPTWO_MAXFIELDSIZE
   $HTTPTWO_MAXHEADERSIZE
   # mozilla recommended
-  ssl_ciphers ${TLSONETHREE_CIPHERS}${CHACHACIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
+  ssl_ciphers ${TLSONETHREE_CIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:${CHACHACIPHERS}DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
   ssl_prefer_server_ciphers   on;
   $SPDY_HEADER
 
@@ -49,11 +49,6 @@ server {
 #include /usr/local/nginx/conf/pagespeed.conf;
 #include /usr/local/nginx/conf/pagespeedhandler.conf;
 #include /usr/local/nginx/conf/pagespeedstatslog.conf;
-
-  #add_header X-Frame-Options SAMEORIGIN;
-  add_header X-Xss-Protection "1; mode=block" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  #add_header Referrer-Policy "strict-origin-when-cross-origin";
 
   # limit_conn limit_per_ip 16;
   # ssi  on;
@@ -108,6 +103,24 @@ location ~* ${WPSUBDIR}/(wp-login\.php) {
 
 location ~* ${WPSUBDIR}/(xmlrpc\.php) {
     limit_req zone=xwprpc burst=45 nodelay;
+    #limit_conn xwpconlimit 30;
+    include /usr/local/nginx/conf/php-wpsc.conf;
+    ${MULTIPHP_INCLUDES}
+    # https://community.centminmod.com/posts/18828/
+    #include /usr/local/nginx/conf/php-rediscache.conf;
+}
+
+location ~* ${WPSUBDIR}/wp-admin/(load-scripts\.php) {
+    limit_req zone=xwprpc burst=5 nodelay;
+    #limit_conn xwpconlimit 30;
+    include /usr/local/nginx/conf/php-wpsc.conf;
+    ${MULTIPHP_INCLUDES}
+    # https://community.centminmod.com/posts/18828/
+    #include /usr/local/nginx/conf/php-rediscache.conf;
+}
+
+location ~* ${WPSUBDIR}/wp-admin/(load-styles\.php) {
+    limit_req zone=xwprpc burst=5 nodelay;
     #limit_conn xwpconlimit 30;
     include /usr/local/nginx/conf/php-wpsc.conf;
     ${MULTIPHP_INCLUDES}

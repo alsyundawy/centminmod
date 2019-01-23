@@ -60,9 +60,10 @@ PHPMVER=$(echo "$PHP_VERSION" | cut -d . -f1,2)
 # compiling PHP with LTO support takes 2-4x times the memory
 # and cpu resources to do and takes 2-4x times longer to compile
 # so only do it for servers with enough cpu cores and memory
-if [[ "$CPUS" -lt '16' && "$TOTALMEMMB" -lt '31000' ]]; then
+CPUS_LTO=$(grep -c "processor" /proc/cpuinfo)
+if [[ "$CPUS_LTO" -lt '16' && "$TOTALMEMMB" -lt '31000' ]]; then
   PHP_LTO='n'
-elif [[ "$CPUS" -lt '16' && "$TOTALMEMMB" -gt '31000' ]]; then
+elif [[ "$CPUS_LTO" -lt '16' && "$TOTALMEMMB" -gt '31000' ]]; then
   PHP_LTO='n'
 fi
 
@@ -97,6 +98,10 @@ if [ -f /proc/user_beancounters ]; then
         # 7401P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7401p
         # while greater than 12 cpu cores downclocks to 2.8Ghz
         CPUS_MAKEPHP=12
+    elif [[ "$(grep -o 'AMD EPYC 7371' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7371' ]]; then
+        # 7371 at 8 cpu cores has 3.8Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7371
+        # while greater than 8 cpu cores downclocks to 3.6Ghz
+        CPUS_MAKEPHP=8
     fi
     if [[ "$CPUS_MAKEPHP" -gt '8' ]]; then
         if [[ "$PHP_LTO" = [yY] ]]; then
@@ -308,9 +313,16 @@ fi
 # disable temporarily for php 7.2.0 due to libzip compile errors
 # https://gist.github.com/centminmod/d1b48ef88bda29a7e352b90fd7111ac1
 
-if [[ "$PHPMUVER" = 7.3 ]]; then
+if [[ "$PHPMVER" = 7.3 || "$PHPMUVER" = 7.3 ]]; then
   # seems PHP 7.3 must use libzip unlike PHP 7.2 which can compile without it
   PHP_LIBZIP='y'
+fi
+if [[ "$PHP_ARGON" = [yY] ]]; then
+  # alias for PHP 7.2 argon support
+  PHP_LIBZIP='y'
+elif [[ "$PHP_ARGON" = [nN] && "$PHP_LIBZIP" = [nN] ]]; then
+  # alias for PHP 7.2 argon support
+  PHP_LIBZIP='n'
 fi
 if [[ "$PHP_LIBZIP" = [yY] ]] && [[ "$PHPMVER" = 7.2 || "$PHPMUVER" = 7.2 || "$PHPMVER" = 7.3 || "$PHPMUVER" = 7.3 ]]; then
   ARGONTWO_OPT=' --with-password-argon2'
@@ -327,13 +339,15 @@ if [[ "$PHP_LIBZIP" = [yY] ]] && [[ "$PHPMVER" = 7.2 || "$PHPMUVER" = 7.2 || "$P
   else
     LIBDIR_ARGONSODIUM='lib'
   fi
-  if [ ! -f "/usr/local/${LIBDIR_ARGONSODIUM}/libsodium.so" ]; then
+  if [[ ! -f "/usr/local/${LIBDIR_ARGONSODIUM}/libsodium.so" || ! -f "libsodium-${LIBSODIUM_VER}.tar.gz" ]]; then
     pushd "$DIR_TMP"
     if [ -s "libsodium-${LIBSODIUM_VER}.tar.gz" ]; then
         cecho "libsodium-${LIBSODIUM_VER}.tar.gz found, skipping download..." $boldgreen
     else
         echo "wget -c${ipv_forceopt} "https://github.com/jedisct1/libsodium/releases/download/${LIBSODIUM_VER}/libsodium-${LIBSODIUM_VER}.tar.gz" --tries=3"
         wget -c${ipv_forceopt} "https://github.com/jedisct1/libsodium/releases/download/${LIBSODIUM_VER}/libsodium-${LIBSODIUM_VER}.tar.gz" --tries=3
+        # echo "wget -c${ipv_forceopt} "https://pecl.php.net/get/libsodium-${LIBSODIUM_VER}.tgz" --tries=3"
+        # wget -c${ipv_forceopt} "https://pecl.php.net/get/libsodium-${LIBSODIUM_VER}.tgz" --tries=3
         ERROR=$?
         if [[ "$ERROR" != '0' ]]; then
             cecho "Error: libsodium-${LIBSODIUM_VER}.tar.gz download failed." $boldgreen
@@ -353,7 +367,7 @@ if [[ "$PHP_LIBZIP" = [yY] ]] && [[ "$PHPMVER" = 7.2 || "$PHPMUVER" = 7.2 || "$P
     make install
     popd
   fi
-  if [ ! -f "/usr/local/${LIBDIR_ARGONSODIUM}/libargon2.so" ]; then
+  if [[ ! -f "/usr/local/${LIBDIR_ARGONSODIUM}/libargon2.so" || ! -f "${LIBARGON_VER}.tar.gz" ]]; then
     pushd "$DIR_TMP"
     if [ -s "${LIBARGON_VER}.tar.gz" ]; then
         cecho "${LIBARGON_VER}.tar.gz found, skipping download..." $boldgreen
@@ -367,6 +381,8 @@ if [[ "$PHP_LIBZIP" = [yY] ]] && [[ "$PHPMVER" = 7.2 || "$PHPMUVER" = 7.2 || "$P
             cecho "Download done." $boldyellow
         fi
     fi
+    # rm -rf phc-winner-argon2-${LIBARGON_VER}
+    rm -rf "/usr/local/${LIBDIR_ARGONSODIUM}/libargon2.so"
     tar xzf ${LIBARGON_VER}.tar.gz
     cd phc-winner-argon2-${LIBARGON_VER}
     make clean
@@ -1090,7 +1106,7 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
 fi
 
 # zend opcache hugepages
-if [[ "$PHPMUVER" > 7 ]]; then
+if [[ "$PHPMUVER" > 7 && ! -f /proc/user_beancounters ]]; then
   opcachehugepages
 else
   if [ -f "${CONFIGSCANDIR}/zendopcache.ini" ]; then

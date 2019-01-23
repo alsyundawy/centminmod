@@ -47,6 +47,17 @@ if [[ -d /usr/share/GeoIP ]]; then
     if [[ "$INITIALINSTALL" != [yY] ]]; then
       make clean
     fi
+    if [[ "$CENTOS_SIX" -eq '6' ]]; then
+        # PHP 7.3.0 + centos 6 issue https://community.centminmod.com/posts/69561/
+        if [ ! -f /usr/bin/autoconf268 ]; then
+            echo "yum -q -y install autoconf268"
+            yum -q -y install autoconf268
+        fi
+        if [ -f /usr/bin/autoconf268 ]; then
+            export PHP_AUTOCONF=/usr/bin/autoconf268
+            export PHP_AUTOHEADER=/usr/bin/autoheader268
+        fi
+    fi
     /usr/local/bin/phpize
     ./configure --with-php-config=/usr/local/bin/php-config
     sar_call
@@ -94,20 +105,20 @@ geoipinstall() {
     # backup existing database in case maxmind end downloads
     \cp -af /usr/share/GeoIP/GeoIP.dat.gz /usr/share/GeoIP/GeoIP.dat-backup.gz
   fi
-  curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 https://geolite.maxmind.com/download/geoip/database/GeoLiteCountry/GeoIP.dat.gz | grep 'HTTP\/' | grep '200'
+  curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 https://centminmod.com/centminmodparts/geoip-legacy/GeoIP.dat.gz | grep 'HTTP\/' | grep '200'
   GEOIPCOUNTRYDATA_CURLCHECK=$?
   # only overwrite existing downloaded file if the download url is working
   # if download doesn't work, do not overwrite existing downloaded file
   if [[ "$GEOIPCOUNTRYDATA_CURLCHECK" = '0' ]]; then
-    wget -${ipv_forceopt}cnv https://geolite.maxmind.com/download/geoip/database/GeoLiteCountry/GeoIP.dat.gz -O /usr/share/GeoIP/GeoIP.dat.gz
+    wget -${ipv_forceopt}cnv https://centminmod.com/centminmodparts/geoip-legacy/GeoIP.dat.gz -O /usr/share/GeoIP/GeoIP.dat.gz
   fi
   gzip -df /usr/share/GeoIP/GeoIP.dat.gz
-  curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 https://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz | grep 'HTTP\/' | grep '200'
+  curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 https://centminmod.com/centminmodparts/geoip-legacy/GeoLiteCity.gz | grep 'HTTP\/' | grep '200'
   GEOIPCITYDATA_CURLCHECK=$?
   # only overwrite existing downloaded file if the download url is working
   # if download doesn't work, do not overwrite existing downloaded file
   if [[ "$GEOIPCITYDATA_CURLCHECK" = '0' ]]; then
-    wget -${ipv_forceopt}cnv https://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz -O /usr/share/GeoIP/GeoLiteCity.dat.gz
+    wget -${ipv_forceopt}cnv https://centminmod.com/centminmodparts/geoip-legacy/GeoLiteCity.gz -O /usr/share/GeoIP/GeoLiteCity.dat.gz
   fi
   gzip -d -f /usr/share/GeoIP/GeoLiteCity.dat.gz
   cp -a /usr/share/GeoIP/GeoLiteCity.dat /usr/share/GeoIP/GeoIPCity.dat

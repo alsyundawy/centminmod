@@ -4,7 +4,7 @@
 # written by George Liu (eva2000) centminmod.com
 ######################################################
 # stackscript installer for latest Centmin Mod LEMP 
-# beta + redis installation for both remi 4.0.9
+# beta + redis installation for both remi server
 ######################################################
 # variables
 #############
@@ -37,7 +37,7 @@
 #<UDF name="csfblocklist" Label="Enable CSF Firewall Advance Blocklist Support (community.centminmod.com/posts/50058/) ?" oneOf="yes,no" default="no" />
 # CSFBLOCKLIST=
 # 
-#<UDF name="redis" Label="Install & Configure Redis 4.x Server from REMI YUM repo ?" oneOf="yes,no" default="yes" />
+#<UDF name="redis" Label="Install & Configure Redis Server from REMI YUM repo ?" oneOf="yes,no" default="yes" />
 # REDIS=
 # 
 #<UDF name="pureftp" Label="Stop & Disable Pure-FTPD Server ?" oneOf="yes,no" default="no" />
@@ -49,8 +49,11 @@
 #<UDF name="compiler" Label="Build Nginx with GCC or Clang Compiler ?" oneOf="clang,gcc" default="gcc" />
 # COMPILER=
 # 
-#<UDF name="openssl" Label="Build Nginx against LibreSSL 2.7+ or OpenSSL 1.1.0+ ?" oneOf="libressl,openssl" default="openssl" />
+#<UDF name="openssl" Label="Build Nginx against LibreSSL 2.8+ or OpenSSL 1.1.1+ ?" oneOf="libressl,openssl" default="openssl" />
 # OPENSSL=
+# 
+#<UDF name="zstdlogrotate" Label="Enable zstd compression for Nginx & PHP-FPM Log Rotation (https://community.centminmod.com/threads/16374/) ?" oneOf="yes,no" default="no" />
+# ZSTDLOGROTATE=
 # 
 #<UDF name="hpack" Label="Enable Cloudflare HTTP/2 HPACK Full Encoding Patch (community.centminmod.com/posts/51082/) ?" oneOf="yes,no" default="no" />
 # HPACK=
@@ -67,7 +70,7 @@
 #<UDF name="lua" Label="Enable OpenResty Lua Nginx mdoule support ? (auto fallback to OpenSSL 1.0.2+ for Lua Nginx compatibility)" oneOf="yes,no" default="no" />
 # LUA=
 # 
-#<UDF name="php" Label="Install Latest PHP 5.6 or 7.0 or 7.1 or 7.2 Version ?" oneOf="5.6,7.0,7.1,7.2" default="5.6" />
+#<UDF name="php" Label="Install Latest PHP 5.6 or 7.0 or 7.1 or 7.2 or 7.3 Version ?" oneOf="5.6,7.0,7.1,7.2,7.3" default="5.6" />
 # PHP=
 # 
 #<UDF name="docker" Label="Install Docker ?" oneOf="yes,no" default="no" />
@@ -176,6 +179,17 @@ echo "NGINX_HPACK='y'" >> /etc/centminmod/custom_config.inc
 echo
 fi
 
+# Enable zstd compression for Nginx & PHP-FPM log rotation
+# https://community.centminmod.com/threads/16374/
+if [[ "$ZSTDLOGROTATE" = 'yes' ]]; then
+echo
+echo "Set ZSTD_LOGROTATE_NGINX='y'"
+echo "Set ZSTD_LOGROTATE_PHPFPM='y'"
+echo "ZSTD_LOGROTATE_NGINX='y'" >> /etc/centminmod/custom_config.inc
+echo "ZSTD_LOGROTATE_PHPFPM='y'" >> /etc/centminmod/custom_config.inc
+echo
+fi
+
 # Enable Cloudflare zlib library install for Nginx server 
 # https://community.centminmod.com/threads/13521/
 # https://community.centminmod.com/threads/13498/
@@ -226,6 +240,15 @@ echo "Set NGXDYNAMIC_NGXPAGESPEED='y'"
 echo "Set NGINX_PAGESPEED='y'"
 echo "NGXDYNAMIC_NGXPAGESPEED='y'" >> /etc/centminmod/custom_config.inc
 echo "NGINX_PAGESPEED='y'" >> /etc/centminmod/custom_config.inc
+echo
+fi
+
+# Build PHP version
+if [[ "$PHP" = '7.3' ]]; then
+echo
+yum -y update
+echo
+curl -O https://centminmod.com/betainstaller73.sh && chmod 0700 betainstaller73.sh && bash betainstaller73.sh
 echo
 fi
 
@@ -311,12 +334,15 @@ chkconfig pure-ftpd off
 fi
 
 # Install docker
+# https://docs.docker.com/install/linux/docker-ce/centos/
 if [[ "$DOCKER" = 'yes' ]]; then
 echo  
 yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+yum -y install yum-utils device-mapper-persistent-data lvm2
 yum -y install docker-ce
 mkdir -p /etc/systemd/system/docker.service.d
 touch /etc/systemd/system/docker.service.d/docker.conf
+mkdir -p /etc/docker
 wget -O /etc/docker/daemon.json https://gist.githubusercontent.com/centminmod/e79bca8d3ef56d4d7272663f755e830d/raw/daemon.json
 systemctl daemon-reload
 systemctl start docker
@@ -325,6 +351,8 @@ echo
 systemctl status docker
 echo
 journalctl -u docker --no-pager
+echo
+docker info
 fi
 
 # Install redis

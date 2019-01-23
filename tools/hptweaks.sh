@@ -91,26 +91,70 @@ fi
 
 if [[ -f /sys/kernel/mm/transparent_hugepage/enabled ]]; then
   if [[ "$CENTOS_SIX" = '6' && "$HP_CHECK" = '[always]' ]]; then
-    if [ -f /usr/bin/numactl ]; then
+    if [[ ! -f /proc/user_beancounters && -f /usr/bin/numactl ]]; then
       # account for multiple cpu socket numa based memory
       # https://community.centminmod.com/posts/48189/
-      FREEMEM=$(($(numactl --hardware | awk '/free:/ {print $4}' | sort | head -n1)*1024))
+      GETCPUNODE_COUNT=$(numactl --hardware | awk '/available: / {print $2}')
+      if [[ "$GETCPUNODE_COUNT" -ge '2' ]]; then
+        FREEMEM_NUMANODE=$(($(numactl --hardware | awk '/free:/ {print $4}' | sort -r | head -n1)*1024))
+        FREEMEMCACHED=$(egrep '^Buffers|^Cached' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
+        FREEMEM=$(($FREEMEM_NUMANODE+$FREEMEMCACHED))
+      else
+        FREEMEM=$(egrep '^MemFree|^Buffers|^Cached' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
+      fi
+    elif [[ -f /proc/user_beancounters ]]; then
+      FREEMEMOPENVZ=$(grep '^MemFree' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
+      FREEMEMCACHED=$(egrep '^Buffers|^Cached' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
+      FREEMEM=$(($FREEMEMOPENVZ+$FREEMEMCACHED))
     else
-      FREEMEM=$(cat /proc/meminfo | grep MemFree | awk '{print $2}')
+      FREEMEM=$(egrep '^MemFree|^Buffers|^Cached' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
     fi
-    NRHUGEPAGES_COUNT=$(($FREEMEM/8/2048/16*16/4))
-    MAXLOCKEDMEM_COUNT=$(($FREEMEM/8/2048/16*16*4))
+    NRHUGEPAGES_COUNT=$(($FREEMEM/2/2048/16*16/4))
+    MAXLOCKEDMEM_COUNT=$(($FREEMEM/2/2048/16*16*4))
     MAXLOCKEDMEM_SIZE=$((MAXLOCKEDMEM_COUNT*1024))
   elif [[ "$CENTOS_SEVEN" = '7' && "$HP_CHECK" = '[always]' ]]; then
-    if [ -f /usr/bin/numactl ]; then
+    if [[ ! -f /proc/user_beancounters && -f /usr/bin/numactl ]]; then
       # account for multiple cpu socket numa based memory
       # https://community.centminmod.com/posts/48189/
-      FREEMEM=$(($(numactl --hardware | awk '/free:/ {print $4}' | sort | head -n1)*1024))
+      GETCPUNODE_COUNT=$(numactl --hardware | awk '/available: / {print $2}')
+      if [[ "$GETCPUNODE_COUNT" -ge '2' ]]; then
+        FREEMEM_NUMANODE=$(($(numactl --hardware | awk '/free:/ {print $4}' | sort -r | head -n1)*1024))
+        FREEMEMCACHED=$(egrep '^Buffers|^Cached' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
+        FREEMEM=$(($FREEMEM_NUMANODE+$FREEMEMCACHED))
+      else
+        FREEMEM=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
+      fi
+    elif [[ -f /proc/user_beancounters ]]; then
+      FREEMEMOPENVZ=$(grep '^MemFree' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
+      FREEMEMCACHED=$(egrep '^Buffers|^Cached' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
+      FREEMEM=$(($FREEMEMOPENVZ+$FREEMEMCACHED))
     else
       FREEMEM=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
     fi
-    NRHUGEPAGES_COUNT=$(($FREEMEM/8/2048/16*16/4))
-    MAXLOCKEDMEM_COUNT=$(($FREEMEM/8/2048/16*16*4))
+    NRHUGEPAGES_COUNT=$(($FREEMEM/2/2048/16*16/4))
+    MAXLOCKEDMEM_COUNT=$(($FREEMEM/2/2048/16*16*4))
+    MAXLOCKEDMEM_SIZE=$((MAXLOCKEDMEM_COUNT*1024))
+  elif [[ "$CENTOS_SEVEN" = '7' && "$HP_CHECK" = '[never]' ]]; then
+    if [[ ! -f /proc/user_beancounters && -f /usr/bin/numactl ]]; then
+      # account for multiple cpu socket numa based memory
+      # https://community.centminmod.com/posts/48189/
+      GETCPUNODE_COUNT=$(numactl --hardware | awk '/available: / {print $2}')
+      if [[ "$GETCPUNODE_COUNT" -ge '2' ]]; then
+        FREEMEM_NUMANODE=$(($(numactl --hardware | awk '/free:/ {print $4}' | sort -r | head -n1)*1024))
+        FREEMEMCACHED=$(egrep '^Buffers|^Cached' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
+        FREEMEM=$(($FREEMEM_NUMANODE+$FREEMEMCACHED))
+      else
+        FREEMEM=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
+      fi
+    elif [[ -f /proc/user_beancounters ]]; then
+      FREEMEMOPENVZ=$(grep '^MemFree' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
+      FREEMEMCACHED=$(egrep '^Buffers|^Cached' /proc/meminfo | awk '{summ+=$2} END {print summ}' | head -n1)
+      FREEMEM=$(($FREEMEMOPENVZ+$FREEMEMCACHED))
+    else
+      FREEMEM=$(cat /proc/meminfo | grep MemAvailable | awk '{print $2}')
+    fi
+    NRHUGEPAGES_COUNT=$(($FREEMEM/2/2048/16*16/4))
+    MAXLOCKEDMEM_COUNT=$(($FREEMEM/2/2048/16*16*4))
     MAXLOCKEDMEM_SIZE=$((MAXLOCKEDMEM_COUNT*1024))
   fi
   
@@ -142,6 +186,17 @@ if [[ -f /sys/kernel/mm/transparent_hugepage/enabled ]]; then
       fi
       cat /etc/security/limits.conf
       echo
+      ulimit -H -l
+    elif [[ "$HP_CHECK" = '[never]' ]]; then
+      echo
+      echo "set vm.nr.hugepages in /etc/sysctl.conf"
+      if [[ -z "$(grep '^vm.nr_hugepages' /etc/sysctl.conf)" ]]; then
+        echo "vm.nr_hugepages=$NRHUGEPAGES_COUNT" >> /etc/sysctl.conf
+        sysctl -p
+      else
+        sed -i "s|vm.nr_hugepages=.*|vm.nr_hugepages=$NRHUGEPAGES_COUNT|" /etc/sysctl.conf
+        sysctl -p
+      fi
     fi
   else
     echo "NRHUGEPAGES_COUNT = $NRHUGEPAGES_COUNT"

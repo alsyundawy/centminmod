@@ -37,7 +37,12 @@ phpxz_detect() {
     PHPTAR_FLAGS='xzf'
   fi
   
-  if [[ "$CENTOS_SEVEN" = 7 || "$CENTOS_SIX" = 6 ]]; then
+  if [[ "$CENTOS_SEVEN" = 7 ]]; then
+    DOWNLOADAPP='axel -4'
+    WGETRETRY=''
+    AXELPHPTARGZ="-o php-${PHP_VERSION}.tar.${PHPEXTSION}"
+    AXELPHPUPGRADETARGZ="-o php-${phpver}.tar.${PHPEXTSION}"
+  elif [[ "$CENTOS_SIX" = 6 ]]; then
     DOWNLOADAPP='axel'
     WGETRETRY=''
     AXELPHPTARGZ="-o php-${PHP_VERSION}.tar.${PHPEXTSION}"
@@ -82,7 +87,7 @@ phpgeolocation() {
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'DE' ]]; then
     echo "DE server detected"
-    PHP_MIRRORURL="http://de1.php.net"
+    PHP_MIRRORURL="http://de2.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'FR' ]]; then
     echo "FR server detected"
@@ -102,7 +107,7 @@ phpgeolocation() {
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'IN' ]]; then
     echo "IN server detected"
-    PHP_MIRRORURL="http://in1.php.net"
+    PHP_MIRRORURL="http://in3.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'JP' ]]; then
     echo "JP server detected"
@@ -634,7 +639,11 @@ then
     phpgeolocation
     curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/get/php-${PHP_VERSION}.tar.${PHPEXTSION}/from/this/mirror" | grep 'HTTP\/' | grep '404'
     PHPGEO_CURLCHECK=$?
-    if [[ "$PHPGEO_CURLCHECK" = '0' ]]; then
+    curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/get/php-${PHP_VERSION}.tar.${PHPEXTSION}/from/this/mirror" | grep 'HTTP\/' | egrep '200|301|302'
+    PHPGEO_CURLCHECKOK=$?
+    # check if download url is 404 not found but also 
+    # check for valid status header 200, 301 or 302
+    if [[ "$PHPGEO_CURLCHECK" = '0' || "$PHPGEO_CURLCHECKOK" != '0' ]]; then
         PHP_MIRRORURL="http://php.net"
         PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
     fi
@@ -822,11 +831,21 @@ nginxpgspeedtarball() {
           #echo ""
         fi
     fi
+    tar xzf "${NGX_PAGESPEEDGITLINKFILE}"
 
+    ERROR=$?
+      if [[ "$ERROR" != '0' ]]; then
+      cecho "Error: ${NGX_PAGESPEEDGITLINKFILE} extraction failed." $boldgreen
+    checklogdetails
+      exit #$ERROR
+    else 
+            cecho "${NGX_PAGESPEEDGITLINKFILE} valid file." $boldyellow
+    echo ""
+      fi
   fi # NGINX_PAGESPEEDGITMASTER
 
         cecho "Download ${NGX_PAGESPEEDLINKFILE} ..." $boldyellow
-    if [[ -s "${NGX_PAGESPEEDLINKFILE}" && "$(tar -tzf ${NGX_PAGESPEEDLINKFILE} >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+    if [[ "$NGINX_PAGESPEEDGITMASTER" != [yY] && -s "${NGX_PAGESPEEDLINKFILE}" && "$(tar -tzf ${NGX_PAGESPEEDLINKFILE} >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
         cecho "${NGX_PAGESPEEDLINKFILE} Archive found, skipping download..." $boldgreen
     else
         echo "wget -c${ipv_forceopt} --progress=bar ${NGX_PAGESPEEDLINK} -O ${NGX_PAGESPEEDLINKFILE} --tries=3"
@@ -855,16 +874,21 @@ echo ""
   fi
 
 # determine top level extracted directory name for $DIR_TMP/${NGX_PAGESPEEDLINKFILE}
-NGXPGSPEED_DIR=$(tar -tzf "$DIR_TMP/${NGX_PAGESPEEDLINKFILE}" | head -1 | cut -f1 -d"/")
-
 if [[ "$NGINX_PAGESPEEDGITMASTER" = [yY] ]]; then
-  if [ -d "$DIR_TMP/$NGXPGSPEED_DIR" ]; then
-    rm -rf "$DIR_TMP/$NGXPGSPEED_DIR"
-  fi
-  \cp -Rf ngx_pagespeed-master "$NGXPGSPEED_DIR"
-  rm -rf ngx_pagespeed-master
-  rm -rf "${NGX_PAGESPEEDGITLINKFILE}"
+  # NGXPGSPEED_DIR=$(tar -tzf "$DIR_TMP/${NGX_PAGESPEEDGITLINKFILE}" | head -1 | cut -f1 -d"/")
+  NGXPGSPEED_DIR=$(tar -tzf "$DIR_TMP/${NGX_PAGESPEEDLINKFILE}" | head -1 | cut -f1 -d"/")
+else
+  NGXPGSPEED_DIR=$(tar -tzf "$DIR_TMP/${NGX_PAGESPEEDLINKFILE}" | head -1 | cut -f1 -d"/")
 fi
+
+#if [[ "$NGINX_PAGESPEEDGITMASTER" = [yY] ]]; then
+  # if [ -d "$DIR_TMP/$NGXPGSPEED_DIR" ]; then
+  #   rm -rf "$DIR_TMP/$NGXPGSPEED_DIR"
+  # fi
+  # \cp -Rf incubator-pagespeed-ngx-master "$NGXPGSPEED_DIR"
+  # rm -rf incubator-pagespeed-ngx-master
+  # rm -rf "${NGX_PAGESPEEDGITLINKFILE}"
+#fi
 
         cecho "Download ${NGX_PAGESPEEDPSOLINKLFILE} PSOL Library..." $boldyellow
         if [ -d "$DIR_TMP/$NGXPGSPEED_DIR" ]; then
@@ -1417,6 +1441,40 @@ else
          cecho "${NGX_LUANGINXLINKFILE} valid file." $boldyellow
 echo ""
     fi
+
+    # ORESTY_LUASTREAM=y|n
+    if [[ "$ORESTY_LUASTREAM" = [yY] ]]; then
+
+        cecho "Download ${NGX_LUASTREAMLINKFILE} ..." $boldyellow
+if [[ -s "${NGX_LUASTREAMLINKFILE}" && "$(tar -tzf ${NGX_LUASTREAMLINKFILE} >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+  cecho "${NGX_LUASTREAMLINKFILE} Archive found, skipping download..." $boldgreen
+  else
+  cecho "Error: ${NGX_LUASTREAMLINKFILE} not found!!! Downloading now......" $boldgreen
+  rm -rf "${NGX_LUASTREAMLINKFILE}"
+        echo "wget -c${ipv_forceopt} --progress=bar ${NGX_LUASTREAMLINK} -O ${NGX_LUASTREAMLINKFILE} --tries=3"
+        wget -c${ipv_forceopt} --progress=bar "${NGX_LUASTREAMLINK}" -O "${NGX_LUASTREAMLINKFILE}" --tries=3
+ERROR=$?
+    if [[ "$ERROR" != '0' ]]; then
+    cecho "Error: ${NGX_LUASTREAMLINKFILE} download failed." $boldgreen
+checklogdetails
+    exit #$ERROR
+else 
+         cecho "Download done." $boldyellow
+#echo ""
+    fi
+    fi
+
+tar xzf "${NGX_LUASTREAMLINKFILE}"
+ERROR=$?
+    if [[ "$ERROR" != '0' ]]; then
+    cecho "Error: ${NGX_LUASTREAMLINKFILE} extraction failed." $boldgreen
+checklogdetails
+    exit #$ERROR
+else 
+         cecho "${NGX_LUASTREAMLINKFILE} valid file." $boldyellow
+echo ""
+    fi
+    fi # ORESTY_LUASTREAM=y|n
 
         cecho "Download ${NGX_LUAGITLINKFILE} ..." $boldyellow
 if [[ -s "${NGX_LUAGITLINKFILE}" && "$(tar -tzf ${NGX_LUAGITLINKFILE} >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
@@ -2931,6 +2989,23 @@ fi
 
 ###############################################
 openssldownload() {
+
+if [ -f "${CONFIGSCANBASE}/custom_config.inc" ]; then
+  OPENSSL_VERSION_CUSTOMCONFIG=$(awk -F "'" '/^OPENSSL_VERSION=/ {print $2}' "${CONFIGSCANBASE}/custom_config.inc")
+  if [[ "${OPENSSL_VERSION}" = '1.1.0j' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0j' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0i' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0h' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0g' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0f' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0e' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0d' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0c' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0b' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0a' ]]; then
+    # force old OpenSSL 1.1.0 branch versions to newer
+    # 1.1.1 branch if detected as some folks hardcode override
+    # OPENSSL_VERSION variable in /etc/centminmod/custom_config.inc
+    # and forget to update them and over time they are out of sync
+    # with OPENSSL_VERSION updated and set in centmin.sh
+    #
+    # also OpenSSL 1.1.0j seems to be failing Nginx compiles so this
+    # is a workaround to jump to 1.1.1a working version for now
+    OPENSSL_VERSION="$OPENSSL_VERSION_OLDOVERRIDE"
+    OPENSSL_LINKFILE="openssl-${OPENSSL_VERSION}.tar.gz"
+    OPENSSL_LINK="https://www.openssl.org/source/${OPENSSL_LINKFILE}"
+  fi
+fi
 
 curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "$OPENSSL_LINK" | grep 'HTTP\/' | grep '200'
 OPENSSL_CURLCHECK=$?

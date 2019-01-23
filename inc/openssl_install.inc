@@ -2,6 +2,214 @@
 opensslpatches() {
   {
 
+if [[ "$OPENSSL_TLSONETHREE_BACKPORTDRAFTS" = [yY] && "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.1.1' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.1"
+    echo "######################################################################"
+    echo "Backport TLS 1.3 draft 23, 26, 27, 28 support patch"
+    echo "https://github.com/hakasenyang/openssl-patch/issues/8"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf openssl-1.1.1-tls13_draft.patch
+    if [ -f "$CUR_DIR/patches/openssl/openssl-1.1.1-tls13_draft.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/openssl-1.1.1-tls13_draft.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/openssl-1.1.1-tls13_draft.patch"
+        openssl_draftbackport_err=$?
+        if [[ "$openssl_draftbackport_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/openssl-1.1.1-tls13_draft.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
+
+if [[ "$OPENSSL_TLSONETHREE_BACKPORTDRAFTS" = [yY] && "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.1.1a' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.1a"
+    echo "######################################################################"
+    echo "Backport TLS 1.3 draft 23, 26, 27, 28 support patch"
+    echo "https://github.com/hakasenyang/openssl-patch/issues/8"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf openssl-1.1.1a-tls13_draft.patch
+    if [ -f "$CUR_DIR/patches/openssl/openssl-1.1.1a-tls13_draft.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/openssl-1.1.1a-tls13_draft.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/openssl-1.1.1a-tls13_draft.patch"
+        openssl_draftbackport_err=$?
+        if [[ "$openssl_draftbackport_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/openssl-1.1.1a-tls13_draft.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
+
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.1.1' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.1"
+    echo "######################################################################"
+    echo "Fix OpenSSL 1.1.1 s_server unknown TLSv1.3 identities patch"
+    echo "https://github.com/openssl/openssl/issues/7433"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL-1.1.1-fix-tls13-s-server-unknown-psk-identity.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-fix-tls13-s-server-unknown-psk-identity.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL-1.1.1-fix-tls13-s-server-unknown-psk-identity.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-fix-tls13-s-server-unknown-psk-identity.patch"
+        openssl_psk_err=$?
+        if [[ "$openssl_psk_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL-1.1.1-fix-tls13-s-server-unknown-psk-identity.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
+
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.1.1' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.1"
+    echo "######################################################################"
+    echo "Fix OpenSSL 1.1.1 safer memory cleanup patch"
+    echo "https://github.com/openssl/openssl/pull/7363"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL-1.1.1-safer-mem-cleanup.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-safer-mem-cleanup.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL-1.1.1-safer-mem-cleanup.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-safer-mem-cleanup.patch"
+        openssl_safermem_err=$?
+        if [[ "$openssl_safermem_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL-1.1.1-safer-mem-cleanup.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
+
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.1.1' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.1"
+    echo "######################################################################"
+    echo "Fix OpenSSL 1.1.1 ocsp memory leak patch"
+    echo "https://github.com/openssl/openssl/pull/7335"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL-1.1.1-fix-ocsp-memleak.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-fix-ocsp-memleak.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL-1.1.1-fix-ocsp-memleak.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-fix-ocsp-memleak.patch"
+        openssl_ocspmemleak_patch_err=$?
+        if [[ "$openssl_ocspmemleak_patch_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL-1.1.1-fix-ocsp-memleak.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
+
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.1.1' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.1"
+    echo "######################################################################"
+    echo "Fix OpenSSL 1.1.1 broken SNI handshake patch"
+    echo "https://github.com/openssl/openssl/issues/7244"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL-1.1.1-sni-fix-delay-sig-algs.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-sni-fix-delay-sig-algs.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL-1.1.1-sni-fix-delay-sig-algs.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-sni-fix-delay-sig-algs.patch"
+        openssl_sni_patch_err=$?
+        if [[ "$openssl_sni_patch_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL-1.1.1-sni-fix-delay-sig-algs.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
+
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.1.1' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.1"
+    echo "######################################################################"
+    echo "Reset TLS 1.3 ciphers in SSL_CTX_set_ssl_version() patch"
+    echo "https://github.com/openssl/openssl/issues/7226"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL-1.1.1-reset-tls1.3-ciphers-SSL_CTX_set_ssl_version.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-reset-tls1.3-ciphers-SSL_CTX_set_ssl_version.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL-1.1.1-reset-tls1.3-ciphers-SSL_CTX_set_ssl_version.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-reset-tls1.3-ciphers-SSL_CTX_set_ssl_version.patch"
+        openssl_resettls_patch_err=$?
+        if [[ "$openssl_resettls_patch_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL-1.1.1-reset-tls1.3-ciphers-SSL_CTX_set_ssl_version.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
+
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.1.1' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.1"
+    echo "######################################################################"
+    echo "Fix the max psk len for TLSv1.3 patch"
+    echo "https://github.com/openssl/openssl/issues/7261"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL-1.1.1-tls13-fix-max-psk-len.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-tls13-fix-max-psk-len.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL-1.1.1-tls13-fix-max-psk-len.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-tls13-fix-max-psk-len.patch"
+        openssl_maxpsk_err=$?
+        if [[ "$openssl_maxpsk_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL-1.1.1-tls13-fix-max-psk-len.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
+
 # Cache timing vulnerability in RSA Key Generation (CVE-2018-0737) patch
 # https://community.centminmod.com/threads/14584/
 if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.0.2o' ]]; then
@@ -123,7 +331,7 @@ if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PA
 fi
 
 # ECDSA performance patch https://community.centminmod.com/posts/57725/
-if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0i' ]]; then
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0i' ]] || [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "$OPENSSLECDSA_PATCH" = [yY] && "${OPENSSL_VERSION}" = '1.1.0j' ]]; then
     echo
     echo  "######################################################################"
     echo "Patching OpenSSL 1.1.0i"
@@ -210,6 +418,59 @@ fi
 
 DETECTOPENSSL_ONEZERO=$(echo $OPENSSL_VERSION  | cut -d . -f1-2)
 DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
+
+# if [[ "$PRIORITIZE_CHACHA_OPENSSL" = [yY] && "$DETECTOPENSSL_ONEONE" = '1.1.1' ]] ; then
+if [[ "$PRIORITIZE_CHACHA_OPENSSL" = [yY] && "${OPENSSL_VERSION}" = '1.1.1' ]] || [[ "$PRIORITIZE_CHACHA_OPENSSL" = [yY] && "${OPENSSL_VERSION}" = '1.1.1a' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.1"
+    echo "######################################################################"
+    echo "bassie OpenSSL 1.1.1 Prioritize Chacha20 patch"
+    echo "https://community.centminmod.com/threads/15708/"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL1.1.1-prioritize-chacha-feature.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL1.1.1-prioritize-chacha-feature.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL1.1.1-prioritize-chacha-feature.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL1.1.1-prioritize-chacha-feature.patch"
+        openssl_prioritize_chacha_err=$?
+        if [[ "$openssl_prioritize_chacha_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL1.1.1-prioritize-chacha-feature.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi # PRIORITIZE_CHACHA_OPENSSL
+
+if [[ "$(uname -m)" = 'x86_64' && "$LIBRESSL_SWITCH" = [nN] && "${OPENSSL_VERSION}" = '1.1.1' ]]; then
+    echo
+    echo "######################################################################"
+    echo "Patching OpenSSL 1.1.1"
+    echo "######################################################################"
+    echo "Timing vulnerability in ECDSA signature generation (CVE-2018-0735) patch"
+    echo "https://www.openssl.org/news/secadv/20181029.txt"
+    echo  "######################################################################"
+    pushd "${DIR_TMP}/openssl-${OPENSSL_VERSION}"
+    rm -rf OpenSSL-1.1.1-ECDSA-signature-gen-CVE-2018-0735.patch
+    if [ -f "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-ECDSA-signature-gen-CVE-2018-0735.patch" ]; then
+        cecho "patch -p1 < $CUR_DIR/patches/openssl/OpenSSL-1.1.1-ECDSA-signature-gen-CVE-2018-0735.patch" $boldyellow
+        patch -p1 < "$CUR_DIR/patches/openssl/OpenSSL-1.1.1-ECDSA-signature-gen-CVE-2018-0735.patch"
+        openssl_ecdsatiming_err=$?
+        if [[ "$openssl_ecdsatiming_err" -ne '0' ]]; then
+            cecho "patch failed, revert patch $CUR_DIR/patches/openssl/OpenSSL-1.1.1-ECDSA-signature-gen-CVE-2018-0735.patch" $boldyellow
+            pushd "$DIR_TMP"
+            rm -rf "openssl-${OPENSSL_VERSION}"
+            tar xzf "openssl-${OPENSSL_VERSION}.tar.gz"
+            popd
+        fi
+    fi
+    popd
+    echo
+fi
 
 if [[ "$CLOUDFLARE_PATCHSSL" = [yY] && "$DETECTOPENSSL_ONEZERO" = '1.0' ]]; then
     # if [[ "${OPENSSL_VERSION}" = '1.0.1h' ]]; then
@@ -415,6 +676,24 @@ fi
 }
 
 installopenssl() {
+
+if [ -f "${CONFIGSCANBASE}/custom_config.inc" ]; then
+  OPENSSL_VERSION_CUSTOMCONFIG=$(awk -F "'" '/^OPENSSL_VERSION=/ {print $2}' "${CONFIGSCANBASE}/custom_config.inc")
+  if [[ "${OPENSSL_VERSION}" = '1.1.0j' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0j' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0i' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0h' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0g' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0f' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0e' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0d' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0c' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0b' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0a' ]]; then
+    # force old OpenSSL 1.1.0 branch versions to newer
+    # 1.1.1 branch if detected as some folks hardcode override
+    # OPENSSL_VERSION variable in /etc/centminmod/custom_config.inc
+    # and forget to update them and over time they are out of sync
+    # with OPENSSL_VERSION updated and set in centmin.sh
+    #
+    # also OpenSSL 1.1.0j seems to be failing Nginx compiles so this
+    # is a workaround to jump to 1.1.1a working version for now
+    OPENSSL_VERSION="$OPENSSL_VERSION_OLDOVERRIDE"
+    OPENSSL_LINKFILE="openssl-${OPENSSL_VERSION}.tar.gz"
+    OPENSSL_LINK="https://www.openssl.org/source/${OPENSSL_LINKFILE}"
+  fi
+fi
+
     # clean up recent no-tls1_3 bug
     # https://community.centminmod.com/posts/63295/
     if [ -d /usr/local/ssl ]; then
@@ -441,6 +720,16 @@ installopenssl() {
         echo "clean up no-tls1_3 bug /usr/local/bin/c_rehash"
         echo "https://community.centminmod.com/posts/63295/"
         rm -rf /usr/local/bin/c_rehash
+    fi
+    if [ -f /usr/local/lib/libssl.a ]; then
+        echo "clean up old /usr/local/lib/libssl.a"
+        rm -rf /usr/local/lib/libssl.a
+        ldconfig
+    fi
+    if [ -f /usr/local/lib/libcrypto.a ]; then
+        echo "clean up old /usr/local/lib/libcrypto.a"
+        rm -rf /usr/local/lib/libcrypto.a
+        ldconfig
     fi
 
     if [[ "$ORESTY_LUANGINX" = [yY] ]]; then
@@ -602,11 +891,11 @@ installopenssl() {
                 elif [[ ! "${OPENSSL_THREADS}" ]]; then
                     OPENSSL_THREADSOPT=""
                 fi
-                echo "./config -Wl,--enable-new-dtags,-rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared${ECNISTP_OPT}${TLSONETHREEOPT}${OPENSSL_THREADSOPT}${OPENSSL_CFZLIB_OPT}"
-                ./config -Wl,--enable-new-dtags,-rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared${ECNISTP_OPT}${TLSONETHREEOPT}${OPENSSL_THREADSOPT}${OPENSSL_CFZLIB_OPT}
+                echo "./config -Wl,--enable-new-dtags,-rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL no-shared${ECNISTP_OPT}${TLSONETHREEOPT}${OPENSSL_THREADSOPT}${OPENSSL_CFZLIB_OPT}"
+                ./config -Wl,--enable-new-dtags,-rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL no-shared${ECNISTP_OPT}${TLSONETHREEOPT}${OPENSSL_THREADSOPT}${OPENSSL_CFZLIB_OPT}
             else
-                echo "./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared enable-tlsext${ECNISTP_OPT}${OPENSSL_CFZLIB_OPT} -Wl, -rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib"
-                ./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared enable-tlsext${ECNISTP_OPT}${OPENSSL_CFZLIB_OPT} -Wl, -rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib
+                echo "./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL no-shared enable-tlsext${ECNISTP_OPT}${OPENSSL_CFZLIB_OPT} -Wl, -rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib"
+                ./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL no-shared enable-tlsext${ECNISTP_OPT}${OPENSSL_CFZLIB_OPT} -Wl, -rpath=${OPENSSL_CFZLIB_RPATH}${STATICLIBSSL}/lib
             fi
         else
             if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
@@ -623,11 +912,11 @@ installopenssl() {
                     fi
                     TLSONETHREE_DETECT='n'
                 fi
-                echo "./config -Wl,--enable-new-dtags,-rpath=${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared${TLSONETHREEOPT}"
-                ./config -Wl,--enable-new-dtags,-rpath=${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared${TLSONETHREEOPT}
+                echo "./config -Wl,--enable-new-dtags,-rpath=${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL no-shared${TLSONETHREEOPT}"
+                ./config -Wl,--enable-new-dtags,-rpath=${STATICLIBSSL}/lib --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL no-shared${TLSONETHREEOPT}
             else
-                echo "./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared enable-tlsext"
-                ./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL shared enable-tlsext
+                echo "./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL no-shared enable-tlsext"
+                ./config --prefix=$STATICLIBSSL --openssldir=$STATICLIBSSL no-shared enable-tlsext
             fi
         fi
         if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
@@ -636,12 +925,14 @@ installopenssl() {
             make depend
             make
         fi
-        make install
+        # make install
+        make install_sw
         if [[ "$?" = '0' ]]; then
             ln -s "${STATICLIBSSL}/lib" "${STATICLIBSSL}/lib64"
         else
             rm -rf "${STATICLIBSSL}/lib64"
         fi
+        mkdir -p /opt/openssl/certs/
         \cp -Rpf /etc/ssl/certs/* /opt/openssl/certs/
         crypto_gccunset
         opensslinstallendtime=$(TZ=UTC date +%s.%N)
@@ -652,7 +943,7 @@ installopenssl() {
         ls -lah ${CENTMINLOGDIR}/centminmod_opensslinstalltime_${DT}.log
     elif [[ "$BORINGSSL_SWITCH" = [yY] ]]; then
         boringsslinstallstarttime=$(TZ=UTC date +%s.%N)
-        
+        crypto_gcc
         if [ -f "$(which figlet)" ]; then
             figlet -ckf standard "Compiling BoringSSL"
         fi
@@ -698,6 +989,10 @@ installopenssl() {
             cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE ..
         fi
         # cmake -DCMAKE_BUILD_TYPE=Release ..
+        # re-enable TLS 1.3 draft 23 /28 support
+        # sed -i 's|tls13_rfc = 0|tls13_all = 0|' ${BORINGSSL_DIR}/boringssl/include/openssl/ssl.h
+        # sed -i 's|  tls13_all,|  tls13_rfc,|' ${BORINGSSL_DIR}/boringssl/include/openssl/ssl.h
+        sed -i 's|tls13_variant_t tls13_variant = tls13_rfc;|tls13_variant_t tls13_variant = tls13_all;|g' ${BORINGSSL_DIR}/boringssl/ssl/internal.h
         make${MAKETHREADS}
         mkdir -p ${BORINGSSL_DIR}/boringssl/.openssl/lib
         cd ${BORINGSSL_DIR}/boringssl/.openssl

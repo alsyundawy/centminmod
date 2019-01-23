@@ -1,5 +1,12 @@
 #!/bin/bash
 #########################################################
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+#########################################################
 # backup nginx binary and modules
 # written by George Liu (eva2000) https://centminmod.com
 #########################################################
@@ -39,10 +46,39 @@ if [[ "$NGINXBIN_CRYPTOBORINGSSL" = 'boringssl' ]]; then
   NGINXBIN_CRYPTO='boringssl'
 fi
 
+if [[ ! -f "$(which tree)" ]]; then
+  yum -y -q install tree
+fi
+
 bin_backup() {
   verbose=$1
   DDT=$(date +"%d%m%y-%H%M%S")
-  backup_tag="${NGINXBIN_VER}-${NGINXBIN_COMPILERNAME}-${NGINXBIN_CRYPTO}-${DDT}"
+
+  # check if nginx binary built with debug mode and lavel accordingly
+  CHECK_NGINXDEBUG=$(nginx -V 2>&1 | grep -o 'with-debug')
+  if [[ "$CHECK_NGINXDEBUG" = 'with-debug' ]]; then
+    NGXDEBUG_LABEL='-debug'
+  else
+    NGXDEBUG_LABEL=""
+  fi
+
+  # check if nginx binary built with Cloudflare HPACK patch
+  CHECK_NGINXHPACKBUILT=$(nginx -V 2>&1 | grep -o 'with-http_v2_hpack_enc')
+  if [[ "$CHECK_NGINXHPACKBUILT" = 'with-http_v2_hpack_enc' ]]; then
+    NGXHPACK_LABEL='-hpack'
+  else
+    NGXHPACK_LABEL=""
+  fi
+
+  # check if nginx binary built with Cloudflare zlib library
+  CHECK_NGINXCFZLIBBUILT=$(nginx -V 2>&1 | grep -o 'zlib-cloudflare')
+  if [[ "$CHECK_NGINXCFZLIBBUILT" = 'zlib-cloudflare' ]]; then
+    NGXZLIB_LABEL='-cfzlib'
+  else
+    NGXZLIB_LABEL=""
+  fi
+
+  backup_tag="${NGINXBIN_VER}-${NGINXBIN_COMPILERNAME}-${NGINXBIN_CRYPTO}-${DDT}${NGXDEBUG_LABEL}${NGXHPACK_LABEL}${NGXZLIB_LABEL}"
   if [ ! -d "${NGINXBIN_BACKUPDIR}/${backup_tag}" ]; then
     echo "--------------------------------------------------------"
     echo "backup current Nginx binary and dynamic modules"
@@ -78,7 +114,7 @@ bin_list() {
     echo "--------------------------------------------------------"
     echo "Listing of available Nginx binary/module backups"
     echo "--------------------------------------------------------"
-    find "${NGINXBIN_BACKUPDIR}" -mindepth 1 -maxdepth 1 -type d
+    find "${NGINXBIN_BACKUPDIR}" -mindepth 1 -maxdepth 1 -type d -printf "%T@ %Tc %p\n" | sort -n | awk '{print $NF}'
     echo "--------------------------------------------------------"
   fi
 }

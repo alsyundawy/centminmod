@@ -151,6 +151,23 @@ if [ -f "${CM_INSTALLDIR}/inc/z_custom.inc" ]; then
     source "${CM_INSTALLDIR}/inc/z_custom.inc"
 fi
 
+if [ -f "${CONFIGSCANBASE}/custom_config.inc" ]; then
+  OPENSSL_VERSION_CUSTOMCONFIG=$(awk -F "'" '/^OPENSSL_VERSION=/ {print $2}' "${CONFIGSCANBASE}/custom_config.inc")
+  if [[ "${OPENSSL_VERSION}" = '1.1.0j' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0j' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0i' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0h' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0g' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0f' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0e' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0d' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0c' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0b' || "$OPENSSL_VERSION_CUSTOMCONFIG" = '1.1.0a' ]]; then
+    # force old OpenSSL 1.1.0 branch versions to newer
+    # 1.1.1 branch if detected as some folks hardcode override
+    # OPENSSL_VERSION variable in /etc/centminmod/custom_config.inc
+    # and forget to update them and over time they are out of sync
+    # with OPENSSL_VERSION updated and set in centmin.sh
+    #
+    # also OpenSSL 1.1.0j seems to be failing Nginx compiles so this
+    # is a workaround to jump to 1.1.1a working version for now
+    OPENSSL_VERSION="$OPENSSL_VERSION_OLDOVERRIDE"
+    OPENSSL_LINKFILE="openssl-${OPENSSL_VERSION}.tar.gz"
+    OPENSSL_LINK="https://www.openssl.org/source/${OPENSSL_LINKFILE}"
+  fi
+fi
+
 if [[ "$ORESTY_LUANGINX" = [yY] ]]; then
     # lua nginx 0.10.7 and lower not compatible with openssl 1.1.x branch
     # so fall back to 1.0.2 branch if lua nginx module is enabled
@@ -187,11 +204,12 @@ fi
     fi
 
 cecho "Check for old ngx_pagespeed master branch existence" $boldyellow
-if [[ -d "${DIR_TMP}/ngx_pagespeed-release-${NGXPGSPEED_VER}/ngx_pagespeed-master" ]]; then
+if [[ -d "${DIR_TMP}/ngx_pagespeed-release-${NGXPGSPEED_VER}/ngx_pagespeed-master" || -d "${DIR_TMP}/incubator-pagespeed-ngx-master" ]]; then
     # rm -rf ${DIR_TMP}/ngx_pagespeed-release-${NGXPGSPEED_VER}
     rm -rf ${DIR_TMP}/ngx_pagespeed-release-*
     rm -rf ${DIR_TMP}/ngx_pagespeed-*
     rm -rf ${DIR_TMP}/release-1.9.32*
+    rm -rf ${DIR_TMP}/incubator-pagespeed-ngx-master*
     nginxpgspeedtarball
 fi
 
@@ -374,6 +392,7 @@ if [[ "$UALL" = 'y' ]]; then
 else
     echo ""
     read -ep "Install which version of Nginx? (version i.e. type $NGINX_VERSION): " ngver
+    service nginx reload >/dev/null 2>&1
 
     # if user forgets to type in nginx version and hits
     # enter, ngxver will be empty so should fall back to
@@ -686,7 +705,7 @@ fi
     ERR=$?
     sar_call
 
-    if [[ "$STRIPNGINX" = [yY] ]]; then
+    if [[ "$STRIPNGINX" = [yY] && "$NGINX_DEBUG" != [yY] ]]; then
         if [ -f objs/nginx ]; then
             echo
             echo "strip nginx binary..."
@@ -998,9 +1017,10 @@ fi
         echo
 
         echo "*************************************************"
-        if [[ "$CLOUDFLARE_ZLIB" = [yY] && "$(cat /proc/cpuinfo | grep -o 'sse4_2' | uniq)" != 'sse4_2' ]]; then
+        CHECK_PCLMUL=$(gcc -c -Q -march=native --help=target | egrep '\[enabled\]|mtune|march' | grep 'mpclmul' | grep -o enabled)
+        if [[ "$CLOUDFLARE_ZLIB" = [yY] && "$(cat /proc/cpuinfo | grep -o 'sse4_2' | uniq)" != 'sse4_2' || "$CHECK_PCLMUL" != 'enabled' ]]; then
             echo
-            cecho "* CLOUDFLARE_ZLIB='y' detected but cpu SSE4.2 support not available" $boldgreen
+            cecho "* CLOUDFLARE_ZLIB='y' detected but cpu SSE4.2 or AES-NI support not available" $boldgreen
             cecho "* Fallback to standard zlib support in Nginx due to SSE4.2 not supported" $boldgreen
             echo
         fi

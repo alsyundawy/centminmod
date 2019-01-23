@@ -95,6 +95,16 @@ echo "set LETSENCRYPT_DETECT='y' and update domain DNS A record first"
 echo "then re-run vhost site creation menu option"
 cecho "---------------------------------------------------------------" $boldyellow
 fi
+# check mysql server is running
+mysqladmin -s ping >/dev/null 2>&1
+CHECKMYSQL_PING=$?
+if [[ "$CHECKMYSQL_PING" -ne '0' ]]; then
+  echo
+  echo "!!  Error: MariaDB MySQL Server is not running  !!"
+  echo "Please make sure MariaDB MySQL Server is running first"
+  echo "aborting centmin.sh menu option 22 run..."
+  exit
+fi
 echo
 read -ep "Do you want to continue with Nginx vhost site creation ? [y/n] " dovhost_continue
 echo
@@ -367,7 +377,7 @@ if [[ "$NGINX_VHOSTSSL" = [yY] ]]; then
 fi
 
 echo "Theme Setup: "
-read -ep "Install CyberChimps Responsive Theme (cyberchimps.com/responsive-theme/) [y/n]: " responsivetheme
+read -ep "Install CyberChimps Responsive Theme (cyberchimps.com/responsive-theme/) [y/n]: " -i n responsivetheme
 
 echo
 echo "Wordpress Setup: "
@@ -471,7 +481,7 @@ if [[ "$PUREFTPD_DISABLED" = [nN] ]]; then
   read -ep "Do you want to auto generate FTP password (recommended) [y/n]: " autogenpass
 
   if [[ "$autogenpass" = [yY] ]]; then
-    ftppass=$(pwgen -1cnys 21)
+    ftppass=$(pwgen -1cnys 27)
   else
     read -ep "Create FTP password for $ftpuser (enter password): " ftppass
   
@@ -619,7 +629,7 @@ cat > "/usr/local/nginx/conf/wpincludes/${vhostname}/wpcacheenabler_${vhostname}
     }
 
     # bypass cache if the cookies containing the following strings
-    if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_logged_in|edd_items_in_cart|woocommerce_items_in_cart|woocommerce_cart_hash|woocommerce_recently_viewed|wc_session_cookie_HASH|wp_woocommerce_session_|wptouch_switch_toogle") {
+    if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_logged_in|edd_items_in_cart|woocommerce_items_in_cart|woocommerce_cart_hash|woocommerce_recently_viewed|wc_session_cookie_HASH|wp_woocommerce_session_|wptouch_switch_toggle") {
         set \$cache_uri 'nullcache';
     }
 
@@ -705,9 +715,9 @@ location ~ [^/]\.php(/|\$) {
 #tcp_nopush off;
 #keepalive_requests 0;
 
-fastcgi_connect_timeout 60;
-fastcgi_send_timeout 180;
-fastcgi_read_timeout 180;
+fastcgi_connect_timeout 60s;
+fastcgi_send_timeout 180s;
+fastcgi_read_timeout 300s;
 fastcgi_buffer_size 512k;
 fastcgi_buffers 512 16k;
 fastcgi_busy_buffers_size 1m;
@@ -808,9 +818,9 @@ location ~ [^/]\.php(/|\$) {
 #tcp_nopush off;
 #keepalive_requests 0;
 
-fastcgi_connect_timeout 60;
-fastcgi_send_timeout 180;
-fastcgi_read_timeout 180;
+fastcgi_connect_timeout 60s;
+fastcgi_send_timeout 180s;
+fastcgi_read_timeout 300s;
 fastcgi_buffer_size 512k;
 fastcgi_buffers 512 16k;
 fastcgi_busy_buffers_size 1m;
@@ -905,6 +915,19 @@ if [[ "$(nginx -V 2>&1 | grep LibreSSL | head -n1)" ]] || [[ "$OPEENSSL_CFPATCHE
   fi
 else
   CHACHACIPHERS=""
+fi
+
+DETECTOPENSSL_ONEZERO=$(echo $OPENSSL_VERSION  | cut -d . -f1-2)
+DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
+if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
+    # openssl 1.1.0 unsupported flag enable-tlsext
+    if [[ "$(grep -w 'tls1_3' "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm")" ]]; then
+        TLSONETHREEOPT=' enable-tls1_3'
+        TLSONETHREE_DETECT='y'
+    else
+        TLSONETHREEOPT=""
+        TLSONETHREE_DETECT='n'
+    fi
 fi
 
 if [[ "$TLSONETHREE_DETECT" = [yY] ]]; then
@@ -1101,7 +1124,7 @@ server {
   $HTTPTWO_MAXFIELDSIZE
   $HTTPTWO_MAXHEADERSIZE
   # mozilla recommended
-  ssl_ciphers ${TLSONETHREE_CIPHERS}${CHACHACIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
+  ssl_ciphers ${TLSONETHREE_CIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:${CHACHACIPHERS}DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
   ssl_prefer_server_ciphers   on;
   $SPDY_HEADER
 
@@ -1378,10 +1401,6 @@ location ~ ^${WPSUBDIR}/(wp-includes/js/tinymce/wp-tinymce.php) {
   # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
   #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
 }
-
-# Deny access to any files with a .php extension in the uploads directory
-# Works in sub-directory installs and also in multisite network
-location ~* ${WPSUBDIR}/(?:uploads|files)/.*\.php\$ { deny all; }
 
 # Whitelist Exception for https://wordpress.org/plugins/onesignal-free-web-push-notifications//
 location ~ ^${WPSUBDIR}/wp-content/plugins/onesignal-free-web-push-notifications/ {
@@ -1861,6 +1880,11 @@ location ~* \.(engine|inc|info|install|make|module|profile|test|po|sh|.*sql|them
 return 444;
 }
 
+location ~* \.(tpl)\$
+{
+  deny all; 
+}
+
 #nocgi
 location ~* \.(pl|cgi|py|sh|lua)\$ {
 return 444;
@@ -1890,7 +1914,7 @@ if ( \$arg_add-to-cart != "" ) { set \$cache_uri 'null cache'; }
 ## bypass cache for empty woocommerce carts
 #if ( \$cookie_woocommerce_items_in_cart != "0" ) { set \$cache_uri 'null cache'; }
 
-if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_logged_in|edd_items_in_cart|woocommerce_items_in_cart|woocommerce_cart_hash|woocommerce_recently_viewed|wc_session_cookie_HASH|wp_woocommerce_session_|wptouch_switch_toogle") { set \$cache_uri 'null cache'; }
+if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_logged_in|edd_items_in_cart|woocommerce_items_in_cart|woocommerce_cart_hash|woocommerce_recently_viewed|wc_session_cookie_HASH|wp_woocommerce_session_|wptouch_switch_toggle") { set \$cache_uri 'null cache'; }
 EFF
 
 # for nginx level redis cache
@@ -1918,7 +1942,7 @@ if (\$request_uri ~* "\?add-to-cart=|/cart/|/my-account/|/checkout/|/shop/checko
 }
 
 # Don't use the cache for logged in users or recent commenters
-if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in|edd_items_in_cart|woocommerce_items_in_cart|woocommerce_cart_hash|woocommerce_recently_viewed|wc_session_cookie_HASH|wp_woocommerce_session_|wptouch_switch_toogle") {
+if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_no_cache|wordpress_logged_in|edd_items_in_cart|woocommerce_items_in_cart|woocommerce_cart_hash|woocommerce_recently_viewed|wc_session_cookie_HASH|wp_woocommerce_session_|wptouch_switch_toggle") {
   set \$skip_cache 1;
 }
 
@@ -2040,7 +2064,7 @@ cd /home/nginx/domains/${vhostname}/public${WPSUBDIR}
 NEWPREFIX=$(echo $RANDOM)
 sed -i "s/'wp_';/'${NEWPREFIX}_';/g" wp-config.php
 
-sed -i "/define('DB_COLLATE', '');/ a\
+sed -i "/define( 'DB_COLLATE', '' );/ a\
 /** Enable core updates for minor releases (default) **/\ndefine('DISABLE_WP_CRON', false);\ndefine('WP_AUTO_UPDATE_CORE', 'minor' );\ndefine('WP_POST_REVISIONS', 10 );\ndefine('EMPTY_TRASH_DAYS', 10 );\ndefine('WP_CRON_LOCK_TIMEOUT', 60 );\ndefine('CONCATENATE_SCRIPTS', false);\
 " wp-config.php
 
@@ -2124,17 +2148,36 @@ if [[ "$wpscache" = [nN] ]]; then
   cecho "------------------------------------------------------------" $boldgreen 
   # \wp plugin install optimus --activate --allow-root
   echo "configure cache-enabler"
-  \wp option update cache-enabler '{"expires":6,"new_post":1,"new_comment":1,"webp":0,"compress":1,"excl_ids":"","minify_html":0}' --format=json --allow-root
+  \wp option update cache-enabler '{"expires":6,"new_post":1,"new_comment":1,"webp":0,"clear_on_upgrade":1,"compress":1,"excl_ids":"","excl_regexp":"","excl_cookies":"","excl_querystrings":"","minify_html":0}' --format=json --allow-root
   \wp option get cache-enabler --format=json --allow-root
   cecho "------------------------------------------------------------" $boldgreen
   \wp plugin install autoptimize --activate --allow-root
-  echo "configure autoptimize"
-  \wp option update autoptimize_css on --allow-root
-  \wp option update autoptimize_extra_settings '{"autoptimize_extra_checkbox_field_1":"1","autoptimize_extra_checkbox_field_0":"1","autoptimize_extra_radio_field_4":"4","autoptimize_extra_text_field_2":"https:\/\/ajax.googleapis.com, https:\/\/fonts.googleapis.com, https:\/\/fonts.gstatic.com, https:\/\/maps.googleapis.com","autoptimize_extra_text_field_3":""}' --format=json --allow-root
-  \wp option update autoptimize_html on --allow-root
-  \wp option update autoptimize_js on --allow-root
-  # \wp option update autoptimize_optimize_logged on --allow-root
-  \wp option update autoptimize_show_adv 1 --allow-root
+  # echo "configure autoptimize"
+  # \wp option update autoptimize_cache_clean 0 --allow-root
+  # \wp option update autoptimize_cdn_url "" --allow-root
+  # \wp option update autoptimize_css on --allow-root
+  # \wp option update autoptimize_css_aggregate on --allow-root
+  # \wp option update autoptimize_css_datauris "" --allow-root
+  # \wp option update autoptimize_css_defer "" --allow-root
+  # \wp option update autoptimize_css_defer_inline "" --allow-root
+  # \wp option update autoptimize_css_exclude "wp-content/cache/, wp-content/uploads/, admin-bar.min.css, dashicons.min.css" --allow-root
+  # \wp option update autoptimize_css_include_inline  on --allow-root
+  # \wp option update autoptimize_css_inline "" --allow-root
+  # \wp option update autoptimize_css_justhead "" --allow-root
+  # \wp option update autoptimize_html on --allow-root
+  # \wp option update autoptimize_html_keepcomments on --allow-root
+  # \wp option update autoptimize_imgopt_launched     on --allow-root
+  # \wp option update autoptimize_js on --allow-root
+  # \wp option update autoptimize_js_aggregate on --allow-root
+  # \wp option update autoptimize_js_exclude  "seal.js, js/jquery/jquery.js" --allow-root
+  # \wp option update autoptimize_js_forcehead "" --allow-root
+  # \wp option update autoptimize_js_include_inline "" --allow-root
+  # \wp option update autoptimize_js_justhead "" --allow-root
+  # \wp option update autoptimize_js_trycatch "" --allow-root
+  # \wp option update autoptimize_optimize_checkout "" --allow-root
+  # \wp option update autoptimize_optimize_logged ""  --allow-root
+  # # \wp option update autoptimize_optimize_logged on --allow-root
+  # \wp option update autoptimize_show_adv 1 --allow-root
   \wp option list --search=autoptimize_* --allow-root
   cecho "------------------------------------------------------------" $boldgreen
 fi
@@ -2420,9 +2463,17 @@ chmod 0700 /usr/bin/wp
 /usr/bin/wp plugin status --allow-root
 /usr/bin/wp plugin update --all --allow-root | tee .wpcli-status
 #/usr/bin/wp core check-update --allow-root
+
+# for major core updates uncomment 3 lines directly below
 #/usr/bin/wp core update --allow-root
 #/usr/bin/wp core update-db --allow-root
 #/usr/bin/wp core update --allow-root
+
+# for minor core updates uncomment 3 lines directly below
+#/usr/bin/wp core update --minor --allow-root
+#/usr/bin/wp core update-db --allow-root
+#/usr/bin/wp core update --minor --allow-root
+
 chown -R nginx:nginx /home/nginx/domains/${vhostname}/public${WPSUBDIR}
 if [[ -f .wpcli-status && ! "\$(grep -w 'Plugin already updated' .wpcli-status)" ]]; then
   exec 99>/tmp/wp_updater_phpfpm.lock
@@ -2473,7 +2524,7 @@ if [[ -z "$(crontab -l 2>&1 | grep wp_updater_${vhostname}.sh)" ]]; then
     # done
 
     # ensure random sleep times do not overlap https://community.centminmod.com/posts/51310/
-    while [[ "$(cat cronjoblist | awk '/ sleep / {print $7}' | grep "$DELAY_DUPCHECK")" ]]; do
+    while [[ "$(cat cronjoblist | awk '/ sleep / {print $7}' | grep -w "$DELAY_DUPCHECK")" ]] && [[ "$(cat cronjoblist | awk '/ sleep / {print $7}' | grep -w "$DELAY")" ]]; do
       DELAY=$(echo ${RANDOM:0:3})
       DELAY_DUPCHECK=$(echo $DELAY | cut -c1,2)
       echo $DELAY
@@ -2765,7 +2816,7 @@ echo
 cecho "-------------------------------------------------------------" $boldyellow
 cecho "vhost for $vhostname wordpress setup successfully" $boldwhite
 cecho "$vhostname setup info log saved at: " $boldwhite
-cecho "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost.log" $boldwhite
+cecho "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_${vhostname}_wordpress_addvhost.log" $boldwhite
 cecho "-------------------------------------------------------------" $boldyellow
 echo ""
 

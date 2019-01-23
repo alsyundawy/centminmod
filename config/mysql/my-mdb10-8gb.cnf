@@ -14,7 +14,7 @@ socket=/var/lib/mysql/mysql.sock
 #bind-address=127.0.0.1
 # optimized my.cnf for MariaDB 5.5.x
 # by eva2000
-# vbtechsupport.com
+# centminmod.com
 
 tmpdir=/home/mysqltmp
 
@@ -72,7 +72,7 @@ innodb_large_prefix=1
 innodb_purge_threads=1
 innodb_file_format = Barracuda
 innodb_file_per_table = 1
-innodb_open_files = 1000
+innodb_open_files = 8000
 innodb_data_file_path= ibdata1:10M:autoextend
 innodb_buffer_pool_size = 1024M
 
@@ -81,7 +81,7 @@ innodb_buffer_pool_size = 1024M
 
 innodb_log_files_in_group = 2
 innodb_log_file_size = 384M
-innodb_log_buffer_size = 8M
+innodb_log_buffer_size = 16M
 innodb_flush_log_at_trx_commit = 2
 innodb_thread_concurrency = 0
 innodb_lock_wait_timeout=50

@@ -140,7 +140,7 @@ fi
 
 if [[ "$DETECTXCACHE" = [yY] ]] || [[ "$DETECTXCACHE" = [yY] && ! -f "$PHPEXTDIR_AUTODETECT/xcache.so" ]]; then
     cecho "Auto reinstalling previously detected Xcache" $boldyellow
-    funct_xcachereinstall
+    funct_xcachereinstall silent
 fi
 
 if [[ "$DETECTAPC" = [yY] ]] || [[ "$DETECTAPC" = [yY] && ! -f "$PHPEXTDIR_AUTODETECT/apc.so" ]]; then
@@ -260,9 +260,9 @@ if [[ "$UALL" = 'y' ]]; then
 else
     echo
     echo "----------------------------------------------------------------"
-    echo "Install which version of PHP? (version i.e. ${PHP_VERSION}, 7.0.30, NGDEBUG)"
-    echo "PHP 7.x/7.1.x/7.2.x is GA Stable but still may have broken PHP extensions."
-    echo "NGDEBUG is PHP 7.3.0 dev builds minus incompatible PHP extensions"
+    echo "Install which version of PHP? (version i.e. ${PHP_VERSION}, 7.0.33, NGDEBUG)"
+    echo "PHP 7.x/7.1.x/7.2.x/7.3.x is GA Stable but still may have broken PHP extensions."
+    echo "NGDEBUG is PHP 7.4.0 dev builds minus incompatible PHP extensions"
     echo "----------------------------------------------------------------"
     read -ep "Enter PHP Version number you want to upgrade/downgrade to: " phpver
     echo "----------------------------------------------------------------"
@@ -351,7 +351,11 @@ fi
     
         curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/get/php-${phpver}.tar.${PHPEXTSION}/from/this/mirror" | grep 'HTTP\/' | grep '404'
         PHPGEO_CURLCHECK=$?
-        if [[ "$PHPGEO_CURLCHECK" = '0' ]]; then
+        curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/get/php-${phpver}.tar.${PHPEXTSION}/from/this/mirror" | grep 'HTTP\/' | egrep '200|301|302'
+        PHPGEO_CURLCHECKOK=$?
+        # check if download url is 404 not found but also 
+        # check for valid status header 200, 301 or 302
+        if [[ "$PHPGEO_CURLCHECK" = '0' || "$PHPGEO_CURLCHECKOK" != '0' ]]; then
             PHP_MIRRORURL="http://php.net"
             PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
         fi
@@ -384,6 +388,8 @@ fi
     fi
 
     cd "php-${phpver}"
+    PHPVER_ID=$(awk '/PHP_VERSION_ID/ {print $3}' ${DIR_TMP}/php-${phpver}/main/php_version.h)
+    echo "PHP VERSION ID: $PHPVER_ID"
 
 ##############################################
 # begin update php.ini
@@ -427,17 +433,19 @@ fi # PHPDIFF
 
     make clean
 
-  if [[ "$PHPMUVER" = 5.3 ]]; then
-    # patch PHP 5.3 source tarballs
-    # https://bugs.php.net/bug.php?id=48795
-    # https://community.centminmod.com/posts/63882/
-    # pushd ../
-    if [ ! -f php53.patch ]; then
-        cp -a $CUR_DIR/patches/php/php53.patch php53.patch
-        patch < php53.patch
+    php_patches
+
+    if [[ "$CENTOS_SIX" -eq '6' ]]; then
+        # PHP 7.3.0 + centos 6 issue https://community.centminmod.com/posts/69561/
+        if [ ! -f /usr/bin/autoconf268 ]; then
+            echo "yum -q -y install autoconf268"
+            yum -q -y install autoconf268
+        fi
+        if [ -f /usr/bin/autoconf268 ]; then
+            export PHP_AUTOCONF=/usr/bin/autoconf268
+            export PHP_AUTOHEADER=/usr/bin/autoheader268
+        fi
     fi
-    # popd
-  fi
 
     ./buildconf --force
     
@@ -541,17 +549,27 @@ fi
             GET_ROOT_PASS=$(awk -F "=" '/password/ {print $2}' /root/.my.cnf | sed -e "s|'||g")
             sed -i "s|define('DB_PASSWORD', 'root');|define('DB_PASSWORD', '$GET_ROOT_PASS');|" "$DIR_TMP/php_pgo_training_scripts/constants.php"
             ./sapi/cli/php "$DIR_TMP/php_pgo_training_scripts/init.php"
-            echo "time ./sapi/cgi/php-cgi -T20 ../Zend/bench.php"
-            time ./sapi/cgi/php-cgi -T20 ../Zend/bench.php
-            echo "time ./sapi/cgi/php-cgi -T10 ../Zend/micro_bench.php"
-            time ./sapi/cgi/php-cgi -T10 ../Zend/micro_bench.php
-            echo "./sapi/cgi/php-cgi -T100 "$DIR_TMP/php_pgo_training_scripts/index.php""
-            time ./sapi/cgi/php-cgi -T100 "$DIR_TMP/php_pgo_training_scripts/index.php"
+            echo "time ./sapi/cgi/php-cgi -T80 ../Zend/bench.php"
+            time ./sapi/cgi/php-cgi -T80 ../Zend/bench.php
+            echo "time ./sapi/cgi/php-cgi -T40 ../Zend/micro_bench.php"
+            time ./sapi/cgi/php-cgi -T40 ../Zend/micro_bench.php
             echo "./sapi/cgi/php-cgi -T100 "$DIR_TMP/php_pgo_training_scripts/index.php""
             time ./sapi/cgi/php-cgi -T100 "$DIR_TMP/php_pgo_training_scripts/index.php"
             if [ -f "$PHPPGO_INDEXPATH" ]; then
                 echo "./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH""
                 time ./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH"
+            fi
+            if [ -f "$PHPPGO_INDEXPATH_TWO" ]; then
+                echo "./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_TWO""
+                time ./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_TWO"
+            fi
+            if [ -f "$PHPPGO_INDEXPATH_THREE" ]; then
+                echo "./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_THREE""
+                time ./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_THREE"
+            fi
+            if [ -f "$PHPPGO_INDEXPATH_FOUR" ]; then
+                echo "./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_FOUR""
+                time ./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_FOUR"
             fi
         elif [ -d "$DIR_TMP/php_pgo_training_scripts" ]; then
             pushd "$DIR_TMP/php_pgo_training_scripts"
@@ -561,17 +579,27 @@ fi
             GET_ROOT_PASS=$(awk -F "=" '/password/ {print $2}' /root/.my.cnf | sed -e "s|'||g")
             sed -i "s|define('DB_PASSWORD', 'root');|define('DB_PASSWORD', '$GET_ROOT_PASS');|" "$DIR_TMP/php_pgo_training_scripts/constants.php"
             ./sapi/cli/php "$DIR_TMP/php_pgo_training_scripts/init.php"
-            echo "time ./sapi/cgi/php-cgi -T20 ../Zend/bench.php"
-            time ./sapi/cgi/php-cgi -T20 ../Zend/bench.php
-            echo "time ./sapi/cgi/php-cgi -T10 ../Zend/micro_bench.php"
-            time ./sapi/cgi/php-cgi -T10 ../Zend/micro_bench.php
-            echo "./sapi/cgi/php-cgi -T100 "$DIR_TMP/php_pgo_training_scripts/index.php""
-            time ./sapi/cgi/php-cgi -T100 "$DIR_TMP/php_pgo_training_scripts/index.php"
-            echo "./sapi/cgi/php-cgi -T100 "$DIR_TMP/php_pgo_training_scripts/index.php""
-            time ./sapi/cgi/php-cgi -T100 "$DIR_TMP/php_pgo_training_scripts/index.php"
+            echo "time ./sapi/cgi/php-cgi -T2,${PHP_PGO_TRAINRUNS} ../Zend/bench.php"
+            time ./sapi/cgi/php-cgi -T2,${PHP_PGO_TRAINRUNS} ../Zend/bench.php
+            echo "time ./sapi/cgi/php-cgi -T2,${PHP_PGO_TRAINRUNS} ../Zend/micro_bench.php"
+            time ./sapi/cgi/php-cgi -T2,${PHP_PGO_TRAINRUNS} ../Zend/micro_bench.php
+            echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$DIR_TMP/php_pgo_training_scripts/index.php""
+            time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$DIR_TMP/php_pgo_training_scripts/index.php"
             if [ -f "$PHPPGO_INDEXPATH" ]; then
-                echo "./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH""
-                time ./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH"
+                echo "./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH""
+                time ./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH"
+            fi
+            if [ -f "$PHPPGO_INDEXPATH_TWO" ]; then
+                echo "./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_TWO""
+                time ./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_TWO"
+            fi
+            if [ -f "$PHPPGO_INDEXPATH_THREE" ]; then
+                echo "./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_THREE""
+                time ./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_THREE"
+            fi
+            if [ -f "$PHPPGO_INDEXPATH_FOUR" ]; then
+                echo "./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_FOUR""
+                time ./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_FOUR"
             fi
         fi
         echo "make prof-clean"
@@ -893,15 +921,16 @@ else
     fi
 fi
 
-if [[ "$PHPSEVENTHREE_EXTFIX" != [nN] && "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/mailparse.ini" ]]; then
-    cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
-    cecho "rm -rf ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
-    rm -rf "${CONFIGSCANDIR}/mailparse.ini"
-fi
+# if [[ "$PHPSEVENTHREE_EXTFIX" != [nN] && "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/mailparse.ini" ]]; then
+#     cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
+#     cecho "rm -rf ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
+#     rm -rf "${CONFIGSCANDIR}/mailparse.ini"
+# fi
 if [[ "$PHPSEVENTHREE_EXTFIX" != [nN] && "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/memcache.ini" ]]; then
-    cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcache.ini" $boldyellow
-    cecho "rm -rf ${CONFIGSCANDIR}/memcache.ini" $boldyellow
-    rm -rf "${CONFIGSCANDIR}/memcache.ini"
+    # cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcache.ini" $boldyellow
+    # cecho "rm -rf ${CONFIGSCANDIR}/memcache.ini" $boldyellow
+    # rm -rf "${CONFIGSCANDIR}/memcache.ini"
+    echo
 fi
 # if [[ "$PHPSEVENTHREE_EXTFIX" != [nN] && "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/memcached.ini" ]]; then
 #     cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcached.ini" $boldyellow
@@ -970,13 +999,14 @@ if [[ "$PHPSEVEN_CHECKVER" = '0' ]]; then
     if [ -f "${CONFIGSCANDIR}/suhosin.ini" ]; then
         cecho "rm -rf ${CONFIGSCANDIR}/suhosin.ini" $boldyellow
     fi
-    if [[ "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/mailparse.ini" ]]; then
-        cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
-        cecho "rm -rf ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
-    fi
+    # if [[ "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/mailparse.ini" ]]; then
+    #     cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
+    #     cecho "rm -rf ${CONFIGSCANDIR}/mailparse.ini" $boldyellow
+    # fi
     if [[ "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/memcache.ini" ]]; then
-        cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcache.ini" $boldyellow
-        cecho "rm -rf ${CONFIGSCANDIR}/memcache.ini" $boldyellow
+        # cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcache.ini" $boldyellow
+        # cecho "rm -rf ${CONFIGSCANDIR}/memcache.ini" $boldyellow
+        echo
     fi
     # if [[ "$PHPMUVER" = '7.3' && -f "${CONFIGSCANDIR}/memcached.ini" ]]; then
     #     cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcached.ini" $boldyellow
@@ -987,6 +1017,7 @@ if [[ "$PHPSEVEN_CHECKVER" = '0' ]]; then
     echo
 fi
 
+    php-config
     echo "***************************************************"
     cecho "* PHP upgraded and auto reinstalled PHP extensions" $boldgreen
     if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' ]]; then

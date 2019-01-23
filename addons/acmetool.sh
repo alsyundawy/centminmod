@@ -1,10 +1,17 @@
 #!/bin/bash
 ###############################################################
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+###############################################################
 # written by George Liu (eva2000) centminmod.com
 ###############################################################
 # variables
 ###############################################################
-ACMEVER='1.0.43'
+ACMEVER='1.0.48'
 DT=$(date +"%d%m%y-%H%M%S")
 ACMEDEBUG='n'
 ACMEDEBUG_LOG='y'
@@ -69,12 +76,6 @@ NOTICE='y'
 CHECKVERSION='y'
 SCRIPTCHECKURL='https://acmetool.centminmod.com'
 ###############################################################
-# set locale temporarily to english
-# due to some non-english locale issues
-export LC_ALL=en_US.UTF-8
-export LANG=en_US.UTF-8
-export LANGUAGE=en_US.UTF-8
-export LC_CTYPE=en_US.UTF-8
 
 shopt -s expand_aliases
 for g in "" e f; do
@@ -659,7 +660,7 @@ sslopts_check() {
   DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
   if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
       # openssl 1.1.0 unsupported flag enable-tlsext
-      if [[ "$(grep -w 'tls1_3' "${DIR_TMP}/openssl-${OPENSSL_VERSION}/Configure")" ]]; then
+      if [[ "$(grep -w 'tls1_3' "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm")" ]]; then
           TLSONETHREEOPT=' enable-tls1_3'
           TLSONETHREE_DETECT='y'
       else
@@ -962,7 +963,7 @@ server {
   $HTTPTWO_MAXFIELDSIZE
   $HTTPTWO_MAXHEADERSIZE
   # mozilla recommended
-  ssl_ciphers ${TLSONETHREE_CIPHERS}${CHACHACIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
+  ssl_ciphers ${TLSONETHREE_CIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:${CHACHACIPHERS}DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
   ssl_prefer_server_ciphers   on;
   $SPDY_HEADER
   
@@ -1302,7 +1303,7 @@ server {
   $HTTPTWO_MAXFIELDSIZE
   $HTTPTWO_MAXHEADERSIZE
   # mozilla recommended
-  ssl_ciphers ${TLSONETHREE_CIPHERS}${CHACHACIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
+  ssl_ciphers ${TLSONETHREE_CIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:${CHACHACIPHERS}DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
   ssl_prefer_server_ciphers   on;
   $SPDY_HEADER
 
@@ -1410,7 +1411,7 @@ server {
   $HTTPTWO_MAXFIELDSIZE
   $HTTPTWO_MAXHEADERSIZE
   # mozilla recommended
-  ssl_ciphers ${TLSONETHREE_CIPHERS}${CHACHACIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
+  ssl_ciphers ${TLSONETHREE_CIPHERS}ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:${CHACHACIPHERS}DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-RSA-AES256-SHA256:DHE-RSA-AES256-SHA:ECDHE-ECDSA-DES-CBC3-SHA:ECDHE-RSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA:!DSS;
   ssl_prefer_server_ciphers   on;
   $SPDY_HEADER
   
@@ -1748,6 +1749,9 @@ issue_acme() {
     fi
     echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}"
     "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}
+    if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" ]; then
+      chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key"
+    fi
     if [ -f "${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nv-remove-cmds-${vhostname}.log" ]; then
       echo "rm -rf ${ACMECERTHOME}/${vhostname}" >> "${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nv-remove-cmds-${vhostname}.log"
     fi
@@ -1758,6 +1762,9 @@ issue_acme() {
             echo
       echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}"
       "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}
+      if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" ]; then
+        chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key"
+      fi
       if [[ "$testcert_dual" = [yY] ]]; then
         convert_dualcrtkeyinctest
       else
@@ -2059,6 +2066,9 @@ reissue_acme() {
     fi
     echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}"
     "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}
+    if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" ]; then
+      chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key"
+    fi
     # dual cert routine start
     if [[ "$DUALCERTS" = [yY] && "$KEYLENGTH" = '2048' && "$DUAL_LECHECK" -eq '0' ]]; then
             echo
@@ -2066,6 +2076,230 @@ reissue_acme() {
             echo
       echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}"
       "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}
+      if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" ]; then
+        chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key"
+      fi
+      if [[ "$testcert_dual" = [yY] ]]; then
+        convert_dualcrtkeyinctest
+      else
+        convert_dualcrtkeyinclive
+      fi
+    fi
+    # dual cert routine end
+    # allow it to be repopulated each time with $vhostname
+    # rm -rf /root/.acme.sh/reload.sh
+    echo
+    echo "letsencrypt ssl certificate setup completed"
+    echo "ssl certs located at: /usr/local/nginx/conf/ssl/${vhostname}"
+    pushover_alert $vhostname
+    backup_acme $vhostname
+    echo
+    echo "openssl x509 -noout -text < "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer""
+    openssl x509 -noout -text < "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer"
+    listlogs
+    echo
+    elif [[ "$LECHECK" = '1' ]]; then
+      listlogs
+      echo
+    elif [[ "$LECHECK" = '2' ]]; then
+      echo
+      echo "reissue / renewal skipped as ssl cert still valid"
+      listlogs
+      echo
+    fi  # reloadcmd_setup
+  fi
+}
+
+#####################
+reissue_acme_only() {
+  check_acmeinstall
+  # split domains for SAN SSL certs
+  split_domains "$vhostname"
+  if [[ "$vhostname" != "$MAIN_HOSTNAME" ]]; then
+    SSLVHOST_CONFIGFILENAME="${vhostname}.ssl.conf"
+    SSLVHOST_CONFIG="/usr/local/nginx/conf/conf.d/${SSLVHOST_CONFIGFILENAME}"
+    WEBROOTPATH_OPT="/home/nginx/domains/${vhostname}/public"
+    VHOST_ALREADYSET='n'
+  elif [[ "$vhostname" = "$MAIN_HOSTNAME" ]]; then
+    SSLVHOST_CONFIGFILENAME="${MAIN_HOSTNAMEVHOSTSSLFILE}"
+    SSLVHOST_CONFIG="/usr/local/nginx/conf/conf.d/${MAIN_HOSTNAMEVHOSTSSLFILE}"
+    WEBROOTPATH_OPT="/usr/local/nginx/html"
+    if [ -d "/home/nginx/domains/${vhostname}/public" ]; then
+      echo "$vhostname setup already at /home/nginx/domains/${vhostname}/public"
+      VHOST_ALREADYSET='y'
+    fi
+  fi
+  # if webroot path directory does not exists 
+  # + ssl vhost file does not exist
+  # but skip creating nginx vhost as reissue-only is for reissue of SSL certificate
+  # and doesn't touch existing Nginx vhosts
+  if [[ ! -d "$WEBROOTPATH_OPT" && ! -f "$SSLVHOST_CONFIG" ]]; then
+    echo
+    echo "${vhostname} nginx vhost doesn't already exist at"
+    echo "$SSLVHOST_CONFIG"
+    echo "reissue-only command is for use with existing nginx HTTPS SSL based vhosts only"
+    echo "aborting..."
+    exit
+  # if webroot path directory exists
+  # + ssl vhost file does not exist
+  # + no ssl_certificate line exists in the non-https vhost file
+  elif [[ -d "$WEBROOTPATH_OPT" && ! -f "$SSLVHOST_CONFIG" ]] && [[ "$(grep -sq ssl_certificate /usr/local/nginx/conf/conf.d/${vhostname}.conf; echo $?)" != '0' ]]; then
+    echo
+    echo "${vhostname} nginx HTTPS SSL vhost doesn't already exist at"
+    echo "$SSLVHOST_CONFIG"
+    echo "reissue-only command is for use with existing nginx HTTPS SSL based vhosts only"
+    echo "aborting..."
+    exit
+  # if webroot path directory exists
+  # + ssl vhost file does not exist
+  # + ssl_certificates line exists in non-https vhost file
+  elif [[ -d "$WEBROOTPATH_OPT" ]] && [[ "$(grep -sq ssl_certificate /usr/local/nginx/conf/conf.d/${vhostname}.conf; echo $?)" = '0' ]] && [[ ! -f "$SSLVHOST_CONFIG" ]]; then
+    echo
+    echo "${vhostname} nginx HTTPS SSL vhost doesn't already exist at"
+    echo "$SSLVHOST_CONFIG"
+    echo "reissue-only command is for use with existing nginx HTTPS SSL based vhosts only"
+    echo "aborting..."
+    exit
+  fi
+
+  # if webroot path directory exists 
+  # + vhostname value exists 
+  # + ssl vhost file exists 
+  # + not main hostname VHOST_ALREADYSET
+  if [[ -d "$WEBROOTPATH_OPT" && ! -z "$vhostname" && -f "$SSLVHOST_CONFIG" && "$VHOST_ALREADYSET" != 'y' ]]; then
+    check_dns "$vhostname"
+    if [[ "$TOPLEVEL" = [yY] ]]; then
+      if [[ "$SAN" = '1' ]]; then
+        DOMAINOPT="-d $DOMAIN_LIST -d www.${vhostname}"
+      else
+        DOMAINOPT="-d ${vhostname} -d www.${vhostname}"
+      fi
+    else
+      if [[ "$SAN" = '1' ]]; then
+        DOMAINOPT="-d $DOMAIN_LIST"
+      else
+        DOMAINOPT="-d ${vhostname}"
+      fi
+    fi
+    if [[ ! -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf" && -f "/usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf" ]]; then
+      # if existing or previous /usr/local/nginx/conf/conf.d/${vhostname}.ssl.conf has the ssl cert key and trust files
+      # inline in vhost, need to move them to their own include file for acmetool.sh at
+      # /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf
+      convert_crtkeyinc
+    fi
+    # do not modify existing nginx vhosts for reissue-only options
+    # sed -i "s|server_name .*|server_name $DOMAIN_LISTNGX;|" "$SSLVHOST_CONFIG"
+    echo "grep 'root' $SSLVHOST_CONFIG"
+    grep 'root' "$SSLVHOST_CONFIG"
+    /usr/bin/ngxreload >/dev/null 2>&1
+    echo
+    echo "-----------------------------------------------------------"
+    echo "reissue & install letsencrypt ssl certificate for $vhostname"
+    echo "-----------------------------------------------------------"
+    echo ""$ACMEBINARY" --force --createDomainKey $DOMAINOPT -k "$KEYLENGTH" --useragent "$LE_USERAGENT""
+    "$ACMEBINARY" --force --createDomainKey $DOMAINOPT -k "$KEYLENGTH" --useragent "$LE_USERAGENT"
+    # if the option flag = live is not passed on command line, the issuance uses the
+    # staging test ssl certificates
+    echo "testcert value = $testcert"
+    if [[ "$testcert" = 'live' ]]; then
+     echo ""$ACMEBINARY"${ACME_APIENDPOINT} --force${ACMEOCSP} --issue $DOMAINOPT --days $RENEWDAYS -w "$WEBROOTPATH_OPT" -k "$KEYLENGTH" --useragent "$LE_USERAGENT" $ACMEDEBUG_OPT"
+      "$ACMEBINARY"${ACME_APIENDPOINT} --force${ACMEOCSP} --issue $DOMAINOPT --days $RENEWDAYS -w "$WEBROOTPATH_OPT" -k "$KEYLENGTH" --useragent "$LE_USERAGENT" $ACMEDEBUG_OPT
+      LECHECK=$?
+      # only enable resolver and ssl_stapling for live ssl certificate deployments
+      if [[ -f "$SSLVHOST_CONFIG" && "$LECHECK" = '0' ]]; then
+        sed -i "s|#resolver |resolver |" "$SSLVHOST_CONFIG"
+        sed -i "s|#resolver_timeout|resolver_timeout|" "$SSLVHOST_CONFIG"
+        sed -i "s|#ssl_stapling on|ssl_stapling on|" "$SSLVHOST_CONFIG"
+        sed -i "s|#ssl_stapling_verify|ssl_stapling_verify|" "$SSLVHOST_CONFIG"
+        sed -i "s|#ssl_trusted_certificate|ssl_trusted_certificate|" "$SSLVHOST_CONFIG"
+        if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf" ]; then
+          sed -i "s|#ssl_trusted_certificate|ssl_trusted_certificate|" "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf"
+        fi
+        # dual cert routine start
+        if [[ "$DUALCERTS" = [yY] && "$KEYLENGTH" = '2048' ]]; then
+            echo
+            echo "get 2nd SSL cert issued for dual ssl cert config"
+            echo
+          echo ""$ACMEBINARY"${ACME_APIENDPOINT} --force${ACMEOCSP} --issue $DOMAINOPT --days $RENEWDAYS -w "$WEBROOTPATH_OPT" -k "$KEYLENGTH_DUAL" --useragent "$LE_USERAGENT" $ACMEDEBUG_OPT"
+          "$ACMEBINARY"${ACME_APIENDPOINT} --force${ACMEOCSP} --issue $DOMAINOPT --days $RENEWDAYS -w "$WEBROOTPATH_OPT" -k "$KEYLENGTH_DUAL" --useragent "$LE_USERAGENT" $ACMEDEBUG_OPT
+          DUAL_LECHECK=$?
+          if [[ "$DUAL_LECHECK" = '0' ]]; then
+            echo
+            echo "success: 2nd SSL cert issued for dual ssl cert config"
+            echo
+          else
+            echo
+            echo "failed: 2nd SSL cert issuance failed for dual ssl cert config"
+            echo
+          fi
+        fi
+        # dual cert routine end
+      fi
+    else
+     testcert_dual=y
+     echo ""$ACMEBINARY" --force${STAGING_OPT} --issue $DOMAINOPT --days $RENEWDAYS -w "$WEBROOTPATH_OPT" -k "$KEYLENGTH" --useragent "$LE_USERAGENT" $ACMEDEBUG_OPT"
+      "$ACMEBINARY" --force${STAGING_OPT} --issue $DOMAINOPT --days $RENEWDAYS -w "$WEBROOTPATH_OPT" -k "$KEYLENGTH" --useragent "$LE_USERAGENT" $ACMEDEBUG_OPT
+      LECHECK=$?
+      if [[ "$LECHECK" = '0' ]]; then
+        # dual cert routine start
+        if [[ "$DUALCERTS" = [yY] && "$KEYLENGTH" = '2048' ]]; then
+            echo
+            echo "get 2nd SSL cert issued for dual ssl cert config"
+            echo
+          echo ""$ACMEBINARY" --force${STAGING_OPT} --issue $DOMAINOPT --days $RENEWDAYS -w "$WEBROOTPATH_OPT" -k "$KEYLENGTH_DUAL" --useragent "$LE_USERAGENT" $ACMEDEBUG_OPT"
+          "$ACMEBINARY" --force${STAGING_OPT} --issue $DOMAINOPT --days $RENEWDAYS -w "$WEBROOTPATH_OPT" -k "$KEYLENGTH_DUAL" --useragent "$LE_USERAGENT" $ACMEDEBUG_OPT
+          DUAL_LECHECK=$?
+          if [[ "$DUAL_LECHECK" = '0' ]]; then
+            echo
+            echo "success: 2nd SSL cert issued for dual ssl cert config"
+            echo
+          else
+            echo
+            echo "failed: 2nd SSL cert issuance failed for dual ssl cert config"
+            echo
+          fi
+        fi
+        # dual cert routine end
+      fi
+    fi
+    # LECHECK=$?
+    echo "LECHECK = $LECHECK"
+    if [[ "$LECHECK" = '0' ]]; then
+      if [[ "$KEYLENGTH" = 'ec-256' || "$KEYLENGTH" = 'ec-384' ]]; then
+      sed -i "s|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}.crt|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}-acme${ECC_SUFFIX}.cer|" "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf"
+      sed -i "s|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}.key|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}-acme${ECC_SUFFIX}.key|" "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf"
+      sed -i "s|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}-trusted.crt|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}-acme${ECC_SUFFIX}.cer|" "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf"
+      else
+      sed -i "s|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}.crt|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}-acme.cer|" "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf"
+      sed -i "s|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}.key|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}-acme.key|" "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf"
+      sed -i "s|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}-trusted.crt|\/usr\/local\/nginx\/conf\/ssl\/${vhostname}\/${vhostname}-acme.cer|" "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf"
+      fi
+      egrep 'ssl_dhparam|ssl_certificate|ssl_certificate_key|ssl_trusted_certificate' "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}.crt.key.conf" | tee /usr/local/nginx/conf/ssl/${vhostname}/acme-vhost-config.txt
+
+    echo
+    echo "-----------------------------------------------------------"
+    echo "install cert"
+    echo "-----------------------------------------------------------"
+    # ensure directory exists before installing and copying ssl cert files
+    # to /usr/local/nginx/conf/ssl/${vhostname}
+    if [ ! -d "/usr/local/nginx/conf/ssl/${vhostname}" ]; then
+      mkdir -p "/usr/local/nginx/conf/ssl/${vhostname}"
+    fi
+    echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}"
+    "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}
+    if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" ]; then
+      chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key"
+    fi
+    # dual cert routine start
+    if [[ "$DUALCERTS" = [yY] && "$KEYLENGTH" = '2048' && "$DUAL_LECHECK" -eq '0' ]]; then
+            echo
+            echo "install 2nd SSL cert issued for dual ssl cert config"
+            echo
+      echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}"
+      "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}
+      if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" ]; then
+        chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key"
+      fi
       if [[ "$testcert_dual" = [yY] ]]; then
         convert_dualcrtkeyinctest
       else
@@ -2364,6 +2598,9 @@ renew_acme() {
     fi
     echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}"
     "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}
+    if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" ]; then
+      chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key"
+    fi
     # dual cert routine start
     if [[ "$DUALCERTS" = [yY] && "$KEYLENGTH" = '2048' && "$DUAL_LECHECK" -eq '0' ]]; then
             echo
@@ -2371,6 +2608,9 @@ renew_acme() {
             echo
       echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}"
       "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}
+      if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" ]; then
+        chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key"
+      fi
       if [[ "$testcert_dual" = [yY] ]]; then
         convert_dualcrtkeyinctest
       else
@@ -2721,6 +2961,9 @@ webroot_issueacme() {
     fi
     echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}"
     "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}
+    if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" ]; then
+      chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key"
+    fi
     if [ -f "${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nv-remove-cmds-${vhostname}.log" ]; then
       echo "rm -rf ${ACMECERTHOME}/${vhostname}" >> "${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nv-remove-cmds-${vhostname}.log"
     fi
@@ -2731,6 +2974,9 @@ webroot_issueacme() {
             echo
       echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}"
       "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}
+      if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" ]; then
+        chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key"
+      fi
       if [[ "$testcert_dual" = [yY] ]]; then
         convert_dualcrtkeyinctest
       else
@@ -3039,6 +3285,9 @@ webroot_reissueacme() {
     fi
     echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}"
     "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}
+    if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" ]; then
+      chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key"
+    fi
     # dual cert routine start
     if [[ "$DUALCERTS" = [yY] && "$KEYLENGTH" = '2048' && "$DUAL_LECHECK" -eq '0' ]]; then
             echo
@@ -3046,6 +3295,9 @@ webroot_reissueacme() {
             echo
       echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}"
       "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}
+      if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" ]; then
+        chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key"
+      fi
       if [[ "$testcert_dual" = [yY] ]]; then
         convert_dualcrtkeyinctest
       else
@@ -3392,6 +3644,9 @@ webroot_renewacme() {
     fi
     echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}"
     "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}
+    if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" ]; then
+      chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key"
+    fi
     # dual cert routine start
     if [[ "$DUALCERTS" = [yY] && "$KEYLENGTH" = '2048' && "$DUAL_LECHECK" -eq '0' ]]; then
             echo
@@ -3399,6 +3654,9 @@ webroot_renewacme() {
             echo
       echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}"
       "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIXDUAL}.key"${ECCFLAG_DUAL}
+      if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key" ]; then
+        chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIXDUAL}.key"
+      fi
       if [[ "$testcert_dual" = [yY] ]]; then
         convert_dualcrtkeyinctest
       else
@@ -3741,6 +3999,9 @@ issue_acmedns() {
     fi
     echo ""$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}"
     "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}.key"${ECCFLAG}
+    if [ -f "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" ]; then
+      chmod 0644 "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key"
+    fi
     if [ -f "${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nv-remove-cmds-${vhostname}.log" ]; then
       echo "rm -rf ${ACMECERTHOME}/${vhostname}" >> "${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nv-remove-cmds-${vhostname}.log"
     fi
@@ -4577,6 +4838,16 @@ update_acme quite
 reissue_acme
 } 2>&1 | tee "${CENTMINLOGDIR}/acmesh-reissue_${DT}.log"
     ;;
+  reissue-only )
+{ 
+nvcheck
+vhostname="$2"
+testcert="$3"
+getuseragent
+update_acme quite
+reissue_acme_only
+} 2>&1 | tee "${CENTMINLOGDIR}/acmesh-reissue-only_${DT}.log"
+    ;;
   renew )
 { 
 nvcheck
@@ -4687,7 +4958,7 @@ fi
 ;;
   * )
   echo
-  echo " $0 {acme-menu|acmeinstall|acmeupdate|acmesetup|manual|issue|reissue|renew|certonly-issue|s3issue|s3reissue|s3renew|renewall|checkdates|checkdomains}"
+  echo " $0 {acme-menu|acmeinstall|acmeupdate|acmesetup|manual|issue|reissue|reissue-only|renew|certonly-issue|s3issue|s3reissue|s3renew|renewall|checkdates|checkdomains}"
   echo "
  Usage Commands: 
  $0 acme-menu
@@ -4703,6 +4974,8 @@ fi
  $0 reissue domainname d
  $0 reissue domainname live
  $0 reissue domainname lived
+ $0 reissue-only domainname
+ $0 reissue-only domainname live
  $0 renew domainname
  $0 renew domainname d
  $0 renew domainname live

@@ -196,12 +196,12 @@ NGX_WEBDAVLINKGITLAB="https://gitlab.com/centminmod-github-mirror/nginx-dav-ext-
 
 # wget renamed
 NGX_PAGESPEEDGITLINKFILE="release-${NGXPGSPEED_VER}.tar.gz"
-NGX_PAGESPEEDGITLINK="https://github.com/pagespeed/ngx_pagespeed/archive/master.tar.gz"
+NGX_PAGESPEEDGITLINK="https://github.com/apache/incubator-pagespeed-ngx/archive/master.tar.gz"
 NGX_PAGESPEEDGITLINKGITLAB="https://gitlab.com/centminmod-github-mirror/ngx_pagespeed/repository/archive.tar.gz?ref=master"
 
 NGX_PAGESPEEDLINKFILE="release-${NGXPGSPEED_VER}.tar.gz"
 NGX_PAGESPEEDLINKREALFILE="v${NGXPGSPEED_VER}.tar.gz"
-NGX_PAGESPEEDLINK="https://github.com/pagespeed/ngx_pagespeed/archive/${NGX_PAGESPEEDLINKREALFILE}"
+NGX_PAGESPEEDLINK="https://github.com/apache/incubator-pagespeed-ngx/archive/${NGX_PAGESPEEDLINKREALFILE}"
 NGX_PAGESPEEDLINKGITLAB="https://gitlab.com/centminmod-github-mirror/ngx_pagespeed/repository/archive.tar.gz?ref=v${NGXPGSPEED_VER}"
 
 NGX_PAGESPEEDPSOLINKLFILE="${NGINX_PAGESPEEDPSOL_VER}.tar.gz"
@@ -278,6 +278,10 @@ NGX_HTTPREDISLINK="http://people.freebsd.org/~osa/ngx_http_redis-${NGINX_HTTPRED
 NGX_LUANGINXLINKFILE="lua-nginx-module_v${ORESTY_LUANGINXVER}.tar.gz"
 NGX_LUANGINXLINK="https://github.com/openresty/lua-nginx-module/archive/v${ORESTY_LUANGINXVER}.tar.gz"
 NGX_LUANGINXLINKGITLAB="https://gitlab.com/centminmod-github-mirror/lua-nginx-module/repository/archive.tar.gz?ref=v${ORESTY_LUANGINXVER}"
+
+NGX_LUASTREAMLINKFILE="stream-lua-nginx-module_v${ORESTY_LUASTREAMVER}.tar.gz"
+NGX_LUASTREAMLINK="https://github.com/openresty/stream-lua-nginx-module/archive/v${ORESTY_LUASTREAMVER}.tar.gz"
+#NGX_LUASTREAMLINKGITLAB="https://gitlab.com/centminmod-github-mirror/lua-nginx-module/repository/archive.tar.gz?ref=v${ORESTY_LUASTREAMVER}"
 
 NGX_LUAGITLINKFILE="luagit-${ORESTY_LUAGITVER}.tar.gz"
 NGX_LUAGITLINK="https://luajit.org/download/LuaJIT-${ORESTY_LUAGITVER}.tar.gz"
