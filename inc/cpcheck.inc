@@ -1,3 +1,24 @@
+dft_phpupstream() {
+  if [ ! -f /usr/local/nginx/conf/default_phpupstream.conf ]; then
+cat > "/usr/local/nginx/conf/default_phpupstream.conf"<<EOF
+upstream dft_php {
+  zone dftphp_zone 128k;
+  server 127.0.0.1:9000;
+  keepalive 2;
+}
+EOF
+  fi
+
+  DFT_SETUPPHPUPSTREAM_INCLUDECHECK=$(grep '\/usr\/local\/nginx\/conf\/default_phpupstream.conf' /usr/local/nginx/conf/nginx.conf)
+  if [[ -z "$DFT_SETUPPHPUPSTREAM_INCLUDECHECK" ]]; then
+    # echo
+    # echo "include file /usr/local/nginx/conf/default_phpupstream.conf add to nginx.conf"
+    sed -i 's|\/usr\/local\/nginx\/conf\/fastcgi_param_https_map.conf;|\/usr\/local\/nginx\/conf\/fastcgi_param_https_map.conf;\ninclude \/usr\/local\/nginx\/conf\/default_phpupstream.conf;|g' /usr/local/nginx/conf/nginx.conf
+    service nginx restart >/dev/null 2>&1
+    service nginx php-fpm >/dev/null 2>&1
+  fi
+}
+
 redetect_tlsonethree() {
   # persistent config file /etc/centminmod/custom_config.inc
   # variable OPENSSL_TLSONETHREE controls whether OpenSSL 1.1.1
@@ -139,63 +160,65 @@ ngx_brotlibuffersfix() {
 }
 
 pip_updates() {
-  # for glances and psutil as glances is installed via outdated EPEL
-  # yum repo but there's a new version available
-  if [[ ! -f /usr/bin/python-config ]]; then
-    $YUMDNFBIN -q -y install python-devel
-  fi
-  if [[ "$CENTOS_SEVEN" -eq '7' && ! -f /usr/bin/pip ]] || [[ "$CENTOS_SIX" -eq '6' &&  ! -f /usr/bin/pip2.7 ]]; then
-    if [[ "$CENTOS_SEVEN" -eq '7' ]]; then
-      $YUMDNFBIN -q -y install python2-pip >/dev/null 2>&1
-      yum -q -y versionlock python2-pip >/dev/null 2>&1
-      export CC='gcc'
-      PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
-    else
-      $YUMDNFBIN -q -y install python-pip >/dev/null 2>&1
-      yum -q -y versionlock python-pip >/dev/null 2>&1
-      export CC='gcc'
-      PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
-      if [[ "$CENTOS_SIX" -eq '6' && -f "${SCRIPT_DIR}/addons/python27_install.sh" && ! -f /usr/bin/pip2.7 ]]; then
-        "${SCRIPT_DIR}/addons/python27_install.sh" install
+  if [[ "$(date "+%u")" -eq '4' || "$(date "+%u")" -eq '6' ]]; then
+    # for glances and psutil as glances is installed via outdated EPEL
+    # yum repo but there's a new version available
+    if [[ ! -f /usr/bin/python-config ]]; then
+      $YUMDNFBIN -q -y install python-devel
+    fi
+    if [[ "$CENTOS_SEVEN" -eq '7' && ! -f /usr/bin/pip ]] || [[ "$CENTOS_SIX" -eq '6' &&  ! -f /usr/bin/pip2.7 ]]; then
+      if [[ "$CENTOS_SEVEN" -eq '7' ]]; then
+        $YUMDNFBIN -q -y install python2-pip >/dev/null 2>&1
+        yum -q -y versionlock python2-pip >/dev/null 2>&1
+        export CC='gcc'
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
+      else
+        $YUMDNFBIN -q -y install python-pip >/dev/null 2>&1
+        yum -q -y versionlock python-pip >/dev/null 2>&1
+        export CC='gcc'
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
+        if [[ "$CENTOS_SIX" -eq '6' && -f "${SCRIPT_DIR}/addons/python27_install.sh" && ! -f /usr/bin/pip2.7 ]]; then
+          "${SCRIPT_DIR}/addons/python27_install.sh" install
+          PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 install -qqq --upgrade pip
+          PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 install -qqq --upgrade psutil
+          PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 install -qqq --upgrade glances
+          echo
+          echo "CentOS 6 python 2.7 compatibility updates completed"
+          echo
+        fi
+      fi
+    elif [[ "$CENTOS_SIX" -eq '6' && -f /usr/bin/pip2.7 ]]; then
+      CHECK_PIPVER=$(PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip show pip 2>&1 | awk '/^Version: / {print $2}' | sed -e 's|\.|0|g')
+      if [[ "$CHECK_PIPVER" -lt '1801' ]]; then
         PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 install -qqq --upgrade pip
-        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 install -qqq --upgrade psutil
-        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 install -qqq --upgrade glances
-        echo
-        echo "CentOS 6 python 2.7 compatibility updates completed"
-        echo
+      fi
+    elif [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/bin/pip ]]; then
+      CHECK_PIPVER=$(PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip show pip 2>&1 | awk '/^Version: / {print $2}' | sed -e 's|\.||g')
+      if [[ "$CHECK_PIPVER" -lt '901' ]]; then
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
       fi
     fi
-  elif [[ "$CENTOS_SIX" -eq '6' && -f /usr/bin/pip2.7 ]]; then
-    CHECK_PIPVER=$(PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip show pip 2>&1 | awk '/^Version: / {print $2}' | sed -e 's|\.|0|g')
-    if [[ "$CHECK_PIPVER" -lt '1801' ]]; then
-      PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 install -qqq --upgrade pip
-    fi
-  elif [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/bin/pip ]]; then
-    CHECK_PIPVER=$(PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip show pip 2>&1 | awk '/^Version: / {print $2}' | sed -e 's|\.||g')
-    if [[ "$CHECK_PIPVER" -lt '901' ]]; then
-      PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
-    fi
-  fi
-  if [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/bin/pip && -f /usr/bin/python-config ]]; then
-    CHECK_PIPALL_UPDATES=$(PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip list -o --format columns)
-    CHECK_PIPUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -o pip)
-    CHECK_PSUTILUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -o psutil)
-    CHECK_GLANCESUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -io glances)
-    if [[ "$CHECK_PIPUPDATE" = 'pip' ]]; then
-      export CC='gcc'
-      PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
-      yum -q -y versionlock python2-pip >/dev/null 2>&1
-    fi
-    if [[ "$CHECK_PSUTILUPDATE" = 'psutil' ]]; then
-      export CC='gcc'
-      if [[ "$(rpm -qa python2-psutil | grep -o python2-psutil)" = 'python2-psutil' ]]; then
-        yum -q -y remove python2-psutil >/dev/null 2>&1
+    if [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/bin/pip && -f /usr/bin/python-config ]]; then
+      CHECK_PIPALL_UPDATES=$(PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip list -o --format columns)
+      CHECK_PIPUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -o pip)
+      CHECK_PSUTILUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -o psutil)
+      CHECK_GLANCESUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -io glances)
+      if [[ "$CHECK_PIPUPDATE" = 'pip' ]]; then
+        export CC='gcc'
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
+        yum -q -y versionlock python2-pip >/dev/null 2>&1
       fi
-      PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade psutil
-    fi
-    if [[ "$CHECK_GLANCESUPDATE" = 'Glances' ]]; then
-      export CC='gcc'
-      PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade glances
+      if [[ "$CHECK_PSUTILUPDATE" = 'psutil' ]]; then
+        export CC='gcc'
+        if [[ "$(rpm -qa python2-psutil | grep -o python2-psutil)" = 'python2-psutil' ]]; then
+          yum -q -y remove python2-psutil >/dev/null 2>&1
+        fi
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade psutil
+      fi
+      if [[ "$CHECK_GLANCESUPDATE" = 'Glances' ]]; then
+        export CC='gcc'
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade glances
+      fi
     fi
   fi
 }
@@ -211,8 +234,10 @@ march_hostcheck() {
   # cpu models to prevent issues when you switch host nodes with differing 
   # cpu models causing seg faults for nginx and php-fpm
   VPS_ASNCHECK=$(curl -s https://ipinfo.io/org)
-  if [[ "$(echo "${VPS_ASNCHECK}" | egrep -i -o 'linode|digitalocean|vultr|choopa')" && "$MARCH_TARGETNATIVE_ALWAYS" != [yY] ]]; then
+  if [[ "$(echo "${VPS_ASNCHECK}" | egrep -i -o 'upcloud|linode|digitalocean|vultr|choopa')" && "$MARCH_TARGETNATIVE_ALWAYS" != [yY] ]]; then
     MARCH_TARGETNATIVE='n'
+    NGX_GSPLITDWARF='n'
+    PHP_GSPLITDWARF='n'
     if [[ -f /etc/centminmod/custom_config.inc && ! "$(grep 'MARCH_TARGETNATIVE' /etc/centminmod/custom_config.inc)" ]]; then
       echo "MARCH_TARGETNATIVE='n'" >> /etc/centminmod/custom_config.inc
     elif [[ ! -f /etc/centminmod/custom_config.inc && "$INITIALINSTALL" = [yY] ]]; then
@@ -951,10 +976,10 @@ gitenv_askupdate() {
 wgetver_check() {
   # only check if on 64bit OS
   if [[ "$(uname -m)" = 'x86_64' ]]; then
-    if [[ "$(wget -V | head -n1 | awk '{print $3}' | grep -q ${WGET_VERSION} >/dev/null 2>&1; echo $?)" != '0' ]]; then
+    if [[ "$(wget -V | head -n1 | awk '{print $3}' | grep -q ${WGET_VERSION} >/dev/null 2>&1; echo $?)" != '0' ]] || [[ "$(pcre-config --version | grep -q ${PCRE_VERSION} >/dev/null 2>&1; echo $?)" != '0' ]]; then
       if [[ "$LOWMEM_INSTALL" != [yY] ]]; then
         if [[ -f "${SCRIPT_DIR}/addons/wget.sh" && -f /usr/local/sbin/nginx ]]; then
-          echo "update wget to ${WGET_VERSION} version... one time task"
+          echo "update wget ${WGET_VERSION} & pcre ${PCRE_VERSION} version... one time task"
           sleep 6
           "${SCRIPT_DIR}/addons/wget.sh" install
         fi
@@ -1064,10 +1089,24 @@ yumupdatechecker() {
     YYUM_UPDATEPARAMETER="--disableplugin=priorities"
     echo
     echo " checking for YUM updates... please wait..."
+    # only check if last yum update was over 24hrs ago
+    LASTYUMCHECK_EPOCHDATE=$(date -d "$(awk '/Updated: / {print $1,$2,$3}' /var/log/yum.log | tail -1)" +%s)
+    # LASTYUMHISTORYCHECK_EPOCHDATE=$(date -d $(history | grep 'yum' | grep update | grep -v list | tail -1 | awk '{print $2}' | sed -e 's|\[||g' -e 's|\]||g' -e 's|\.|\/|g') +%s)
+    TODAY_EPOCHDATE=$(date +%s)
+    SEC_SINCELASTUPDATE=$(echo ${TODAY_EPOCHDATE} - ${LASTYUMCHECK_EPOCHDATE} | bc)
+    # SEC_SINCEHISTORYLASTUPDATE=$(echo ${TODAY_EPOCHDATE} - ${LASTYUMHISTORYCHECK_EPOCHDATE} | bc)
     if [[ -f /etc/yum.repos.d/remi.repo || -f /etc/yum.repos.d/city-fan.org.repo ]]; then
-      UPDATE_CHECK=$(/usr/bin/yum $YYUM_PARAMETER -e 0 -d 0 check-update --enablerepo=$YENABLEREPOS --exclude="$YEXCLUDE" 1> /dev/null 2>&1; echo $?)
+      if [[ "${SEC_SINCELASTUPDATE}" -gt '86400' ]]; then
+        UPDATE_CHECK=$(/usr/bin/yum $YYUM_PARAMETER -e 0 -d 0 check-update --enablerepo=$YENABLEREPOS --exclude="$YEXCLUDE" 1> /dev/null 2>&1; echo $?)
+      else
+        UPDATE_CHECK=1
+      fi
     else
-      UPDATE_CHECK=$(/usr/bin/yum $YYUM_PARAMETER -e 0 -d 0 check-update --exclude="$YEXCLUDE" 1> /dev/null 2>&1; echo $?)
+      if [[ "${SEC_SINCELASTUPDATE}" -gt '86400' ]]; then
+        UPDATE_CHECK=$(/usr/bin/yum $YYUM_PARAMETER -e 0 -d 0 check-update --exclude="$YEXCLUDE" 1> /dev/null 2>&1; echo $?)
+      else
+        UPDATE_CHECK=1
+      fi
     fi
     if [[ "$UPDATE_CHECK" = '100' ]]; then
       echo
@@ -2452,6 +2491,7 @@ if [[ "$INITIALINSTALL" != [yY] ]]; then
   disable_varnishrepo
   pzcat_install
   redetect_tlsonethree
+  dft_phpupstream
 fi
 
 }

@@ -9,6 +9,10 @@ scl_install() {
       if [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]]; then
         source /opt/gcc8/enable
       fi
+    elif [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+      if [[ -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+        source /opt/rh/devtoolset-8/enable
+      fi
     elif [[ "$DEVTOOLSETSEVEN" = [yY] ]]; then
       if [[ -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
         source /opt/rh/devtoolset-7/enable
@@ -39,6 +43,21 @@ scl_install() {
         echo
         /opt/gcc8/bin/gcc --version
         /opt/gcc8/bin/g++ --version
+      elif [[ "$DEVTOOLSETEIGHT" = [yY] && ! -f /opt/rh/devtoolset-8/root/usr/bin/gcc ]]; then
+        if [[ -z "$(rpm -qa | grep rpmforge)" ]]; then
+          if [[ "$(rpm -ql devtoolset-8-gcc >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ "$(rpm -ql devtoolset-8-gcc-c++ >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ "$(rpm -ql devtoolset-8-binutils >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
+            time $YUMDNFBIN -y -q install devtoolset-8-gcc devtoolset-8-gcc-c++ devtoolset-8-binutils
+          fi
+          sar_call
+        else
+          if [[ "$(rpm -ql devtoolset-8-gcc >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ "$(rpm -ql devtoolset-8-gcc-c++ >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ "$(rpm -ql devtoolset-8-binutils >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
+            time $YUMDNFBIN -y -q install devtoolset-8-gcc devtoolset-8-gcc-c++ devtoolset-8-binutils --disablerepo=rpmforge
+          fi
+          sar_call
+        fi
+        echo
+        /opt/rh/devtoolset-8/root/usr/bin/gcc --version
+        /opt/rh/devtoolset-8/root/usr/bin/g++ --version
       elif [[ "$DEVTOOLSETSEVEN" = [yY] ]]; then
       # llbm-toolset-7 for clang 4 isn't ready for centos 6.x yet
       # if [[ "$DEVTOOLSETSEVEN" = [yY] || "$CLANG_FOUR" = [yY] ]]; then
@@ -109,10 +128,38 @@ scl_install() {
         fi
         sar_call
       fi
-      if [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]]; then
+      if [[ "$DEVTOOLSETNINE" = [yY] ]] && [[ -f /opt/gcc9/bin/gcc && -f /opt/gcc9/bin/g++ ]]; then
+        echo
+        /opt/gcc9/bin/gcc --version
+        /opt/gcc9/bin/g++ --version
+      elif [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]]; then
         echo
         /opt/gcc8/bin/gcc --version
         /opt/gcc8/bin/g++ --version
+      elif [[ "$DEVTOOLSETEIGHT" = [yY] && ! -f /opt/rh/devtoolset-8/root/usr/bin/gcc ]]; then
+        if [[ -z "$(rpm -qa | grep rpmforge)" ]]; then
+          if [[ "$(rpm -ql devtoolset-8-gcc >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ "$(rpm -ql devtoolset-8-gcc-c++ >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ "$(rpm -ql devtoolset-8-binutils >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
+            time $YUMDNFBIN -y -q install devtoolset-8-gcc devtoolset-8-gcc-c++ devtoolset-8-binutils
+          fi
+          sar_call
+        else
+          if [[ "$(rpm -ql devtoolset-8-gcc >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ "$(rpm -ql devtoolset-8-gcc-c++ >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ "$(rpm -ql devtoolset-8-binutils >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
+            time $YUMDNFBIN -y -q install devtoolset-8-gcc devtoolset-8-gcc-c++ devtoolset-8-binutils --disablerepo=rpmforge
+          fi
+          sar_call
+        fi
+        if [[ "$CLANG_FOUR" = [yY] && ! -f /opt/rh/llvm-toolset-7/root/usr/bin/clang ]]; then
+          time $YUMDNFBIN -y install devtoolset-7-runtime llvm-toolset-7-runtime devtoolset-7-libstdc++-devel llvm-toolset-7-clang llvm-toolset-7-llvm-libs llvm-toolset-7-llvm-static llvm-toolset-7-compiler-rt llvm-toolset-7-libomp llvm-toolset-7-clang-libs
+        fi
+        if [[ "$CLANG_FIVE" = [yY] && ! -f /opt/rh/llvm-toolset-7/root/usr/bin/clang ]]; then
+          time $YUMDNFBIN -y install devtoolset-7-runtime llvm-toolset-7-runtime devtoolset-7-libstdc++-devel llvm-toolset-7-clang llvm-toolset-7-llvm-libs llvm-toolset-7-llvm-static llvm-toolset-7-compiler-rt llvm-toolset-7-libomp llvm-toolset-7-clang-libs
+        fi
+        echo
+        /opt/rh/devtoolset-8/root/usr/bin/gcc --version
+        /opt/rh/devtoolset-8/root/usr/bin/g++ --version
+        if [[ "$CLANG_FOUR" = [yY] && -f /opt/rh/llvm-toolset-7/root/usr/bin/clang || "$CLANG_FIVE" = [yY] && -f /opt/rh/llvm-toolset-7/root/usr/bin/clang ]]; then
+          /opt/rh/llvm-toolset-7/root/usr/bin/clang -v
+        fi
       elif [[ "$DEVTOOLSETSEVEN" = [yY] || "$CLANG_FOUR" = [yY] || "$CLANG_FIVE" = [yY] ]]; then
         if [[ -z "$(rpm -qa | grep rpmforge)" ]]; then
           if [[ "$(rpm -ql devtoolset-7-gcc >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ "$(rpm -ql devtoolset-7-gcc-c++ >/dev/null 2>&1; echo $?)" -ne '0' ]] || [[ "$(rpm -ql devtoolset-7-binutils >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
@@ -268,10 +315,14 @@ libbroti_install() {
     fi    
     fi # centos 6 only needed
 
+    if [[ "$DEVTOOLSETNINE" = [yY] ]] && [[ -f /opt/gcc9/bin/gcc && -f /opt/gcc9/bin/g++ ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1,2 | sed "s|\.|0|")" -lt '407' ]]; then
+      unset CC
+      unset CXX 
+    fi
     if [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1,2 | sed "s|\.|0|")" -lt '407' ]]; then
       unset CC
       unset CXX 
-    fi        
+    fi
   fi
 }
 
@@ -341,7 +392,7 @@ ngxbrotli_download() {
 cat > "/usr/local/nginx/conf/brotli_inc.conf" <<EIF
 brotli on;
 brotli_static on;
-brotli_min_length 65536;
+brotli_min_length 1400;
 brotli_buffers 1024 8k;
 brotli_comp_level 5;
 brotli_types text/plain text/css text/xml application/javascript application/x-javascript application/xml application/xml+rss application/ecmascript application/json image/svg+xml;

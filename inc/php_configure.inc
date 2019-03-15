@@ -84,9 +84,9 @@ fi
 
 # Disabled by default as currently PHP seems to fail to 
 # compile some of the PHP extensions with GCC 8
-if [[ "$DEVTOOLSETEIGHT" = [yY] ]]; then
-  DEVTOOLSETEIGHT='n'
-fi
+# if [[ "$DEVTOOLSETEIGHT" = [yY] ]]; then
+#   DEVTOOLSETEIGHT='n'
+# fi
 
 # If PHP 5.3 detected disable PHP EMBED SAPI
 # https://community.centminmod.com/posts/63877/
@@ -462,14 +462,108 @@ if [[ ! -f /usr/bin/xslt-config ]]; then
   sar_call
 fi
 
+# for PHP versions lower than 7.1 switch back to system libicu versions for compatibility
+if [[ "$PHPMVER" = 5.[23456] ]]; then
+  NEWLIBICU='n'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPMUVER" = 5.[23456] ]]; then
+  NEWLIBICU='n'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPMVER" = '7.0' ]]; then
+  NEWLIBICU='n'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPMVER" = '7.1' ]]; then
+  NEWLIBICU='n'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPMVER" = '7.2' ]]; then
+  NEWLIBICU='n'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPMVER" = '7.3' ]]; then
+  NEWLIBICU='y'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPMVER" = '7.4' ]]; then
+  NEWLIBICU='y'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPMUVER" = '7.0' ]]; then
+  NEWLIBICU='n'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPUVER" = '7.1' ]]; then
+  NEWLIBICU='n'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPUVER" = '7.2' ]]; then
+  NEWLIBICU='n'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPUVER" = '7.3' ]]; then
+  NEWLIBICU='y'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+if [[ "$PHPUVER" = '7.4' ]]; then
+  NEWLIBICU='y'
+  echo "NEWLIBICU=$NEWLIBICU"
+fi
+
 if [[ ! -f /usr/bin/icu-config ]]; then
-  if [ -f /etc/yum.repos.d/rpmforge.repo ]; then
-   yum -q -y install libicu libicu-devel --disablerepo=rpmforge,epel
-   sar_call
+  if [[ "$NEWLIBICU" = [yY] && "$CENTOS_SEVEN" = '7' && -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/rpmforge.repo ]]; then
+    yum -q -y install libicu62 libicu62-devel --enablerepo=remi --disablerepo=rpmforge,epel
+    sar_call
+  elif [[ "$NEWLIBICU" = [yY] && "$CENTOS_SEVEN" = '7' && -f /etc/yum.repos.d/remi.repo && ! -f /etc/yum.repos.d/rpmforge.repo ]]; then
+    yum -q -y install libicu62 libicu62-devel --enablerepo=remi --disablerepo=epel
+    sar_call
+  elif [[ "$CENTOS_SIX" = '6' && -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/rpmforge.repo ]]; then
+    yum -q -y install libicu-last libicu-last-devel --enablerepo=remi --disablerepo=rpmforge,epel
+    sar_call
+  elif [[ "$CENTOS_SIX" = '6' && -f /etc/yum.repos.d/remi.repo && ! -f /etc/yum.repos.d/rpmforge.repo ]]; then
+    yum -q -y install libicu-last libicu-last-devel --enablerepo=remi --disablerepo=epel
+    sar_call
+  elif [ -f /etc/yum.repos.d/rpmforge.repo ]; then
+    yum -q -y install libicu libicu-devel --disablerepo=rpmforge,epel
+    sar_call
   else
     yum -q -y install libicu libicu-devel --disablerepo=epel
     sar_call
   fi
+fi
+if [[ "$NEWLIBICU" = [yY] && "$CENTOS_SEVEN" = '7' && -f /etc/yum.repos.d/remi.repo && -f /usr/bin/icu-config && "$(/usr/bin/icu-config --version| cut -d . -f1)" -lt '62' ]]; then
+  # update centos 7 libicu 50.1 version to remi yum repo provided libicu 62.1 version
+  yum -y install libicu62 --enablerepo=remi
+  yum -y swap libicu-devel libicu62-devel --enablerepo=remi
+fi
+# for PHP versions lower than 7.1 switch back to system libicu versions for compatibility
+if [[ "$NEWLIBICU" = [nN] && "$CENTOS_SEVEN" = '7' && -f /etc/yum.repos.d/remi.repo && -f /usr/bin/icu-config && "$(/usr/bin/icu-config --version| cut -d . -f1)" -gt '50' ]]; then
+  # update centos 7 libicu 50.1 version to remi yum repo provided libicu 62.1 version
+  if [ "$(rpm -ql libicu62)" ]; then
+    yum -y remove libicu62 --enablerepo=remi
+    if [ -f /etc/yum.repos.d/rpmforge.repo ]; then
+      yum -q -y install libicu-devel --disablerepo=rpmforge,epel
+    else
+      yum -q -y install libicu-devel --disablerepo=epel
+    fi
+  fi
+  if [ "$(rpm -ql libicu62-devel)" ]; then
+    yum -y swap libicu62-devel libicu-devel --enablerepo=remi
+  else
+    if [ -f /etc/yum.repos.d/rpmforge.repo ]; then
+      yum -q -y install libicu-devel --disablerepo=rpmforge,epel
+    else
+      yum -q -y install libicu-devel --disablerepo=epel
+    fi
+  fi
+fi
+if [[ "$CENTOS_SIX" = '6' && -f /etc/yum.repos.d/remi.repo && -f /usr/bin/icu-config && "$(/usr/bin/icu-config --version| cut -d . -f1)" -lt '50' ]]; then
+  # update centos 7 libicu 50.1 version to remi yum repo provided libicu 62.1 version
+  yum -y install libicu-last --enablerepo=remi
+  yum -y remove libicu-devel
+  yum -y install libicu-last-devel --enablerepo=remi
 fi
 
 if [[ ! -f /usr/bin/pspell-config ]]; then
@@ -614,10 +708,19 @@ fi
 
 # let centmin.sh set PHPFINFO variable override the
 # low memory CHECKLOWMEMPHP variable check
-if [[ "$PHPFINFO" = [yY] ]] && [[ "$CHECKLOWMEMPHP" = "1" && "$TOTALSWAPMEM" -ge '1023000' ]]; then
+if [[ "$PHPFINFO_STANDALONE" = [yY] ]]; then
+  PHPFINFO='y'
+fi
+if [[ "$PHPFINFO" = [yY] ]] && [[ "$CHECKLOWMEMPHP" = "1" && "$TOTALSWAPMEM" -ge '1023000' && "$PHPFINFO_STANDALONE" = [yY] ]]; then
+  # PHPFINFO yes + low mem install + swap space enough = enable file info php extension
+  FILEINFOOPT=" --disable-fileinfo"
+elif [[ "$PHPFINFO" = [yY] ]] && [[ "$CHECKLOWMEMPHP" = "1" && "$TOTALSWAPMEM" -ge '1023000' && "$PHPFINFO_STANDALONE" = [nN] ]]; then
   # PHPFINFO yes + low mem install + swap space enough = enable file info php extension
   FILEINFOOPT=""
-elif [[ "$PHPFINFO" = [yY] ]] && [[ "$CHECKLOWMEMPHP" != "1" ]]; then
+elif [[ "$PHPFINFO" = [yY] ]] && [[ "$CHECKLOWMEMPHP" != "1" && "$PHPFINFO_STANDALONE" = [yY] ]]; then
+  # PHPFINFO yes + enough mem install = enable file info php extension
+  FILEINFOOPT=" --disable-fileinfo"
+elif [[ "$PHPFINFO" = [yY] ]] && [[ "$CHECKLOWMEMPHP" != "1" && "$PHPFINFO_STANDALONE" = [nN] ]]; then
   # PHPFINFO yes + enough mem install = enable file info php extension
   FILEINFOOPT=""
 elif [[ "$PHPFINFO" = [yY] ]] && [[ "$CHECKLOWMEMPHP" = "1" && "$TOTALSWAPMEM" -lt '1023000' ]]; then
@@ -701,7 +804,17 @@ if [[ "$CENTOS_SEVEN" = '7' || "$CENTOS_SIX" = '6' ]]; then
 fi
 
 # set_intelflags
-if [[ "$(grep -c "processor" /proc/cpuinfo)" -lt '2' ]]; then
+if [[ "$(grep -c "processor" /proc/cpuinfo)" -lt '2' ]] && [[ "$PHPMVER" = '7.3' || "$PHPMUVER" = '7.3' || "$PHPMVER" = '7.4' || "$PHPMUVER" = '7.4' ]]; then
+  # Enable faster clang compiler for PHP if less than 2 cpu threads
+  # CLANG_PHP='y'
+
+  # Disable PGO if less than 2 cpu threads
+  PHP_PGO='n'
+
+  # Disable php intel optimisation flags if less than 2 cpu threads
+  # detected due to being very very slow for php compile times
+  GCCINTEL_PHP='y'
+elif [[ "$(grep -c "processor" /proc/cpuinfo)" -lt '2' ]]; then
   # Enable faster clang compiler for PHP if less than 2 cpu threads
   # CLANG_PHP='y'
 
@@ -711,6 +824,16 @@ if [[ "$(grep -c "processor" /proc/cpuinfo)" -lt '2' ]]; then
   # Disable php intel optimisation flags if less than 2 cpu threads
   # detected due to being very very slow for php compile times
   GCCINTEL_PHP='n'
+elif [[ "$PHPMVER" = '7.3' || "$PHPMUVER" = '7.3' || "$PHPMVER" = '7.4' || "$PHPMUVER" = '7.4' ]]; then
+  # Enable faster clang compiler for PHP if less than 2 cpu threads
+  # CLANG_PHP='y'
+
+  # Disable PGO if less than 2 cpu threads
+  # PHP_PGO='n'
+
+  # Disable php intel optimisation flags if less than 2 cpu threads
+  # detected due to being very very slow for php compile times
+  GCCINTEL_PHP='y'
 fi
 
 if [[ "$CLANG_PHP" = [yY] ]]; then
@@ -748,14 +871,14 @@ else
   # recompiles. however on initial install ccache has no benefits, so for initial
   # centmin mod install disabling ccache will in theory speed up first time installs
   if [[ "$INITIALINSTALL" != [yY] ]]; then
-      export CC="ccache /usr/bin/gcc"
-      export CXX="ccache /usr/bin/g++"
+      export CC="ccache gcc"
+      export CXX="ccache g++"
       export CCACHE_CPP2=yes
       # PLACEHOLDER FOR CLAGS FOR PHP
       # CFLAGS=
   else
-      export CC="/usr/bin/gcc"
-      export CXX="/usr/bin/g++"
+      export CC="gcc"
+      export CXX="g++"
       # export CCACHE_CPP2=yes
       # PLACEHOLDER FOR CLAGS FOR PHP
       # CFLAGS=
@@ -763,6 +886,14 @@ else
 fi
 
 if [[ "$GCCINTEL_PHP" = [yY] ]]; then
+
+  # ensure devtoolset-7 and devtoolset-8 are installed
+  if [[ "$DEVTOOLSETEIGHT" = [yY] && ! -f /opt/rh/devtoolset-8/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+      scl_install
+  fi
+  if [[ "$DEVTOOLSETSEVEN" = [yY] && ! -f /opt/rh/devtoolset-7/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
+      scl_install
+  fi
 
   # PGO PHP7 on CentOS 6 might have GCC too old 4.4.7 so use devtoolset=3 GCC 4.9
   # initial php install
@@ -778,8 +909,9 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
         export CC="ccache /opt/rh/devtoolset-4/root/usr/bin/gcc"
         export CXX="ccache /opt/rh/devtoolset-4/root/usr/bin/g++"
       elif [[ "$DEVTOOLSETSEVEN" = [yY] && -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
+        GENERAL_DEVTOOLSETGCC='y'
         DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
-        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
         source /opt/rh/devtoolset-7/enable
         scl_install
         which gcc
@@ -822,8 +954,9 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
         export CC="ccache /opt/rh/devtoolset-4/root/usr/bin/gcc"
         export CXX="ccache /opt/rh/devtoolset-4/root/usr/bin/g++"
       elif [[ "$DEVTOOLSETSEVEN" = [yY] && -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
+        GENERAL_DEVTOOLSETGCC='y'
         DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
-        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
         source /opt/rh/devtoolset-7/enable
         scl_install
         which gcc
@@ -858,8 +991,9 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
   if [[ "$CENTOS_SEVEN" = '7' && "$PHP_PGO" = [yY] && "$PHPMVER" > 7 ]] || [[ "$CENTOS_SEVEN" = '7' && "$PHPMVER" = '7.3' ]] || [[ "$DEVTOOLSET_PHP" = [yY] ]]; then
     # if devtoolset-4 gcc and g++ exist use then instead of system versions regardless of CentOS version
     if [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]]; then
+      GENERAL_DEVTOOLSETGCC='y'
       DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
-      DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+      DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
       source /opt/gcc8/enable
       which gcc
       which g++
@@ -867,9 +1001,24 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
       unset CXX
       export CC="ccache gcc"
       export CXX="ccache g++"
-    elif [[ "$DEVTOOLSETSEVEN" = [yY] && -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
+    elif [[ "$DEVTOOLSETEIGHT" = [yY] && -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+        GENERAL_DEVTOOLSETGCC='y'
         DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
-        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+        source /opt/rh/devtoolset-8/enable
+        which gcc
+        which g++
+        unset CC
+        unset CXX
+        export CC="ccache /opt/rh/devtoolset-8/root/usr/bin/gcc"
+        export CXX="ccache /opt/rh/devtoolset-8/root/usr/bin/g++"
+        echo "centos 7 set devtoolset-8"
+        echo $CC
+        echo $CXX
+    elif [[ "$DEVTOOLSETSEVEN" = [yY] && -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
+        GENERAL_DEVTOOLSETGCC='y'
+        DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
         source /opt/rh/devtoolset-7/enable
         which gcc
         which g++
@@ -908,8 +1057,9 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
   if [[ "$CENTOS_SEVEN" = '7' && "$PHP_PGO" = [yY] && "$PHPMUVER" > 7 ]] || [[ "$CENTOS_SEVEN" = '7' && "$PHPMUVER" = '7.3' ]] || [[ "$DEVTOOLSET_PHP" = [yY] ]]; then
     # if devtoolset-4 gcc and g++ exist use then instead of system versions regardless of CentOS version
     if [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]]; then
+      GENERAL_DEVTOOLSETGCC='y'
       DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
-      DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+      DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
       source /opt/gcc8/enable
       which gcc
       which g++
@@ -917,9 +1067,24 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
       unset CXX
       export CC="ccache gcc"
       export CXX="ccache g++"
-    elif [[ "$DEVTOOLSETSEVEN" = [yY] && -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
+    elif [[ "$DEVTOOLSETEIGHT" = [yY] && -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+        GENERAL_DEVTOOLSETGCC='y'
         DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
-        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+        source /opt/rh/devtoolset-8/enable
+        which gcc
+        which g++
+        unset CC
+        unset CXX
+        export CC="ccache /opt/rh/devtoolset-8/root/usr/bin/gcc"
+        export CXX="ccache /opt/rh/devtoolset-8/root/usr/bin/g++"
+        echo "centos 7 set devtoolset-8"
+        echo $CC
+        echo $CXX
+    elif [[ "$DEVTOOLSETSEVEN" = [yY] && -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
+        GENERAL_DEVTOOLSETGCC='y'
+        DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
         source /opt/rh/devtoolset-7/enable
         which gcc
         which g++
@@ -956,11 +1121,20 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
   fi
 
   if [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1-3 | sed "s|\.|0|g")" -ge '40805' && "$PHP_LTO" = [yY] ]]; then
-    DEVTOOLSETEIGHT='y'
-    DEVTOOLSETSEVEN='y'
+    if [[ "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+      DEVTOOLSETEIGHT='y'
+      DEVTOOLSETSEVEN='n'
+    elif [[ "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+      DEVTOOLSETEIGHT='y'
+      DEVTOOLSETSEVEN='n'
+    else
+      DEVTOOLSETEIGHT='y'
+      DEVTOOLSETSEVEN='y'
+    fi
     if [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]]; then
+      GENERAL_DEVTOOLSETGCC='y'
       DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
-      DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+      DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
       source /opt/gcc8/enable
       which gcc
       which g++
@@ -968,7 +1142,19 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
       unset CXX
       export CC="ccache gcc"
       export CXX="ccache g++"
+    elif [[ "$DEVTOOLSETEIGHT" = [yY] && -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+      GENERAL_DEVTOOLSETGCC='y'
+      DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+      DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting'
+      source /opt/rh/devtoolset-8/enable
+      which gcc
+      which g++
+      unset CC
+      unset CXX
+      export CC="ccache /opt/rh/devtoolset-8/root/usr/bin/gcc"
+      export CXX="ccache /opt/rh/devtoolset-8/root/usr/bin/g++"
     elif [[ "$DEVTOOLSETSEVEN" = [yY] && -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
+      GENERAL_DEVTOOLSETGCC='y'
       DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
       DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting'
       source /opt/rh/devtoolset-7/enable
@@ -1000,20 +1186,44 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
   CPUSTEPPING=$(awk -F ": " '/stepping/ {print $2}' /proc/cpuinfo | uniq)
   SSEFOURTWOCHECK=$(grep -o sse4_2 /proc/cpuinfo | sort -u | wc -l)
   MARCHCHECK=$(gcc -c -Q -march=native --help=target | awk '/  -march=/ {print $2}' | head -n1)
-  gcc --version | tee ${CENTMINLOGDIR}/gcc_php_native.log
-  gcc -c -Q -march=native --help=target | egrep '\[enabled\]|mtune|march|mfpmath' | tee -a ${CENTMINLOGDIR}/gcc_php_native.log
+  # gcc --version | tee ${CENTMINLOGDIR}/gcc_php_native.log
+  # gcc -c -Q -march=native --help=target | egrep '\[enabled\]|mtune|march|mfpmath' | tee -a ${CENTMINLOGDIR}/gcc_php_native.log
 
+  echo
+  gcc -c -Q -march=native --help=target | egrep '\-mtune|\-march|\-msse|\-msse2|\-msse2avx|\-msse3|\-mavx|\-msse4|\-mssse3|\-mpclmul' | tee ${CENTMINLOGDIR}/gcc_php_native.log
+  echo
+  gcc -c -Q -march=x86-64 --help=target | egrep '\-mtune|\-march|\-msse|\-msse2|\-msse2avx|\-msse3|\-mavx|\-msse4|\-mssse3|\-mpclmul' | tee ${CENTMINLOGDIR}/gcc_php_x86-64.log
+  echo
+  diff -y --suppress-common-lines ${CENTMINLOGDIR}/gcc_php_native.log ${CENTMINLOGDIR}/gcc_php_x86-64.log | tee ${CENTMINLOGDIR}/gcc_php_diff_native-vs-x86-64.log
+  echo
+  egrep '\-march=|\-mtune|\-mavx|\-msse4|\-mpclmul' ${CENTMINLOGDIR}/gcc_php_diff_native-vs-x86-64.log
+  # if non native target x86-64 is used 
+  # pick up important native cpu instructions
+  # and manually pass them to x86-64 target
+  if [[ "$MARCH_TARGETNATIVE" = [yY] ]]; then
+    GCC_NONNATIVEFLAGS=""
+  else
+    GCC_NONNATIVEFLAGS=" $(egrep '\-march=|\-mtune|\-mavx|\-msse4|\-mpclmul' ${CENTMINLOGDIR}/gcc_php_native.log | egrep -v 'march|mtune|avx512' | grep enabled | sed -e 's|\[||g' -e 's|\]||g' -e 's|enabled||g'| xargs)"
+    echo
+    gcc -c -Q -march=x86-64${GCC_NONNATIVEFLAGS} --help=target | egrep '\-mtune|\-march|\-msse|\-msse2|\-msse2avx|\-msse3|\-mavx|\-msse4|\-mssse3|\-mpclmul' | tee ${CENTMINLOGDIR}/gcc_php_x86-64-non-native.log
+  fi
+  echo
+  echo "GCC_NONNATIVEFLAGS=$GCC_NONNATIVEFLAGS"
+    echo
 
   # for PHP_LTO='y'
   if [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1-3 | sed "s|\.|0|g")" -ge '40805' && "$PHP_GSPLITDWARF" = [yY] && "$PHP_LTO" = [yY] ]]; then
     # remove  -gsplit-dwarf when PHP_LTO='y' seems *.dwo files aren't cleaned from /tmp with it enabled
-    PHPEXTRA_CFLAGS="$PHPEXTRA_CFLAGS -flto -fno-fat-lto-objects -fuse-ld=gold -fuse-linker-plugin -flto-partition=max${DEVTOOLSETPHP_FALLTHROUGH}${DEVTOOLSETPHP_EXTRAFLAGS}"
+    PHPEXTRA_CFLAGS="$PHPEXTRA_CFLAGS -flto -fno-fat-lto-objects -fuse-ld=gold -fuse-linker-plugin -flto-partition=max -Wno-deprecated-declarations${DEVTOOLSETPHP_FALLTHROUGH}${DEVTOOLSETPHP_EXTRAFLAGS}"
     PHPLTOOPT=' --disable-gcc-global-regs'
   elif [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1-3 | sed "s|\.|0|g")" -ge '40805' && "$PHP_GSPLITDWARF" = [yY] && "$PHP_LTO" = [nN] ]]; then
-    PHPEXTRA_CFLAGS="$PHPEXTRA_CFLAGS -gsplit-dwarf"
+    PHPEXTRA_CFLAGS="$PHPEXTRA_CFLAGS -gsplit-dwarf -Wno-deprecated-declarations${DEVTOOLSETPHP_FALLTHROUGH}${DEVTOOLSETPHP_EXTRAFLAGS}"
+    PHPLTOOPT=""
+  elif [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1-3 | sed "s|\.|0|g")" -ge '40805' && "$PHP_GSPLITDWARF" = [nN] && "$PHP_LTO" = [nN] ]]; then
+    PHPEXTRA_CFLAGS="$PHPEXTRA_CFLAGS -Wno-deprecated-declarations${DEVTOOLSETPHP_FALLTHROUGH}${DEVTOOLSETPHP_EXTRAFLAGS}"
     PHPLTOOPT=""
   elif [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1-3 | sed "s|\.|0|g")" -ge '40805' && "$PHP_LTO" = [yY] ]]; then
-    PHPEXTRA_CFLAGS="$PHPEXTRA_CFLAGS -flto -fno-fat-lto-objects -fuse-ld=gold -fuse-linker-plugin -flto-partition=max${DEVTOOLSETPHP_FALLTHROUGH}${DEVTOOLSETPHP_EXTRAFLAGS}"
+    PHPEXTRA_CFLAGS="$PHPEXTRA_CFLAGS -flto -fno-fat-lto-objects -fuse-ld=gold -fuse-linker-plugin -flto-partition=max -Wno-deprecated-declarations${DEVTOOLSETPHP_FALLTHROUGH}${DEVTOOLSETPHP_EXTRAFLAGS}"
     PHPLTOOPT=' --disable-gcc-global-regs'
   fi
 
@@ -1021,41 +1231,92 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
     CCM=64
     
     if [[ "$MARCH_TARGETNATIVE" = [nN] ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}"
+      PHP_MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}${GCC_NONNATIVEFLAGS}"
     elif [[ "$CPU_MARCH" = 'silvermont' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=silvermont"
+      echo
+      gcc -c -Q -march=silvermont --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'bonnell' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=bonnell"
+      echo
+      gcc -c -Q -march=bonnell --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'cannonlake' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=cannonlake"
+      echo
+      gcc -c -Q -march=cannonlake --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'skylake-avx512' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=skylake-avx512"
+      echo
+      gcc -c -Q -march=skylake-avx512 --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'skylake' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=skylake"
+      echo
+      gcc -c -Q -march=skylake --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'broadwell' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=broadwell"
+      echo
+      gcc -c -Q -march=broadwell --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'haswell' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=haswell"
+      echo
+      gcc -c -Q -march=haswell --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'ivybridge' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=ivybridge"
+      echo
+      gcc -c -Q -march=ivybridge --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'sandybridge' && "$(cat /proc/cpuinfo | grep -o 'avx' | uniq)" = 'avx' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=sandybridge"
+      echo
+      gcc -c -Q -march=sandybridge --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'westmere' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=westmere"
+      echo
+      gcc -c -Q -march=westmere --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'nehalem' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=nehalem"
+      echo
+      gcc -c -Q -march=nehalem --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'core-avx2' && "$(cat /proc/cpuinfo | grep -o 'avx' | uniq)" = 'avx' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=core-avx2"
+      echo
+      gcc -c -Q -march=core-avx2 --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'core-avx-i' && "$(cat /proc/cpuinfo | grep -o 'avx' | uniq)" = 'avx' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=core-avx-i"
+      echo
+      gcc -c -Q -march=core-avx-i --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'corei7-avx' && "$(cat /proc/cpuinfo | grep -o 'avx' | uniq)" = 'avx' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=corei7-avx"
+      echo
+      gcc -c -Q -march=corei7-avx --help=target
+      echo
     elif [[ "$CPU_MARCH" = 'corei7' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=corei7"
+      echo
+      gcc -c -Q -march=corei7 --help=target
+      echo
     elif [[ "$CENTOS_SIX" = '6' && "$CPU_MARCH" = 'core2' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=core2"
+      echo
+      gcc -c -Q -march=core2 --help=target
+      echo
     elif [[ "$CENTOS_SEVEN" = '7' && "$CPU_MARCH" = 'core2' ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=core2"
+      echo
+      gcc -c -Q -march=core2 --help=target
+      echo
     else
       PHP_MTUNEOPT="-m${CCM} -mtune=native"
     fi
@@ -1069,6 +1330,18 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
     fi
     export CXXFLAGS="$CFLAGS"
   elif [[ "$(uname -m)" = 'x86_64' && "$CPUVENDOR" = 'AuthenticAMD' && "$CPU_MARCH" = 'znver1' ]] && [[ "$CLANG_PHP" = [nN] ]]; then
+    CCM=64
+    PHP_MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}"
+    # if only 1 cpu thread use -O2 to keep compile times sane
+    if [[ "$(grep -c "processor" /proc/cpuinfo)" -eq '1' ]]; then
+      export CFLAGS="-O2 $PHP_MTUNEOPT -pipe${PHPEXTRA_CFLAGS}"
+    elif [[ "$(grep -c "processor" /proc/cpuinfo)" -eq '2' ]]; then
+      export CFLAGS="-O2 $PHP_MTUNEOPT -pipe${PHPEXTRA_CFLAGS}"
+    else
+      export CFLAGS="-O3 $PHP_MTUNEOPT -pipe${PHPEXTRA_CFLAGS}"
+    fi
+    export CXXFLAGS="$CFLAGS"
+  elif [[ "$(uname -m)" = 'x86_64' && "$CPUVENDOR" = 'AuthenticAMD' && "$CPU_MARCH" = 'znver2' ]] && [[ "$CLANG_PHP" = [nN] ]]; then
     CCM=64
     PHP_MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}"
     # if only 1 cpu thread use -O2 to keep compile times sane

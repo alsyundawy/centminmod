@@ -99,6 +99,11 @@ if [[ "$CENTOS_SEVEN" != '7' ]]; then
         echo "/etc/init.d/memcached stop" >/usr/bin/memcachedstop ; chmod 700 /usr/bin/memcachedstop
         echo "/etc/init.d/memcached start" >/usr/bin/memcachedstart ; chmod 700 /usr/bin/memcachedstart
         echo "/etc/init.d/memcached restart" >/usr/bin/memcachedrestart ; chmod 700 /usr/bin/memcachedrestart
+        if [[ "$USEEDITOR" = 'vim' ]]; then
+            echo "vim /etc/init.d/memcached" >/usr/bin/memcachedconfig ; chmod 700 /usr/bin/memcachedconfig
+        else
+            echo "nano /etc/init.d/memcached" >/usr/bin/memcachedconfig ; chmod 700 /usr/bin/memcachedconfig
+        fi
     fi
     
     if [ -f /usr/sbin/csf ]; then
@@ -114,18 +119,20 @@ if [[ "$CENTOS_SEVEN" = '7' ]]; then
     echo "/etc/init.d/nginx start" >/usr/bin/ngxstart ; chmod 700 /usr/bin/ngxstart
     echo "/etc/init.d/nginx restart" >/usr/bin/ngxrestart ; chmod 700 /usr/bin/ngxrestart
     echo "/etc/init.d/nginx reload" >/usr/bin/ngxreload ; chmod 700 /usr/bin/ngxreload
-    echo "/etc/init.d/php-fpm stop" >/usr/bin/fpmstop ; chmod 700 /usr/bin/fpmstop
-    echo "/etc/init.d/php-fpm start" >/usr/bin/fpmstart ; chmod 700 /usr/bin/fpmstart
-    echo "/etc/init.d/php-fpm restart" >/usr/bin/fpmrestart ; chmod 700 /usr/bin/fpmrestart
-    echo "/etc/init.d/php-fpm reload" >/usr/bin/fpmreload ; chmod 700 /usr/bin/fpmreload
-    echo "/etc/init.d/php-fpm configtest" >/usr/bin/fpmconfigtest ; chmod 700 /usr/bin/fpmconfigtest
+    if [[ "$SWITCH_PHPFPM_SYSTEMD" != [yY] && ! -f /usr/lib/systemd/system/php-fpm.service ]]; then
+        echo "/etc/init.d/php-fpm stop" >/usr/bin/fpmstop ; chmod 700 /usr/bin/fpmstop
+        echo "/etc/init.d/php-fpm start" >/usr/bin/fpmstart ; chmod 700 /usr/bin/fpmstart
+        echo "/etc/init.d/php-fpm restart" >/usr/bin/fpmrestart ; chmod 700 /usr/bin/fpmrestart
+        echo "/etc/init.d/php-fpm reload" >/usr/bin/fpmreload ; chmod 700 /usr/bin/fpmreload
+        echo "/etc/init.d/php-fpm configtest" >/usr/bin/fpmconfigtest ; chmod 700 /usr/bin/fpmconfigtest
+    fi
 
     if [ -f /etc/init.d/mysql ]; then
     
         echo "systemctl daemon-reload; service mysql stop" >/usr/bin/mysqlstop ; chmod 700 /usr/bin/mysqlstop
         echo "systemctl daemon-reload; service mysql start" >/usr/bin/mysqlstart ; chmod 700 /usr/bin/mysqlstart
         echo "systemctl daemon-reload; service mysql restart" >/usr/bin/mysqlrestart ; chmod 700 /usr/bin/mysqlrestart
-        if [[ "$MARIADB_INSTALLTENTHREE" != [yY] || "$(mysqladmin ver | awk '/Server version/ {print $3}' | cut -d . -f1,2)" != '10.3' ]]; then
+        if [[ "$MARIADB_INSTALLTENTHREE" != [yY] || "$(/usr/bin/mysql_config --version | cut -d . -f1,2)" != '10.3' ]]; then
             echo "systemctl daemon-reload; service mysql reload" >/usr/bin/mysqlreload ; chmod 700 /usr/bin/mysqlreload
         fi
     
@@ -134,20 +141,27 @@ if [[ "$CENTOS_SEVEN" = '7' ]]; then
         echo "systemctl daemon-reload; service mysqld stop" >/usr/bin/mysqlstop ; chmod 700 /usr/bin/mysqlstop
         echo "systemctl daemon-reload; service mysqld start" >/usr/bin/mysqlstart ; chmod 700 /usr/bin/mysqlstart
         echo "systemctl daemon-reload; service mysqld restart" >/usr/bin/mysqlrestart ; chmod 700 /usr/bin/mysqlrestart
-        if [[ "$MARIADB_INSTALLTENTHREE" != [yY] || "$(mysqladmin ver | awk '/Server version/ {print $3}' | cut -d . -f1,2)" != '10.3' ]]; then
+        if [[ "$MARIADB_INSTALLTENTHREE" != [yY] || "$(/usr/bin/mysql_config --version | cut -d . -f1,2)" != '10.3' ]]; then
             echo "systemctl daemon-reload; service mysqld reload" >/usr/bin/mysqlreload ; chmod 700 /usr/bin/mysqlreload
         fi
     
     fi
-        echo "/etc/init.d/nginx stop;/etc/init.d/php-fpm stop" >/usr/bin/npstop ; chmod 700 /usr/bin/npstop
-        echo "/etc/init.d/nginx start;/etc/init.d/php-fpm start" >/usr/bin/npstart ; chmod 700 /usr/bin/npstart
-        echo "/etc/init.d/nginx restart;/etc/init.d/php-fpm restart" >/usr/bin/nprestart ; chmod 700 /usr/bin/nprestart
-        echo "/etc/init.d/nginx reload;/etc/init.d/php-fpm reload" >/usr/bin/npreload ; chmod 700 /usr/bin/npreload
+        if [[ "$SWITCH_PHPFPM_SYSTEMD" != [yY] && ! -f /usr/lib/systemd/system/php-fpm.service ]]; then
+            echo "/etc/init.d/nginx stop;/etc/init.d/php-fpm stop" >/usr/bin/npstop ; chmod 700 /usr/bin/npstop
+            echo "/etc/init.d/nginx start;/etc/init.d/php-fpm start" >/usr/bin/npstart ; chmod 700 /usr/bin/npstart
+            echo "/etc/init.d/nginx restart;/etc/init.d/php-fpm restart" >/usr/bin/nprestart ; chmod 700 /usr/bin/nprestart
+            echo "/etc/init.d/nginx reload;/etc/init.d/php-fpm reload" >/usr/bin/npreload ; chmod 700 /usr/bin/npreload
+        fi
     
     if [ -f /usr/local/bin/memcached ]; then
         echo "/etc/init.d/memcached stop" >/usr/bin/memcachedstop ; chmod 700 /usr/bin/memcachedstop
         echo "/etc/init.d/memcached start" >/usr/bin/memcachedstart ; chmod 700 /usr/bin/memcachedstart
         echo "/etc/init.d/memcached restart" >/usr/bin/memcachedrestart ; chmod 700 /usr/bin/memcachedrestart
+        if [[ "$USEEDITOR" = 'vim' ]]; then
+            echo "vim /etc/init.d/memcached" >/usr/bin/memcachedconfig ; chmod 700 /usr/bin/memcachedconfig
+        else
+            echo "nano /etc/init.d/memcached" >/usr/bin/memcachedconfig ; chmod 700 /usr/bin/memcachedconfig
+        fi
         if [ -f /usr/bin/memflush ]; then
         echo "memflush --quiet --servers=localhost:11211" >/usr/bin/memcachedflush ; chmod 700 /usr/bin/memcachedflush
         fi

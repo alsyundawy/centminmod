@@ -8,6 +8,14 @@
 # chmod +x /usr/local/bin/dmotd
 # 
 ###########################################################
+export PATH="/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin"
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
+###########################################################
 DT=$(date +"%d%m%y-%H%M%S")
 DMOTD_USER=$(whoami)
 DMOTD_HOSTNAME=$(uname -n)
@@ -115,6 +123,7 @@ echo "
 ===============================================================================
 * Getting Started Guide - https://centminmod.com/getstarted.html
 * Centmin Mod FAQ - https://centminmod.com/faq.html
+* Centmin Mod Config Files - https://centminmod.com/configfiles.html
 * Change Log - https://centminmod.com/changelog.html
 * Community Forums https://community.centminmod.com  [ << Register ]
 ===============================================================================
@@ -210,6 +219,7 @@ gitenv_askupdate() {
         echo "${CENTMINLOGDIR}/cmm-login-git-checks_${DT}.log"
         echo
       fi
+      if [[ -f /opt/centminmod/first-login-run && -f /opt/centminmod/first-login.sh ]]; then /opt/centminmod/first-login.sh; fi
     fi
 }
 

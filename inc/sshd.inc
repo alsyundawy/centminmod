@@ -3,6 +3,9 @@ sshdtweaks() {
   if [[ "$(grep '^#Port' /etc/ssh/sshd_config)" && "$(egrep '^#Port|^Port' /etc/ssh/sshd_config | wc -l)" -eq '1' ]]; then
     sed -i 's/^#Port /Port /g' /etc/ssh/sshd_config
   fi
+  if [[ ! "$(grep '^X11Forwarding no' /etc/ssh/sshd_config)" ]]; then
+    sed -i 's|^X11Forwarding .*|X11Forwarding no|' /etc/ssh/sshd_config
+  fi
 
   CHECKHOSTKEY=$(grep '#HostKey /etc/ssh/ssh_host_rsa_key' /etc/ssh/sshd_config)
   CHECKHOSTKEYB=$(grep '#HostKey /etc/ssh/ssh_host_ecdsa_key' /etc/ssh/sshd_config)
@@ -42,7 +45,7 @@ sshdtweaks() {
   # centos 6.x openssh 5.3p1 backported ecdsa keys support but
   # not configured out of the box https://community.centminmod.com/posts/19702/
   # this sets up ecdh-sha2-* key exchange support
-  if [ ! -f /etc/ssh/ssh_host_ecdsa_key ]; then
+  if [[ "$CENTOS_SIX" -eq '6' && ! -f /etc/ssh/ssh_host_ecdsa_key ]]; then
     echo "ssh-keygen -q -N "" -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key"
     ssh-keygen -q -N "" -t ecdsa -f /etc/ssh/ssh_host_ecdsa_key
   

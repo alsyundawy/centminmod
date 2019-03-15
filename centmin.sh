@@ -26,10 +26,10 @@ DT=$(date +"%d%m%y-%H%M%S")
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='093'
+SCRIPT_INCREMENTVER='110'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
-SCRIPT_DATE='31/01/2019'
+SCRIPT_DATE='31/03/2019'
 SCRIPT_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_MODIFICATION_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_URL='https://centminmod.com'
@@ -238,6 +238,14 @@ if [ -f /proc/user_beancounters ]; then
             # 7551P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7551p
             # while greater than 12 cpu cores downclocks to 2.55Ghz
             CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7501' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7501' ]]; then
+            # 7501P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7501p
+            # while greater than 12 cpu cores downclocks to 2.6Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7451' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7451' ]]; then
+            # 7451 at 12 cpu cores has 3.2Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7451
+            # while greater than 12 cpu cores downclocks to 2.9Ghz
+            CPUS=12
         elif [[ "$(grep -o 'AMD EPYC 7401' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7401' ]]; then
             # 7401P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7401p
             # while greater than 12 cpu cores downclocks to 2.8Ghz
@@ -264,6 +272,14 @@ else
         elif [[ "$(grep -o 'AMD EPYC 7551' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7551' ]]; then
             # 7551P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7551p
             # while greater than 12 cpu cores downclocks to 2.55Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7501' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7501' ]]; then
+            # 7501P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7501p
+            # while greater than 12 cpu cores downclocks to 2.6Ghz
+            CPUS=12
+        elif [[ "$(grep -o 'AMD EPYC 7451' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7451' ]]; then
+            # 7451 at 12 cpu cores has 3.2Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7451
+            # while greater than 12 cpu cores downclocks to 2.9Ghz
             CPUS=12
         elif [[ "$(grep -o 'AMD EPYC 7401' /proc/cpuinfo | sort -u)" = 'AMD EPYC 7401' ]]; then
             # 7401P at 12 cpu cores has 3.0Ghz clock frequency https://en.wikichip.org/wiki/amd/epyc/7401p
@@ -409,8 +425,8 @@ PHP_PGO_TRAINRUNS='80'        # number of runs done during PGO PHP 7 training ru
 PHP_PGO_CENTOSSIX='n'         # CentOS 6 may need GCC >4.4.7 fpr PGO so use devtoolset-4 GCC 5.3
 DEVTOOLSET_PHP='n'            # use devtoolset GCC for GCCINTEL_PHP='y'
 DEVTOOLSETSIX='n'             # Enable or disable devtoolset-6 GCC 6.2 support instead of devtoolset-4 GCC 5.3 support
-DEVTOOLSETSEVEN='y'           # Enable or disable devtoolset-7 GCC 7.1 support instead of devtoolset-6 GCC 6.2 support
-DEVTOOLSETEIGHT='n'           # source compiled GCC 8 from latest snapshot builds
+DEVTOOLSETSEVEN='n'           # Enable or disable devtoolset-7 GCC 7.1 support instead of devtoolset-6 GCC 6.2 support
+DEVTOOLSETEIGHT='y'           # source compiled GCC 8 from latest snapshot builds
 NGINX_DEVTOOLSETGCC='y'       # Use devtoolset-4 GCC 5.3 even for CentOS 7 nginx compiles
 GENERAL_DEVTOOLSETGCC='n'     # Use devtoolset-4 GCC 5.3 whereever possible/coded
 CRYPTO_DEVTOOLSETGCC='n'      # Use devtoolset-4 GCC 5.3 for libressl or openssl compiles
@@ -535,7 +551,7 @@ NGINX_HTTPREDIS='y'          # Nginx redis http://wiki.nginx.org/HttpRedisModule
 NGINX_HTTPREDISVER='0.3.7'   # Nginx redis version
 NGINX_PCREJIT='y'            # Nginx configured with pcre & pcre-jit support
 NGINX_PCRE_DYNAMIC='y'       # compile nginx pcre as dynamic instead of static library
-NGINX_PCREVER='8.42'         # Version of PCRE used for pcre-jit support in Nginx
+NGINX_PCREVER='8.43'         # Version of PCRE used for pcre-jit support in Nginx
 NGINX_ZLIBCUSTOM='y'         # Use custom zlib instead of system version
 NGINX_ZLIBVER='1.2.11'       # http://www.zlib.net/
 NGINX_VIDEO='n'              # control variable when 'y' set for NGINX_SLICE='y', NGINX_RTMP='y', NGINX_FLV='y', NGINX_MP4='y'
@@ -562,21 +578,21 @@ LUAJIT_GITINSTALL='y'        # opt to install luajit 2.1 from dev branch http://
 LUAJIT_GITINSTALLVER='2.1-agentzh'   # branch version = v2.1 will override ORESTY_LUAGITVER if LUAJIT_GITINSTALL='y'
 
 ORESTY_LUANGINX='n'             # enable or disable or ORESTY_LUA* nginx modules below
-ORESTY_LUANGINXVER='0.10.14rc2'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
+ORESTY_LUANGINXVER='0.10.14'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
 ORESTY_LUAGITVER='2.0.5'        # luagit http://luajit.org/
 ORESTY_LUAMEMCACHEDVER='0.14'   # openresty https://github.com/openresty/lua-resty-memcached
 ORESTY_LUAMYSQLVER='0.21'    # openresty https://github.com/openresty/lua-resty-mysql
-ORESTY_LUAREDISVER='0.26'       # openresty https://github.com/openresty/lua-resty-redis
+ORESTY_LUAREDISVER='0.27'       # openresty https://github.com/openresty/lua-resty-redis
 ORESTY_LUADNSVER='0.21'         # openresty https://github.com/openresty/lua-resty-dns
 ORESTY_LUAUPLOADVER='0.10'      # openresty https://github.com/openresty/lua-resty-upload
-ORESTY_LUAWEBSOCKETVER='0.05'   # openresty https://github.com/openresty/lua-resty-websocket
-ORESTY_LUALOCKVER='0.07'        # openresty https://github.com/openresty/lua-resty-lock
+ORESTY_LUAWEBSOCKETVER='0.07'   # openresty https://github.com/openresty/lua-resty-websocket
+ORESTY_LUALOCKVER='0.08'        # openresty https://github.com/openresty/lua-resty-lock
 ORESTY_LUASTRINGVER='0.11rc1'      # openresty https://github.com/openresty/lua-resty-string
 ORESTY_LUAREDISPARSERVER='0.13'    # openresty https://github.com/openresty/lua-redis-parser
-ORESTY_LUAUPSTREAMCHECKVER='0.04'  # openresty https://github.com/openresty/lua-resty-upstream-healthcheck
-ORESTY_LUALRUCACHEVER='0.09rc1'       # openresty https://github.com/openresty/lua-resty-lrucache
-ORESTY_LUARESTYCOREVER='0.1.16rc2'    # openresty https://github.com/openresty/lua-resty-core
-ORESTY_LUASTREAMVER='0.0.6rc2'     # https://github.com/openresty/stream-lua-nginx-module
+ORESTY_LUAUPSTREAMCHECKVER='0.06'  # openresty https://github.com/openresty/lua-resty-upstream-healthcheck
+ORESTY_LUALRUCACHEVER='0.09'       # openresty https://github.com/openresty/lua-resty-lrucache
+ORESTY_LUARESTYCOREVER='0.1.16'    # openresty https://github.com/openresty/lua-resty-core
+ORESTY_LUASTREAMVER='0.0.6'     # https://github.com/openresty/stream-lua-nginx-module
 ORESTY_LUASTREAM='y'               # control https://github.com/openresty/stream-lua-nginx-module
 ORESTY_LUAUPSTREAMVER='0.06'       # openresty https://github.com/openresty/lua-upstream-nginx-module
 NGX_LUAUPSTREAM='n'                # disable https://github.com/openresty/lua-upstream-nginx-module
@@ -584,10 +600,11 @@ ORESTY_LUALOGGERSOCKETVER='0.1'    # cloudflare openresty https://github.com/clo
 ORESTY_LUACOOKIEVER='master'       # cloudflare openresty https://github.com/cloudflare/lua-resty-cookie
 ORESTY_LUAUPSTREAMCACHEVER='0.1.1' # cloudflare openresty https://github.com/cloudflare/lua-upstream-cache-nginx-module
 NGX_LUAUPSTREAMCACHE='n'           # disable https://github.com/cloudflare/lua-upstream-cache-nginx-module
-LUACJSONVER='2.1.0.6'              # https://github.com/openresty/lua-cjson
+LUACJSONVER='2.1.0.7'              # https://github.com/openresty/lua-cjson
 
 STRIPPHP='y'                 # set 'y' to strip PHP binary to reduce size
 PHP_INSTALL='y'              # Install PHP /w Fast Process Manager
+SWITCH_PHPFPM_SYSTEMD='n'    # Switch to centos 7 systemd php-fpm service file https://community.centminmod.com/threads/16511/
 ZSTD_LOGROTATE_PHPFPM='n'    # initial install only for zstd compressed log rotation community.centminmod.com/threads/16371/
 PHP_PATCH='y'                # Apply PHP patches if they exist
 PHP_TUNING='n'               # initial php-fpm install auto tuning
@@ -601,6 +618,7 @@ PHPIMAGICK_ALWAYS='y'        # imagick php extension is always reinstalled on ph
 PHPDEBUGMODE='n'             # --enable-debug PHP compile flag
 PHPIMAP='y'                  # Disable or Enable PHP Imap extension
 PHPFINFO='n'                 # Disable or Enable PHP File Info extension
+PHPFINFO_STANDALONE='n'      # Disable or Enable PHP File Info extension as standalone module
 PHPPCNTL='y'                 # Disable or Enable PHP Process Control extension
 PHPINTL='y'                  # Disable or Enable PHP intl extension
 PHPRECODE=n                  # Disable or Enable PHP Recode extension
@@ -625,21 +643,26 @@ REDISPHP_GIT='n'            # pull php 7 redis extension from git or pecl downlo
 PHPMONGODB='n'              # MongoDB PHP extension install
 MONGODBPHP_VER='1.5.3'      # MongoDB PHP version
 MONGODB_SASL='n'            # SASL not working yet leave = n
-PDOPGSQL_PHPVER='9.6'       # pdo-pgsql PHP extension version for postgresql
+PDOPGSQL_PHPVER='11'        # pdo-pgsql PHP extension version for postgresql
 PHP_LIBZIP='n'              # use newer libzip instead of PHP embedded zip
 PHP_ARGON='n'               # alias for PHP_LIBZIP, when PHP_ARGON='y' then PHP_LIBZIP='y'
 LIBZIP_VER='1.5.0'          # required for PHP 7.2 + with libsodium & argon2
-LIBSODIUM_VER='1.0.16'      # https://github.com/jedisct1/libsodium/releases
+LIBSODIUM_VER='1.0.17'      # https://github.com/jedisct1/libsodium/releases
 LIBSODIUM_NATIVE='n'        # optimise for specific cpu not portable between different cpu modules
 LIBARGON_VER='20171227'     # https://github.com/P-H-C/phc-winner-argon2
 PHP_MCRYPTPECL='y'          # PHP 7.2 deprecated mcrypt support so this adds it back as PECL extension
 PHP_MCRYPTPECLVER='1.0.1'   # https://pecl.php.net/package/mcrypt
 PHPZOPFLI='n'               # enable zopfli php extension https://github.com/kjdev/php-ext-zopfli
 PHPZOPFLI_ALWAYS='n'        # zopfli php extension always install on php recompiles
+PHP_BROTLI='n'              # brotli php extension https://github.com/kjdev/php-ext-brotli
+PHP_LZFOUR='n'              # lz4 php extension https://github.com/kjdev/php-ext-lz4
+PHP_LZF='n'                 # lzf php extension https://github.com/php/pecl-file_formats-lzf php-ext-lzf
+PHP_ZSTD='n'                # zstd php extension https://github.com/kjdev/php-ext-zstd
 
 SHORTCUTS='y'                # shortcuts
 
 POSTGRESQL='n'               # set to =y to install PostgreSQL 9.6 server, devel packages and pdo-pgsql PHP extension
+POSTGRESQL_BRANCHVER='11'   # PostgresSQL branch version https://www.postgresql.org/ i.e. 9.6, 10 or 11
 ########################################################
 # Choice of installing MariaDB 5.2 via RPM or via MariaDB 5.2 CentOS YUM Repo
 # If MDB_YUMREPOINSTALL=y and MDB_INSTALL=n then MDB_VERONLY version 
@@ -668,7 +691,7 @@ MYSQL_INSTALL='n'            # Install official Oracle MySQL Server (MariaDB alt
 SENDMAIL_INSTALL='n'         # Install Sendmail (and mailx) set to y and POSTFIX_INSTALL=n for sendmail
 POSTFIX_INSTALL=y            # Install Postfix (and mailx) set to n and SENDMAIL_INSTALL=y for sendmail
 # Nginx
-NGINX_VERSION='1.15.8'       # Use this version of Nginx
+NGINX_VERSION='1.15.9'       # Use this version of Nginx
 NGINX_VHOSTSSL='y'           # enable centmin.sh menu 2 prompt to create self signed SSL vhost 2nd vhost conf
 NGINXBACKUP='y'
 ZSTD_LOGROTATE_NGINX='n'     # initial install only for zstd compressed log rotation community.centminmod.com/threads/16371/
@@ -688,9 +711,9 @@ VHOSTCTRL_AUTOPROTECTINC='y'
 NGINX_PRIORITIZECHACHA='n' # https://community.centminmod.com/posts/67042/
 DISABLE_TLSONEZERO_PROTOCOL='n' # disable TLS 1.0 protocol by default industry is moving to deprecate for security
 NOSOURCEOPENSSL='y'        # set to 'y' to disable OpenSSL source compile for system default YUM package setup
-OPENSSL_VERSION='1.1.1a'   # Use this version of OpenSSL http://openssl.org/
-OPENSSL_VERSIONFALLBACK='1.1.1a'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
-OPENSSL_VERSION_OLDOVERRIDE='1.1.1a' # override version if persist config OPENSSL_VERSION variable is out of date
+OPENSSL_VERSION='1.1.1b'   # Use this version of OpenSSL http://openssl.org/
+OPENSSL_VERSIONFALLBACK='1.1.1b'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
+OPENSSL_VERSION_OLDOVERRIDE='1.1.1b' # override version if persist config OPENSSL_VERSION variable is out of date
 OPENSSL_THREADS='y'        # control whether openssl 1.1 branch uses threading or not
 OPENSSL_TLSONETHREE='y'    # whether OpenSSL 1.1.1 builds enable TLSv1.3
 OPENSSL_CUSTOMPATH='/opt/openssl'  # custom directory path for OpenSSL 1.0.2+
@@ -729,7 +752,7 @@ GPERFTOOLS_VERSION='2.6.3'        # Use this version of google-perftools
 
 # Choose whether to compile PCRE from source. Note PHP 5.3.8 already includes PCRE
 PCRE_SOURCEINSTALL='n'     
-PCRE_VERSION='8.42'          # PCRE version
+PCRE_VERSION='8.43'          # PCRE version
 
 # PHP and Cache/Acceleration
 IMAGICKPHP_VER='3.4.3'   # PHP extension for imagick
@@ -764,6 +787,7 @@ SIEGE_VERSION='4.0.4'
 CURL_TIMEOUTS=' --max-time 5 --connect-timeout 5'
 WGETOPT="-cnv --no-dns-cache${ipv_forceopt_wget}"
 AXEL_VER='2.6'               # Axel source compile version https://github.com/axel-download-accelerator/axel/releases
+USEAXEL='y'                  # whether to use axel download accelerator or wget
 ###############################################################
 # experimental Intel compiled optimisations 
 # when auto detect Intel based processors
@@ -901,6 +925,7 @@ source "inc/nsd_install.inc"
 source "inc/nsdsetup.inc"
 source "inc/nsd_reinstall.inc"
 source "inc/compress.inc"
+source "inc/compress_php.inc"
 source "inc/nginx_logformat.inc"
 source "inc/logrotate_nginx.inc"
 source "inc/logrotate_phpfpm.inc"
@@ -938,6 +963,7 @@ source "inc/zendopcache_tweaks.inc"
 source "inc/php_extraopts.inc"
 source "inc/mysql_legacy.inc"
 source "inc/imap.inc"
+source "inc/fileinfo.inc"
 source "inc/php_configure.inc"
 source "inc/phpng_download.inc"
 source "inc/php_upgrade.inc"
@@ -1045,6 +1071,15 @@ if [[ "$INITIALINSTALL" = [yY] && -f /usr/bin/systemd-detect-virt && "$(/usr/bin
   fi
 fi
 
+# auto enable nginx brotli module if Intel Skylake or newer cpus exist
+# newer cpus allow brotli compressed nginx files to be served faster
+# https://community.centminmod.com/posts/70527/
+# if [[ "$(grep -o 'avx512' /proc/cpuinfo | uniq)" = 'avx512' ]]; then
+#   NGXDYNAMIC_BROTLI='y'
+#   NGINX_LIBBROTLI='y'
+#   NGINX_BROTLIDEP_UPDATE='y'
+# fi
+
 ###############################################################
 # The default is stable, you can change this to development if you wish
 #ARCH_OVERRIDE='i386'
@@ -1121,6 +1156,20 @@ if [[ "$MARCH_TARGETNATIVE" = [yY] ]]; then
   MARCH_TARGET='native'
 else
   MARCH_TARGET='x86-64'
+fi
+
+if [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+  DEVTOOLSETEIGHT='y'
+  DEVTOOLSETSEVEN='n'
+elif [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+  DEVTOOLSETEIGHT='y'
+  DEVTOOLSETSEVEN='n'
+elif [[ "$CENTOS_SIX" -eq '6' && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+  DEVTOOLSETEIGHT='n'
+  DEVTOOLSETSEVEN='y'
+elif [[ "$CENTOS_SIX" -eq '6' && "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+  DEVTOOLSETEIGHT='n'
+  DEVTOOLSETSEVEN='y'
 fi
 
 if [[ "$CENTOS_SIX" -eq '6' && "$BORINGSSL_SWITCH" = [yY] ]]; then
@@ -1249,10 +1298,10 @@ checkfor_lowmem
 ###############################################################
 # FUNCTIONS
 
-if [[ "$CENTOS_SEVEN" = 7 ]]; then
+if [[ "$CENTOS_SEVEN" = 7 && "$USEAXEL" = [yY] ]]; then
     DOWNLOADAPP='axel -4'
     WGETRETRY=''
-elif [[ "$CENTOS_SIX" = 6 ]]; then
+elif [[ "$CENTOS_SIX" = 6 && "$USEAXEL" = [yY] ]]; then
     DOWNLOADAPP='axel'
     WGETRETRY=''
 else
@@ -1956,6 +2005,11 @@ fi
     #/etc/init.d/php-fpm restart 2>/dev/null
     # /etc/init.d/php-fpm force-quit
     /etc/init.d/php-fpm start
+    fileinfo_standalone
+
+    if [[ "$CENTOS_SEVEN" -eq '7' && "$SWITCH_PHPFPM_SYSTEMD" = [yY] && -f "$CUR_DIR/tools/php-systemd.sh" ]]; then
+      $CUR_DIR/tools/php-systemd.sh fpm-systemd
+    fi
 
 if [[ "$(grep exclude /etc/yum.conf)" && "$MDB_INSTALL" = y ]]; then
     cecho "exclude line exists... adding nginx* mysql* php* exclusions" $boldgreen
@@ -2068,6 +2122,26 @@ zopfliinstall
 if [[ "$PHPMSSQL" = [yY] ]]; then
   echo "php_mssqlinstall"
   php_mssqlinstall
+fi
+
+if [[ "$PHP_BROTLI" = [yY] ]]; then
+  echo "php_ext_brotli"
+  php_ext_brotli
+fi
+
+if [[ "$PHP_LZFOUR" = [yY] ]]; then
+  echo "php_ext_lzfour"
+  php_ext_lzfour
+fi
+
+if [[ "$PHP_LZF" = [yY] ]]; then
+  echo "php_ext_lzf"
+  php_ext_lzf
+fi
+
+if [[ "$PHP_ZSTD" = [yY] ]]; then
+  echo "php_ext_zstd"
+  php_ext_zstd
 fi
 
 if [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMVER" = '7.3' ]]; then
@@ -2208,6 +2282,7 @@ fi
     cecho "* MariaDB Security Setup Completed" $boldgreen
     echo "*************************************************"
 
+disk_cleanups
 bookmark
 
 sync 

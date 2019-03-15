@@ -1,3 +1,18 @@
+highergcc_cflags() {
+  # if DEVTOOLSETSEVEN or DEVTOOLSETEIGHT enabled, some PHP extensions have issues with implicit-fallthrough
+  if [[ "$GCCINTEL_PHP" = [yY] && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+    DEVTOOLSETGENERAL_FALLTHROUGH='-Wimplicit-fallthrough=0'
+    DEVTOOLSETGENERAL_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+    export CFLAGS="${DEVTOOLSETGENERAL_FALLTHROUGH}${DEVTOOLSETGENERAL_EXTRAFLAGS}"
+    export CXXFLAGS="$CFLAGS"
+  elif [[ "$GCCINTEL_PHP" = [yY] && "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+    DEVTOOLSETGENERAL_FALLTHROUGH='-Wimplicit-fallthrough=0'
+    DEVTOOLSETGENERAL_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+    export CFLAGS="${DEVTOOLSETGENERAL_FALLTHROUGH}${DEVTOOLSETGENERAL_EXTRAFLAGS}"
+    export CXXFLAGS="$CFLAGS"
+  fi
+}
+
 enable_clang() {
    if [[ "$CENTOS_SIX" = 6 || "$CENTOS_SEVEN" = 7 ]] && [[ ! -f /usr/bin/clang ]]; then
       time $YUMDNFBIN -q -y install clang clang-devel${DISABLEREPO_DNF}
@@ -20,12 +35,12 @@ enable_devtoolset() {
    # recompiles. however on initial install ccache has no benefits, so for initial
    # centmin mod install disabling ccache will in theory speed up first time installs
    if [[ "$INITIALINSTALL" != [yY] ]]; then            
-      export CC="ccache /usr/bin/gcc"
-      export CXX="ccache /usr/bin/g++"
+      export CC="ccache gcc"
+      export CXX="ccache g++"
       export CCACHE_CPP2=yes
    else
-      export CC="/usr/bin/gcc"
-      export CXX="/usr/bin/g++"
+      export CC="gcc"
+      export CXX="g++"
    fi
    CLANG_CFLAGOPT=""
    CFLAGS=""
@@ -34,13 +49,20 @@ enable_devtoolset() {
       # devtoolset-4 usage for ngx_pagespeed 1.10 branch which doesn't support
       # centos 6 based gcc 4.4.7
       if [[ "$CENTOS_SIX" = 6 || "$CENTOS_SEVEN" = 7 ]]; then
-         if [[ "$DEVTOOLSETSEVEN" = [yY] ]]; then
+         if [[ "$CENTOS_SEVEN" = 7 && "$DEVTOOLSETEIGHT" = [yY] ]]; then
+            if [[ ! -f /opt/rh/devtoolset-8/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+               scl_install
+            fi       
+            source /opt/rh/devtoolset-8/enable
+            GENERALDEVTOOLSET_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+            GENERALDEVTOOLSET_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+         elif [[ "$DEVTOOLSETSEVEN" = [yY] ]]; then
             if [[ ! -f /opt/rh/devtoolset-7/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
                scl_install
             fi       
             source /opt/rh/devtoolset-7/enable
-            GENERALDEVTOOLSETSEVEN_FALLTHROUGH=' -Wimplicit-fallthrough=0'
-            GENERALDEVTOOLSETSEVEN_EXTRAFLAGS=' -fcode-hoisting'
+            GENERALDEVTOOLSET_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+            GENERALDEVTOOLSET_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
          elif [[ "$DEVTOOLSETSIX" = [yY] ]]; then
             if [[ ! -f /opt/rh/devtoolset-6/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-6/root/usr/bin/g++ ]]; then
                scl_install
@@ -68,11 +90,34 @@ enable_devtoolset() {
       # intel specific
       CPUVENDOR=$(cat /proc/cpuinfo | awk '/vendor_id/ {print $3}' | sort -u | head -n1)
       SSECHECK=$(gcc -c -Q -march=native --help=target | awk '/  -msse/ {print $2}' | head -n1)
-      gcc --version | tee ${CENTMINLOGDIR}/gcc_general_native.log
-      gcc -c -Q -march=native --help=target | egrep '\[enabled\]|mtune|march|mfpmath' | tee -a ${CENTMINLOGDIR}/gcc_general_native.log
+      # gcc --version | tee ${CENTMINLOGDIR}/gcc_general_native.log
+      # gcc -c -Q -march=native --help=target | egrep '\[enabled\]|mtune|march|mfpmath' | tee -a ${CENTMINLOGDIR}/gcc_general_native.log
+
+      echo
+      gcc -c -Q -march=native --help=target | egrep '\-mtune|\-march|\-msse|\-msse2|\-msse2avx|\-msse3|\-mavx|\-msse4|\-mssse3|\-mpclmul' | tee ${CENTMINLOGDIR}/gcc_general_native.log
+      echo
+      gcc -c -Q -march=x86-64 --help=target | egrep '\-mtune|\-march|\-msse|\-msse2|\-msse2avx|\-msse3|\-mavx|\-msse4|\-mssse3|\-mpclmul' | tee ${CENTMINLOGDIR}/gcc_general_x86-64.log
+      echo
+      diff -y --suppress-common-lines ${CENTMINLOGDIR}/gcc_general_native.log ${CENTMINLOGDIR}/gcc_general_x86-64.log | tee ${CENTMINLOGDIR}/gcc_general_diff_native-vs-x86-64.log
+      echo
+      egrep '\-march=|\-mtune|\-mavx|\-msse4|\-mpclmul' ${CENTMINLOGDIR}/gcc_general_diff_native-vs-x86-64.log
+      # if non native target x86-64 is used 
+      # pick up important native cpu instructions
+      # and manually pass them to x86-64 target
+      if [[ "$MARCH_TARGETNATIVE" = [yY] ]]; then
+        GCC_NONNATIVEFLAGS=""
+      else
+        GCC_NONNATIVEFLAGS=" $(egrep '\-march=|\-mtune|\-mavx|\-msse4|\-mpclmul' ${CENTMINLOGDIR}/gcc_general_native.log | egrep -v 'march|mtune|avx512' | grep enabled | sed -e 's|\[||g' -e 's|\]||g' -e 's|enabled||g'| xargs)"
+        echo
+        gcc -c -Q -march=x86-64${GCC_NONNATIVEFLAGS} --help=target | egrep '\-mtune|\-march|\-msse|\-msse2|\-msse2avx|\-msse3|\-mavx|\-msse4|\-mssse3|\-mpclmul' | tee ${CENTMINLOGDIR}/gcc_general_x86-64-non-native.log
+      fi
+      echo
+      echo "GCC_NONNATIVEFLAGS=$GCC_NONNATIVEFLAGS"
+      echo
+
       if [[ "$(uname -m)" = 'x86_64' && "$CPUVENDOR" = 'GenuineIntel' && "$SSECHECK" = '[enabled]' ]]; then
          CCM=64
-         GEN_MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}${GENERALDEVTOOLSETSEVEN_FALLTHROUGH}${GENERALDEVTOOLSETSEVEN_EXTRAFLAGS}"
+         GEN_MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}${GCC_NONNATIVEFLAGS}${GENERALDEVTOOLSET_FALLTHROUGH}${GENERALDEVTOOLSET_EXTRAFLAGS}"
          # if only 1 cpu thread use -O2 to keep compile times sane
          if [[ "$CPUS" = '1' ]]; then
             export CFLAGS="-O2 $GEN_MTUNEOPT -pipe"

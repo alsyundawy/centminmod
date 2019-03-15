@@ -96,7 +96,7 @@ MARIADB_UPDATEMAINTENANCE='n'
 
 # Nginx
 NGINXCOMPILE_PIE='n'         # build nginx with Position-independent code (PIC) / Position-indendendent executables (PIEs)
-NGINX_VERSION='1.15.8'       # Use this version of Nginx
+NGINX_VERSION='1.15.9'       # Use this version of Nginx
 NGINX_VHOSTSSL='y'           # enable centmin.sh menu 2 prompt to create self signed SSL vhost 2nd vhost conf
 NGINXBACKUP='y'
 ZSTD_LOGROTATE_NGINX='n'     # initial install only for zstd compressed log rotation community.centminmod.com/threads/16371/
@@ -171,7 +171,7 @@ NGINX_HTTPREDIS='y'          # Nginx redis http://wiki.nginx.org/HttpRedisModule
 NGINX_HTTPREDISVER='0.3.7'   # Nginx redis version
 NGINX_PCREJIT='y'            # Nginx configured with pcre & pcre-jit support
 NGINX_PCRE_DYNAMIC='y'       # compile nginx pcre as dynamic instead of static library
-NGINX_PCREVER='8.42'         # Version of PCRE used for pcre-jit support in Nginx
+NGINX_PCREVER='8.43'         # Version of PCRE used for pcre-jit support in Nginx
 NGINX_ZLIBCUSTOM='y'         # Use custom zlib instead of system version
 NGINX_ZLIBVER='1.2.11'       # http://www.zlib.net/
 NGINX_VIDEO='n'              # control variable when 'y' set for NGINX_SLICE='y', NGINX_RTMP='y', NGINX_FLV='y', NGINX_MP4='y'
@@ -198,21 +198,21 @@ LUAJIT_GITINSTALL='y'        # opt to install luajit 2.1 from dev branch http://
 LUAJIT_GITINSTALLVER='2.1-agentzh'   # branch version = v2.1 will override ORESTY_LUAGITVER if LUAJIT_GITINSTALL='y'
 
 ORESTY_LUANGINX='n'             # enable or disable or ORESTY_LUA* nginx modules below
-ORESTY_LUANGINXVER='0.10.14rc2'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
+ORESTY_LUANGINXVER='0.10.14'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
 ORESTY_LUAGITVER='2.0.5'        # luagit http://luajit.org/
 ORESTY_LUAMEMCACHEDVER='0.14'   # openresty https://github.com/openresty/lua-resty-memcached
 ORESTY_LUAMYSQLVER='0.21'    # openresty https://github.com/openresty/lua-resty-mysql
-ORESTY_LUAREDISVER='0.26'       # openresty https://github.com/openresty/lua-resty-redis
+ORESTY_LUAREDISVER='0.27'       # openresty https://github.com/openresty/lua-resty-redis
 ORESTY_LUADNSVER='0.21'         # openresty https://github.com/openresty/lua-resty-dns
 ORESTY_LUAUPLOADVER='0.10'      # openresty https://github.com/openresty/lua-resty-upload
-ORESTY_LUAWEBSOCKETVER='0.05'   # openresty https://github.com/openresty/lua-resty-websocket
-ORESTY_LUALOCKVER='0.07'        # openresty https://github.com/openresty/lua-resty-lock
+ORESTY_LUAWEBSOCKETVER='0.07'   # openresty https://github.com/openresty/lua-resty-websocket
+ORESTY_LUALOCKVER='0.08'        # openresty https://github.com/openresty/lua-resty-lock
 ORESTY_LUASTRINGVER='0.11rc1'      # openresty https://github.com/openresty/lua-resty-string
 ORESTY_LUAREDISPARSERVER='0.13'    # openresty https://github.com/openresty/lua-redis-parser
-ORESTY_LUAUPSTREAMCHECKVER='0.04'  # openresty https://github.com/openresty/lua-resty-upstream-healthcheck
-ORESTY_LUALRUCACHEVER='0.09rc1'       # openresty https://github.com/openresty/lua-resty-lrucache
-ORESTY_LUARESTYCOREVER='0.1.16rc2'    # openresty https://github.com/openresty/lua-resty-core
-ORESTY_LUASTREAMVER='0.0.6rc2'     # https://github.com/openresty/stream-lua-nginx-module
+ORESTY_LUAUPSTREAMCHECKVER='0.06'  # openresty https://github.com/openresty/lua-resty-upstream-healthcheck
+ORESTY_LUALRUCACHEVER='0.09'       # openresty https://github.com/openresty/lua-resty-lrucache
+ORESTY_LUARESTYCOREVER='0.1.16'    # openresty https://github.com/openresty/lua-resty-core
+ORESTY_LUASTREAMVER='0.0.6'     # https://github.com/openresty/stream-lua-nginx-module
 ORESTY_LUASTREAM='y'               # control https://github.com/openresty/stream-lua-nginx-module
 ORESTY_LUAUPSTREAMVER='0.06'       # openresty https://github.com/openresty/lua-upstream-nginx-module
 NGX_LUAUPSTREAM='n'                # disable https://github.com/openresty/lua-upstream-nginx-module
@@ -220,10 +220,11 @@ ORESTY_LUALOGGERSOCKETVER='0.1'    # cloudflare openresty https://github.com/clo
 ORESTY_LUACOOKIEVER='master'       # cloudflare openresty https://github.com/cloudflare/lua-resty-cookie
 ORESTY_LUAUPSTREAMCACHEVER='0.1.1' # cloudflare openresty https://github.com/cloudflare/lua-upstream-cache-nginx-module
 NGX_LUAUPSTREAMCACHE='n'           # disable https://github.com/cloudflare/lua-upstream-cache-nginx-module
-LUACJSONVER='2.1.0.6'              # https://github.com/openresty/lua-cjson
+LUACJSONVER='2.1.0.7'              # https://github.com/openresty/lua-cjson
 
 STRIPPHP='y'                 # set 'y' to strip PHP binary to reduce size
 PHP_INSTALL='y'              # Install PHP /w Fast Process Manager
+SWITCH_PHPFPM_SYSTEMD='n'    # Switch to centos 7 systemd php-fpm service file https://community.centminmod.com/threads/16511/
 ZSTD_LOGROTATE_PHPFPM='n'    # initial install only for zstd compressed log rotation community.centminmod.com/threads/16371/
 PHP_PATCH='y'                # Apply PHP patches if they exist
 PHP_TUNING='n'               # initial php-fpm install auto tuning
@@ -237,6 +238,7 @@ PHPIMAGICK_ALWAYS='y'        # imagick php extension is always reinstalled on ph
 PHPDEBUGMODE='n'             # --enable-debug PHP compile flag
 PHPIMAP='y'                  # Disable or Enable PHP Imap extension
 PHPFINFO='n'                 # Disable or Enable PHP File Info extension
+PHPFINFO_STANDALONE='n'      # Disable or Enable PHP File Info extension as standalone module
 PHPPCNTL='y'                 # Disable or Enable PHP Process Control extension
 PHPINTL='y'                  # Disable or Enable PHP intl extension
 PHPRECODE=n                  # Disable or Enable PHP Recode extension
@@ -262,9 +264,9 @@ VHOSTCTRL_AUTOPROTECTINC='y'
 NGINX_PRIORITIZECHACHA='n' # https://community.centminmod.com/posts/67042/
 DISABLE_TLSONEZERO_PROTOCOL='n' # disable TLS 1.0 protocol by default industry is moving to deprecate for security
 NOSOURCEOPENSSL='y'        # set to 'y' to disable OpenSSL source compile for system default YUM package setup
-OPENSSL_VERSION='1.1.1a'   # Use this version of OpenSSL http://openssl.org/
-OPENSSL_VERSIONFALLBACK='1.1.1a'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
-OPENSSL_VERSION_OLDOVERRIDE='1.1.1a' # override version if persist config OPENSSL_VERSION variable is out of date
+OPENSSL_VERSION='1.1.1b'   # Use this version of OpenSSL http://openssl.org/
+OPENSSL_VERSIONFALLBACK='1.1.1b'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
+OPENSSL_VERSION_OLDOVERRIDE='1.1.1b' # override version if persist config OPENSSL_VERSION variable is out of date
 OPENSSL_THREADS='y'        # control whether openssl 1.1 branch uses threading or not
 OPENSSL_TLSONETHREE='y'    # whether OpenSSL 1.1.1 builds enable TLSv1.3
 OPENSSL_CUSTOMPATH='/opt/openssl'  # custom directory path for OpenSSL 1.0.2+
@@ -302,7 +304,7 @@ GPERFTOOLS_VERSION='2.6.3'        # Use this version of google-perftools
 
 # Choose whether to compile PCRE from source. Note PHP 5.3.8 already includes PCRE
 PCRE_SOURCEINSTALL='n'     
-PCRE_VERSION='8.42'          # PCRE version
+PCRE_VERSION='8.43'          # PCRE version
 
 # PHP and Cache/Acceleration
 IMAGICKPHP_VER='3.4.3'   # PHP extension for imagick
@@ -324,17 +326,21 @@ REDISPHP_GIT='n'            # pull php 7 redis extension from git or pecl downlo
 PHPMONGODB='n'              # MongoDB PHP extension install
 MONGODBPHP_VER='1.5.3'      # MongoDB PHP version
 MONGODB_SASL='n'            # SASL not working yet leave = n
-PDOPGSQL_PHPVER='9.6'       # pdo-pgsql PHP extension version for postgresql
+PDOPGSQL_PHPVER='11'       # pdo-pgsql PHP extension version for postgresql
 PHP_LIBZIP='n'              # use newer libzip instead of PHP embedded zip
 PHP_ARGON='n'               # alias for PHP_LIBZIP, when PHP_ARGON='y' then PHP_LIBZIP='y'
 LIBZIP_VER='1.5.0'          # required for PHP 7.2 + with libsodium & argon2
-LIBSODIUM_VER='1.0.16'      # https://github.com/jedisct1/libsodium/releases
+LIBSODIUM_VER='1.0.17'      # https://github.com/jedisct1/libsodium/releases
 LIBSODIUM_NATIVE='n'        # optimise for specific cpu not portable between different cpu modules
 LIBARGON_VER='20171227'     # https://github.com/P-H-C/phc-winner-argon2
 PHP_MCRYPTPECL='y'          # PHP 7.2 deprecated mcrypt support so this adds it back as PECL extension
 PHP_MCRYPTPECLVER='1.0.1'   # https://pecl.php.net/package/mcrypt
 PHPZOPFLI='n'               # enable zopfli php extension https://github.com/kjdev/php-ext-zopfli
 PHPZOPFLI_ALWAYS='n'        # zopfli php extension always install on php recompiles
+PHP_BROTLI='n'              # brotli php extension https://github.com/kjdev/php-ext-brotli
+PHP_LZFOUR='n'              # lz4 php extension https://github.com/kjdev/php-ext-lz4
+PHP_LZF='n'                 # lzf php extension https://github.com/php/pecl-file_formats-lzf php-ext-lzf
+PHP_ZSTD='n'                # zstd php extension https://github.com/kjdev/php-ext-zstd
 
 PHP_FTPEXT='y'              # ftp PHP extension
 PHP_MEMCACHE='y'            # memcache PHP extension 

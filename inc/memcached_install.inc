@@ -244,7 +244,7 @@ else
     cp -f "$DIR_TMP/memcached-${MEMCACHED_VERSION}/scripts/memcached-tool" /usr/local/bin
 fi # FPMRPM_MEMCACHED
 
-    cecho "Compiled memcached..." $boldgreen
+    cecho "Compiled memcached server..." $boldgreen
 
 if [[ "$CENTOS_SIX" = '6' ]]; then
     kill -9 $(pidof memcached)
@@ -287,14 +287,28 @@ if [ "$PHP_MEMCACHE" == 'y' ]; then
             fi
         fi
         if [[ "$PHPCURRENTVER" = '7.3' || "$PHPMUVER" = '7.3' ]]; then
+           # rollback to commit prior to memcache 4.0.1 release
+           # https://github.com/websupport-sk/pecl-memcache/issues/38
+           git checkout 4a9e4ab0d1
            # patch support https://github.com/websupport-sk/pecl-memcache/pull/30
            wget -O memcache-php73.patch https://patch-diff.githubusercontent.com/raw/websupport-sk/pecl-memcache/pull/30.patch
            patch -p1 < memcache-php73.patch
+        elif [[ "$PHPCURRENTVER" = '7.0' || "$PHPMUVER" = '7.0' || "$PHPCURRENTVER" = '7.1' || "$PHPMUVER" = '7.1' || "$PHPCURRENTVER" = '7.2' || "$PHPMUVER" = '7.2' ]]; then
+           # rollback to commit prior to memcache 4.0.1 release
+           # https://github.com/websupport-sk/pecl-memcache/issues/38
+           git checkout 4a9e4ab0d1
+           #wget -O memcache-php73.patch https://patch-diff.githubusercontent.com/raw/websupport-sk/pecl-memcache/pull/30.patch
+           #patch -p1 < memcache-php73.patch
+        elif [[ "$PHPCURRENTVER" = '5.4' || "$PHPMUVER" = '5.4' || "$PHPCURRENTVER" = '5.5' || "$PHPMUVER" = '5.5' || "$PHPCURRENTVER" = '5.6' || "$PHPMUVER" = '5.6' ]]; then
+           # rollback to commit prior to memcache 4.0.1 release
+           # https://github.com/websupport-sk/pecl-memcache/issues/38
+           git checkout 4a9e4ab0d1
         fi
         /usr/local/bin/phpize
         ./configure --enable-memcache --with-php-config=/usr/local/bin/php-config
         make${MAKETHREADS}
         make install
+        cecho "PHP memcache extension installed" $boldgreen
         popd
     else
         cecho "Compiling PHP memcache extension..." $boldgreen
@@ -321,6 +335,7 @@ if [ "$PHP_MEMCACHE" == 'y' ]; then
         ./configure --enable-memcache --with-php-config=/usr/local/bin/php-config
         make${MAKETHREADS}
         make install
+        cecho "PHP memcache extension installed" $boldgreen
     
     fi
 else
@@ -356,6 +371,7 @@ if [[ "$LIBMEMCACHED_YUM" = [yY] ]]; then
         ./configure
         time make${MAKETHREADS}
         time make install
+        cecho "libmemcached installed" $boldgreen
     fi # centos not 7
 else    
     cecho "Compiling libmemcached-${LIBMEMCACHED_VER} ..." $boldgreen
@@ -375,6 +391,7 @@ else
     ./configure
     time make${MAKETHREADS}
     time make install
+    cecho "libmemcached installed" $boldgreen
 fi 
 wait
 
@@ -441,6 +458,7 @@ if [[ "$PHPMUVER" > 7 || "$PHPSEVEN_CHECKVER" = '0' ]]; then
     fi
     make${MAKETHREADS}
     make install
+    cecho "memcached PHP extension installed" $boldgreen
 else
     echo
     echo "compiling memcached PHP extension ${MEMCACHEDPHP_VER} ..."
@@ -462,6 +480,7 @@ else
     fi
     make${MAKETHREADS}
     make install
+    cecho "memcached PHP extension installed" $boldgreen
 fi # php 7 or not
 
 #############################################
@@ -481,6 +500,7 @@ fi # php 7 or not
 # check to see if memcache.so already loaded in php.ini
 
 MEMCACHESOCHECK=$(grep 'memcache.so' /usr/local/lib/php.ini)
+echo "check ${CONFIGSCANDIR}/memcache.ini"
 MEMCACHESOCHECKB=$(grep 'memcache.so' "${CONFIGSCANDIR}/memcache.ini")
 PHPEXTDIR=$(cat /usr/local/bin/php-config | awk '/^extension_dir/ {extdir=$1} END {gsub(/\047|extension_dir|=|)/,"",extdir); print extdir}')
 
@@ -503,6 +523,7 @@ fi # memcache.so check
 # check to see if memcached.so already loaded in php.ini
 
 MEMCACHEDSOCHECK=$(grep 'memcached.so' /usr/local/lib/php.ini)
+echo "check ${CONFIGSCANDIR}/memcached.ini"
 MEMCACHEDSOCHECKB=$(grep 'memcached.so' "${CONFIGSCANDIR}/memcached.ini")
 PHPEXTDIRD=$(cat /usr/local/bin/php-config | awk '/^extension_dir/ {extdir=$1} END {gsub(/\047|extension_dir|=|)/,"",extdir); print extdir}')
 
@@ -554,7 +575,17 @@ sleep 2
 service memcached stop
 service memcached start
 service php-fpm restart
-
+echo
+echo "memcached -V"
+memcached -V
+echo
+echo "php --ri memcache"
+php --ri memcache
+echo
+echo "php --ri memcached"
+php --ri memcached
+echo
+cecho "memcache/memcached routines completed" $boldgreen
 }
 
 
@@ -635,40 +666,40 @@ chkconfig --level 345 memcached on
 service memcached start
 # fi # CENTOS_SEVEN != 7
 
-    if [[ "$PHP_INSTALL" = [yY] ]]; then
-    cecho "Compiling PHP memcache extension..." $boldgreen
+#     if [[ "$PHP_INSTALL" = [yY] ]]; then
+#     cecho "Compiling PHP memcache extension..." $boldgreen
 
-cd "$DIR_TMP"
-tar -xvf "memcache-${MEMCACHE_VERSION}.tgz"
-cd "memcache-${MEMCACHE_VERSION}"
-/usr/local/bin/phpize
-./configure --enable-memcache --with-php-config=/usr/local/bin/php-config
-make${MAKETHREADS} && make install
+# cd "$DIR_TMP"
+# tar -xvf "memcache-${MEMCACHE_VERSION}.tgz"
+# cd "memcache-${MEMCACHE_VERSION}"
+# /usr/local/bin/phpize
+# ./configure --enable-memcache --with-php-config=/usr/local/bin/php-config
+# make${MAKETHREADS} && make install
 
-#######################################################
-# check to see if memcache.so already loaded in php.ini
+# #######################################################
+# # check to see if memcache.so already loaded in php.ini
 
-MEMCACHESOCHECK=$(grep 'memcache.so' /usr/local/lib/php.ini)
-MEMCACHESOCHECKB=$(grep 'memcache.so' "${CONFIGSCANDIR}/memcache.ini")
-PHPEXTDIR=$(cat /usr/local/bin/php-config | awk '/^extension_dir/ {extdir=$1} END {gsub(/\047|extension_dir|=|)/,"",extdir); print extdir}')
+# MEMCACHESOCHECK=$(grep 'memcache.so' /usr/local/lib/php.ini)
+# MEMCACHESOCHECKB=$(grep 'memcache.so' "${CONFIGSCANDIR}/memcache.ini")
+# PHPEXTDIR=$(cat /usr/local/bin/php-config | awk '/^extension_dir/ {extdir=$1} END {gsub(/\047|extension_dir|=|)/,"",extdir); print extdir}')
 
-if [[ -z "$MEMCACHESOCHECK" || -z "$MEMCACHESOCHECKB" ]]; then
+# if [[ -z "$MEMCACHESOCHECK" || -z "$MEMCACHESOCHECKB" ]]; then
 
-#echo "" >> /usr/local/lib/php.ini
-#echo "extension=${PHPEXTDIR}/memcache.so" >> /usr/local/lib/php.ini
-echo "extension=${PHPEXTDIR}/memcache.so" > "${CONFIGSCANDIR}/memcache.ini"
+# #echo "" >> /usr/local/lib/php.ini
+# #echo "extension=${PHPEXTDIR}/memcache.so" >> /usr/local/lib/php.ini
+# echo "extension=${PHPEXTDIR}/memcache.so" > "${CONFIGSCANDIR}/memcache.ini"
 
-else
+# else
 
-echo ""
-echo "memcache.so already loaded in /usr/local/lib/php.ini"
-echo "$MEMCACHESOCHECK"
-echo ""
+# echo ""
+# echo "memcache.so already loaded in /usr/local/lib/php.ini"
+# echo "$MEMCACHESOCHECK"
+# echo ""
 
-fi # memcache.so check
+# fi # memcache.so check
 
-/etc/init.d/php-fpm restart
-    fi # PHP_INSTALL=y
+# /etc/init.d/php-fpm restart
+#     fi # PHP_INSTALL=y
 
     echo "*************************************************"
     cecho "* memcached installed" $boldgreen
