@@ -1,5 +1,5 @@
 reduceports() {
-    PORTS_TOCHECK='3000 3334 8080 8888 9312 6081 6082 30865'
+    PORTS_TOCHECK='3000 3334 8888 9312 6081 6082 30865'
     # reduce number of whitelisted open ports setup by csf install routine
     # double check if any services are listening on these ports before removal
     for p in $PORTS_TOCHECK; do
@@ -144,6 +144,19 @@ if [ -f /etc/csf/csf.conf ]; then
     csf_loadalert
 
     if [[ ! -f /proc/user_beancounters ]] && [[ "$(uname -r | grep linode)" || "$(find /lib/modules/`uname -r` -name 'ipset')" ]]; then
+        if [[ ! -f /usr/sbin/ipset ]]; then
+            # CSF now has ipset support to offload large IP address numbers 
+            # from iptables so uses less server resources to handle many IPs
+            # does not work with OpenVZ VPS so only implement for non-OpenVZ
+            yum -q -y install ipset ipset-devel
+            sed -i 's/LF_IPSET = \"0\"/LF_IPSET = \"1\"/' /etc/csf/csf.conf
+            setiplimits
+        elif [[ -f /usr/sbin/ipset ]]; then
+            sed -i 's/LF_IPSET = \"0\"/LF_IPSET = \"1\"/' /etc/csf/csf.conf
+            setiplimits
+        fi
+    elif [[ -f /proc/user_beancounters && "$KERNEL_NUMERICVER" -ge '3000000000' ]]; then
+        # openvz7's 3.10 linux kernels support IPSET
         if [[ ! -f /usr/sbin/ipset ]]; then
             # CSF now has ipset support to offload large IP address numbers 
             # from iptables so uses less server resources to handle many IPs

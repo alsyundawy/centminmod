@@ -297,8 +297,8 @@ fi
 
 funct_mktempfile
 
-if [[ "$UALL" = 'y' ]]; then 
-    phpver=${PHP_VERSION}
+if [[ "$UALL" = 'y' ]]; then
+    phpver=$(php-config --version)
     overwritephpfpmconf='n'
     lessphpmem='y'
 else
@@ -308,7 +308,28 @@ else
     echo "PHP 7.x/7.1.x/7.2.x/7.3.x is GA Stable but still may have broken PHP extensions."
     echo "NGDEBUG is PHP 7.4.0 dev builds minus incompatible PHP extensions"
     echo "----------------------------------------------------------------"
+    echo
+    echo "Current PHP Version: $(php -v 2>&1 | head -n1 | cut -d "(" -f1 | awk '{print $2}')"
+    echo
     read -ep "Enter PHP Version number you want to upgrade/downgrade to: " phpver
+    echo
+    # validate php version format is 7.3.x and not 7.3
+    phpver_formatcheck="$(echo "$phpver" | grep '[0-9].[0-9].[0-9]')"
+    if [[ ! "$phpver_formatcheck" ]]; then
+        echo
+        echo "error: invalid php version format entered you entered: $phpver"
+        echo
+        echo "correct exact format example is 7.3.7 not 7.3"
+        echo "latest php versions are listed at https://php.net/"
+        echo
+        read -ep "Enter PHP Version number you want to upgrade/downgrade to: " phpver
+        echo
+    fi
+    read -ep "Do you still want to continue? [y/n] " phpfpm_stillcont
+    if [[ "$phpfpm_stillcont" = [nN] ]];then
+        exit 0
+    fi
+    echo
     echo "----------------------------------------------------------------"
     echo "existing php.ini will be backed up at /usr/local/lib/php.ini-oldversion_$DT"
     
@@ -321,10 +342,11 @@ else
         PHPCONF_DIFFCHECK=1
     fi
     if [[ "$PHPCONF_DIFFCHECK" != '0' && "$PHP_OVERWRITECONF" = [yY] ]]; then
-        echo "Want to update to latest php.conf ? (overwrites will auto backup existing php.conf)"
-        echo "existing php.conf will be backed up at /usr/local/nginx/conf/php.conf-oldversion_$DT"
+        echo "Want to update to latest php.conf & php-fpm.conf ? (overwrites will auto backup existing files)"
+        echo "existing php.conf will be backed up to /usr/local/nginx/conf/php.conf-oldversion_$DT"
+        echo "existing php-fpm.conf will be backed up to /usr/local/etc/php-fpm.conf-oldversion_$DT"
         echo "----------------------------------------------------------------"
-        read -ep "Update & overwrite your existing php.conf [y/n]: " overwritephpfpmconf
+        read -ep "Update & overwrite your existing php.conf & php-fpm.conf [y/n]: " overwritephpfpmconf
         echo "----------------------------------------------------------------"
     else
         echo "----------------------------------------------------------------"
@@ -393,20 +415,20 @@ fi
             figlet -ckf standard "PHP: Download"
         fi
     
-        curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/get/php-${phpver}.tar.${PHPEXTSION}/from/this/mirror" | grep 'HTTP\/' | grep '404'
+        curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/distributions/php-${phpver}.tar.${PHPEXTSION}" | grep 'HTTP\/' | grep '404'
         PHPGEO_CURLCHECK=$?
-        curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/get/php-${phpver}.tar.${PHPEXTSION}/from/this/mirror" | grep 'HTTP\/' | egrep '200|301|302'
+        curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/distributions/php-${phpver}.tar.${PHPEXTSION}" | grep 'HTTP\/' | egrep '200|301|302'
         PHPGEO_CURLCHECKOK=$?
         # check if download url is 404 not found but also 
         # check for valid status header 200, 301 or 302
         if [[ "$PHPGEO_CURLCHECK" = '0' || "$PHPGEO_CURLCHECKOK" != '0' ]]; then
-            PHP_MIRRORURL="http://php.net"
+            PHP_MIRRORURL="https://www.php.net"
             PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
         fi
         if [ -s "php-${phpver}.tar.${PHPEXTSION}" ]; then
             cecho "php ${phpver} Archive found, skipping download..." $boldgreen
         else
-            $DOWNLOADAPP "${PHP_MIRRORURL}/get/php-${phpver}.tar.${PHPEXTSION}/from/this/mirror" $AXELPHPUPGRADETARGZ $WGETRETRY
+            $DOWNLOADAPP "${PHP_MIRRORURL}/distributions/php-${phpver}.tar.${PHPEXTSION}" $AXELPHPUPGRADETARGZ $WGETRETRY
             ERROR=$?
             if [[ "$ERROR" != '0' ]]; then
                 cecho "Error: php-${phpver}.tar.${PHPEXTSION} download failed." $boldgreen
@@ -521,6 +543,7 @@ fi
   if [ $ERR != 0 ]; then
       echo -e "\n`date`\nError: $ERR, PHP configure failed ($SCRIPT_VERSION)\n"
         echo "report errors on the forums at community.centminmod.com/forums/8/"
+        echo "with info asked at community.centminmod.com/threads/17857/"
         echo
         free -m
         echo
@@ -577,13 +600,19 @@ if [[ "$(grep -c "processor" /proc/cpuinfo)" -lt '2' ]]; then
   # Disable PGO if less than 2 cpu threads
   PHP_PGO='n'
 fi
+if [[ "$PHP_PGO_ALWAYS" = [yY] ]]; then
+  # override above greater than 2 cpu only PHP PGO enabling
+  # so when PHP_PGO_ALWAYS='y' set, you can even do PHP PGO
+  # compilations when you have 1 cpu detected
+  PHP_PGO='y'
+fi
 
     if [ -f "$(which figlet)" ]; then
         figlet -ckf standard "PHP: Make"
     fi
     echo "PHPMUVER = $PHPMUVER"
     echo "PHP_PGO = $PHP_PGO"
-    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' ]]; then
+    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' || "$PHPMUVER" = '7.4' ]]; then
         echo "make${MAKETHREADS_PHP} prof-gen"
         time make${MAKETHREADS_PHP} prof-gen
         if [ ! -d "$DIR_TMP/php_pgo_training_scripts" ]; then
@@ -615,6 +644,16 @@ fi
                 echo "./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_FOUR""
                 time ./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_FOUR"
             fi
+            echo "pgophpbench"
+            pgophpbench
+            if [ -f "${DIR_TMP}/phpbench/phpbench.php" ]; then
+              echo "./sapi/cgi/php-cgi -T10 ${DIR_TMP}/phpbench/phpbench.php"
+              time ./sapi/cgi/php-cgi -T10 "${DIR_TMP}/phpbench/phpbench.php"
+            fi
+            if [ -f /opt/phpbench/detailed_benchmark.php ]; then
+              echo "./sapi/cgi/php-cgi -T20 /opt/phpbench/detailed_benchmark.php"
+              time ./sapi/cgi/php-cgi -T20 /opt/phpbench/detailed_benchmark.php
+            fi
         elif [ -d "$DIR_TMP/php_pgo_training_scripts" ]; then
             pushd "$DIR_TMP/php_pgo_training_scripts"
             git stash
@@ -645,6 +684,16 @@ fi
                 echo "./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_FOUR""
                 time ./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_FOUR"
             fi
+            echo "pgophpbench"
+            pgophpbench
+            if [ -f "${DIR_TMP}/phpbench/phpbench.php" ]; then
+              echo "./sapi/cgi/php-cgi -T10 ${DIR_TMP}/phpbench/phpbench.php"
+              time ./sapi/cgi/php-cgi -T10 "${DIR_TMP}/phpbench/phpbench.php"
+            fi
+            if [ -f /opt/phpbench/detailed_benchmark.php ]; then
+              echo "./sapi/cgi/php-cgi -T20 /opt/phpbench/detailed_benchmark.php"
+              time ./sapi/cgi/php-cgi -T20 /opt/phpbench/detailed_benchmark.php
+            fi
         fi
         echo "make prof-clean"
         time make prof-clean
@@ -665,6 +714,7 @@ fi
         free -m
         echo
         echo "report errors on the forums at community.centminmod.com/forums/8/"
+        echo "with info asked at community.centminmod.com/threads/17857/"
         echo
         free -m
         echo
@@ -727,6 +777,7 @@ fi
   if [ $ERR != 0 ]; then
     echo -e "\n`date`\nError: $ERR, PHP wasn't installed properly ($SCRIPT_VERSION)\n"
         echo "report errors on the forums at community.centminmod.com/forums/8/"
+        echo "with info asked at community.centminmod.com/threads/17857/"
         echo
         free -m
         echo
@@ -968,7 +1019,14 @@ fi
 
 addmysql_legacyinstall
 
-if [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMUVER" = '7.3' ]]; then
+if [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMUVER" = '7.4' ]]; then
+    echo "PHP_MCRYPTPECL=$PHP_MCRYPTPECL"
+    echo "PHPMVER=$PHPMVER"
+    echo "PHPMUVER=$PHPMUVER"
+    if [ -f /usr/local/src/centminmod/addons/php74-mcrypt.sh ]; then
+        /usr/local/src/centminmod/addons/php74-mcrypt.sh menu
+    fi
+elif [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMUVER" = '7.3' ]]; then
     echo "PHP_MCRYPTPECL=$PHP_MCRYPTPECL"
     echo "PHPMVER=$PHPMVER"
     echo "PHPMUVER=$PHPMUVER"
@@ -1010,6 +1068,16 @@ fi
 
 fileinfo_standalone
 
+# set php-fpm alias log inspection shotcuts
+if [[ ! "$(grep fpm-errlog /root/.bashrc)" || ! "$(grep fpm-slowlog /root/.bashrc)" || ! "$(grep fpm-phperrlog /root/.bashrc)" ]]; then
+  alias fpm-errlog='tail -10 /var/log/php-fpm/www-error.log'
+  alias fpm-phperrlog='tail -10 /var/log/php-fpm/www-php.error.log'
+  alias fpm-slowlog='tail -10 /var/log/php-fpm/www-slow.log'
+  echo "alias fpm-errlog='tail -10 /var/log/php-fpm/www-error.log'" >> /root/.bashrc
+  echo "alias fpm-phperrlog='tail -10 /var/log/php-fpm/www-php.error.log'" >> /root/.bashrc
+  echo "alias fpm-slowlog='tail -10 /var/log/php-fpm/www-slow.log'" >> /root/.bashrc
+fi
+
 echo
 php --ini
 
@@ -1032,6 +1100,9 @@ fi
 
 sar_call
 
+    if [[ "$CENTOS_SEVEN" -eq '7' && "$SWITCH_PHPFPM_SYSTEMD" = [yY] && -f "/usr/local/src/centminmod/tools/php-systemd.sh" && ! -f /usr/lib/systemd/system/php-fpm.service ]]; then
+      /usr/local/src/centminmod/tools/php-systemd.sh fpm-systemd
+    fi
     cmservice php-fpm restart
 
 phpiadmin
@@ -1043,13 +1114,13 @@ if [[ "$zendopcacheon" = [yY] && "$OLD_OPCACHEPHP" != [yY] ]]; then
 fi
 
 # notes for users if PHP 7.0 detected
-php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2|7.3'
+php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2|7.3|7.4'
 PHPSEVEN_CHECKVER=$?
 echo "$PHPSEVEN_CHECKVER"
 
 if [[ "$PHPSEVEN_CHECKVER" = '0' ]]; then
     cecho "***************************************************" $boldgreen
-    cecho "PHP 7.0/7.1/7.2/7.3 detected.. remove unsupported PHP extensions manually" $boldyellow
+    cecho "PHP 7.0/7.1/7.2/7.3/7.4 detected.. remove unsupported PHP extensions manually" $boldyellow
     cecho "by removing their ini files listed below (if list is empty = nothing to do):" $boldyellow
     cecho "***************************************************" $boldgreen
     echo
@@ -1095,7 +1166,7 @@ fi
         cecho "* PHP compiled with CPU_MARCH=$CPU_MARCH" $boldgreen
     fi
     cecho "* PHP upgraded and auto reinstalled PHP extensions" $boldgreen
-    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' ]]; then
+    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' || "$PHPMUVER" = '7.4' ]]; then
         cecho "* PHP_PGO='y' detected. PHP compiled with Profile Guided Optimizations" $boldgreen
         cecho "* https://software.intel.com/en-us/blogs/2015/10/09/pgo-let-it-go-php" $boldgreen
     fi

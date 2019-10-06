@@ -11,7 +11,7 @@ export LC_CTYPE=en_US.UTF-8
 ###############################################################
 # variables
 ###############################################################
-ACMEVER='1.0.50'
+ACMEVER='1.0.55'
 DT=$(date +"%d%m%y-%H%M%S")
 ACMEDEBUG='n'
 ACMEDEBUG_LOG='y'
@@ -75,6 +75,28 @@ UNATTENDED='n'
 NOTICE='y'
 CHECKVERSION='y'
 SCRIPTCHECKURL='https://acmetool.centminmod.com'
+###############################################################
+# Settings for centmin.sh menu option 2 and option 22 for
+# the details of the self-signed SSL certificate that is auto 
+# generated. The default values where vhostname variable is 
+# auto added based on what you input for your site name
+# 
+# -subj "/C=US/ST=California/L=Los Angeles/O=${vhostname}/OU=${vhostname}/CN=${vhostname}"
+# 
+# You can only customise the first 5 variables for 
+# C = Country 2 digit code
+# ST = state 
+# L = Location as in city 
+# 0 = organisation
+# OU = organisational unit
+# 
+# if left blank # defaults to same as vhostname that is your domain
+# if set it overrides that
+SELFSIGNEDSSL_C='US'
+SELFSIGNEDSSL_ST='California'
+SELFSIGNEDSSL_L='Los Angeles'
+SELFSIGNEDSSL_O=''
+SELFSIGNEDSSL_OU=''
 ###############################################################
 
 shopt -s expand_aliases
@@ -359,7 +381,7 @@ checkdate() {
 check_dns() {
   vhostname_dns="$1"
     # if CHECKIDN = 0 then internationalized domain name which not supported by letsencrypt
-    CHECKIDN=$(echo $vhostname_dns | grep '^xn--' >/dev/null 2>&1; echo $?)
+    CHECKIDN=$(echo $vhostname_dns | idn | grep '^xn--' >/dev/null 2>&1; echo $?)
     if [[ "$CHECKIDN" = '0' ]]; then
       TOPLEVELCHECK=$(dig soa @8.8.8.8 $vhostname_dns | grep -v ^\; | grep SOA | awk '{print $1}' | sed 's/\.$//' | idn)
     else
@@ -472,12 +494,24 @@ split_domains() {
     SAN=1
     DOMAIN_LIST="$(echo "$parse_domains"| sed -e 's|\s||g' | sed -e 's|,| -d |g')"
     vhostname=$(echo "$parse_domains"| awk -F ',' '{print $1}')
+    # if checkidn_vhost = 0 then internationalized domain name
+    checkidn_splitvhost=$(echo $vhostname | idn | grep '^xn--' >/dev/null 2>&1; echo $?)
+    if [[ "$checkidn_splitvhost" = '0' ]]; then
+      DOMAIN_LIST=$(echo $DOMAIN_LIST | idn)
+      vhostname=$(echo $vhostname | idn)
+    fi
     DOMAIN_LISTNGX="$(echo "$(echo "$parse_domains"| sed -e 's|,| |g') www.$vhostname")"
     # take only 1st entry for nginx vhost
   else
     SAN=0
     DOMAIN_LIST="$parse_domains"
     vhostname="$parse_domains"
+    # if checkidn_vhost = 0 then internationalized domain name
+    checkidn_splitvhost=$(echo $vhostname | idn | grep '^xn--' >/dev/null 2>&1; echo $?)
+    if [[ "$checkidn_splitvhost" = '0' ]]; then
+      DOMAIN_LIST=$(echo $DOMAIN_LIST | idn)
+      vhostname=$(echo $vhostname | idn)
+    fi
   fi
 }
 
@@ -684,18 +718,27 @@ fi
     HTTPTWO_MAXHEADERSIZE='http2_max_header_size 32k;'  
   elif [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]]; then
     HTTPTWO=y
+    # check if backlogg directive is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
+    # CHECK_HTTPSBACKLOG=$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep backlog | awk -F ':  ' '{print $2}' | grep -o backlog)
+    # if [[ "$CHECK_HTTPSBACKLOG" != 'backlog' ]]; then
+    #   if [[ ! -f /proc/user_beancounters ]]; then
+    #       GETSOMAXCON_VALUE=$(sysctl net.core.somaxconn | awk -F  '= ' '{print $2}')
+    #       SET_NGINXBACKLOG=$(($GETSOMAXCON_VALUE/16))
+    #       ADD_BACKLOG=" backlog=$SET_NGINXBACKLOG"
+    #   fi
+    # fi
     if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep reuseport | awk -F ':  ' '{print $2}' | grep -o reuseport)" != 'reuseport' ]]; then
-    # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
-    NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
-    if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
-      ADD_REUSEPORT=' reuseport'
+      # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
+      NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
+      if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
+        ADD_REUSEPORT=' reuseport'
+      else
+        ADD_REUSEPORT=""
+      fi
+      LISTENOPT="ssl http2${ADD_REUSEPORT}${ADD_BACKLOG}"
     else
-      ADD_REUSEPORT=""
+      LISTENOPT="ssl http2${ADD_BACKLOG}"
     fi
-    LISTENOPT="ssl http2${ADD_REUSEPORT}"
-  else
-    LISTENOPT='ssl http2'
-  fi
     COMP_HEADER='#spdy_headers_comp 5'
     SPDY_HEADER='#add_header Alternate-Protocol  443:npn-spdy/3;'
     HTTPTWO_MAXFIELDSIZE='http2_max_field_size 16k;'
@@ -883,6 +926,8 @@ fi
 if [ ! -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
   mkdir -p /usr/local/nginx/conf/ssl/cloudflare/${vhostname}
   wget $CLOUDFLARE_AUTHORIGINPULLCERT -O origin.crt
+elif [ -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
+  wget $CLOUDFLARE_AUTHORIGINPULLCERT -O origin.crt
 fi
 
 if [ ! -f /usr/local/nginx/conf/ssl_include.conf ]; then
@@ -925,8 +970,53 @@ else
   SELFSIGNEDSSL_OU="$SELFSIGNEDSSL_OU"
 fi
 
-openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
-openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt
+# self-signed ssl cert with SANs
+cat > /tmp/req.cnf <<EOF
+[req]
+default_bits       = 2048
+distinguished_name = req_distinguished_name
+req_extensions     = v3_req
+prompt = no
+[req_distinguished_name]
+C = ${SELFSIGNEDSSL_C}
+ST = ${SELFSIGNEDSSL_ST}
+L = ${SELFSIGNEDSSL_L}
+O = ${vhostname}
+OU = ${vhostname}
+CN = ${vhostname}
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = ${vhostname}
+DNS.2 = www.${vhostname}
+EOF
+
+cat > /tmp/v3ext.cnf <<EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${vhostname}
+DNS.2 = www.${vhostname}
+EOF
+
+echo
+cat /tmp/req.cnf
+echo
+cat /tmp/v3ext.cnf
+echo
+openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -config /tmp/req.cnf
+# openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${vhostname}/OU=${vhostname}/CN=${vhostname}"
+openssl req -noout -text -in ${vhostname}.csr | grep DNS
+openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt -extfile /tmp/v3ext.cnf
+# openssl req -x509 -nodes -days 36500 -sha256 -newkey rsa:2048 -keyout ${vhostname}.key -out ${vhostname}.crt -config /tmp/req.cnf
+
+rm -f /tmp/req.cnf
+rm -f /tmp/v3ext.cnf
 
 echo
 cecho "---------------------------------------------------------------" $boldyellow
@@ -3895,8 +3985,8 @@ issue_acmedns() {
     # if CF_DNSAPI enabled for Cloudflare DNS mode, use Cloudflare API for setting
     # up DNS mode validation via TXT DNS record creation
     if [[ "$CF_DNSAPI" = [yY] ]] && [[ ! -z "$CF_KEY" && ! -z "$CF_KEY" ]]; then
-      export CF_KEY="$CF_KEY"
-      export CF_EMAIL="$CF_EMAIL"
+      export CF_Key="$CF_KEY"
+      export CF_Email="$CF_EMAIL"
       DNSAPI_OPT=' dns_cf'
       sed -i "s|^#CF_|CF_|" "$ACMECERTHOME"account.conf
       sed -i "s|CF_Key=\".*|CF_Key=\"$CF_KEY\"|" "$ACMECERTHOME"account.conf
@@ -4050,6 +4140,13 @@ issue_acmedns() {
         cat "${CENTMINLOGDIR}/acme.sh-dnslog-${vhostname}${ECC_SUFFIX}-${DT}.log" | perl -pe 's/\x1b.*?[mGKH]//g' | sed 's/\[[^]]*\]//g' | grep -A60 'Verify each domain' | sed '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/d'
         echo
         pushover_alert $vhostname dnscf "${CENTMINLOGDIR}/acme.sh-dnslog-${vhostname}${ECC_SUFFIX}-${DT}.log"
+        echo " If want to install cert into Nginx vhost, run SSH command: " >> "${CENTMINLOGDIR}/acme.sh-dnslog-${vhostname}${ECC_SUFFIX}-${DT}.log"
+        # echo "" >> "${CENTMINLOGDIR}/acme.sh-dnslog-${vhostname}${ECC_SUFFIX}-${DT}.log"
+        echo "---------------------------------" >> "${CENTMINLOGDIR}/acme.sh-dnslog-${vhostname}${ECC_SUFFIX}-${DT}.log"
+      echo "  "$ACMEBINARY" --installcert $DOMAINOPT --certpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --keypath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.key" --capath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-acme${ECC_SUFFIX}.cer" --reloadCmd /usr/bin/ngxreload --fullchainpath "/usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-fullchain-acme${ECC_SUFFIX}. key"${ECCFLAG}" >> "${CENTMINLOGDIR}/acme.sh-dnslog-${vhostname}${ECC_SUFFIX}-${DT}.log"
+        echo "---------------------------------" >> "${CENTMINLOGDIR}/acme.sh-dnslog-${vhostname}${ECC_SUFFIX}-${DT}.log"
+        echo " SSL certs will be installed at (requires manual configuration in intended Nginx vhost config files community.centminmod.com/posts/35135/): /usr/local/nginx/conf/ssl/${vhostname}/" >> "${CENTMINLOGDIR}/acme.sh-dnslog-${vhostname}${ECC_SUFFIX}-${DT}.log"
+        echo "" >> "${CENTMINLOGDIR}/acme.sh-dnslog-${vhostname}${ECC_SUFFIX}-${DT}.log"
       fi # if CF_DNSAPI enabled can skip this text
     fi # DNS Mode certonly 3
 }

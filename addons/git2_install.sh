@@ -2,7 +2,7 @@
 ###########################################################
 # installs IUS Community YUM Repository
 # https://iuscommunity.org/pages/Repos.html
-# for access to git 2.8.x branch
+# for access to git 2.16+ branch
 # https://community.centminmod.com/posts/20898/
 ###########################################################
 DT=$(date +"%d%m%y-%H%M%S")
@@ -28,6 +28,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -143,9 +145,18 @@ cecho "*************************************************" $boldgreen
 cecho "Installing Git 2.x" $boldgreen
 cecho "*************************************************" $boldgreen
 
-# install Git 2.8 package to replace Git 1.8 package
+# install Git 2.16+ package to replace Git 1.8 package
 yum -y install yum-plugin-replace --enablerepo=ius
+yum -y update git
 yum -y replace git --replace-with git2u --enablerepo=ius
+
+echo
+yum versionlock git perl-Git
+
+if [[ "$(grep '^exclude=' /etc/yum.conf | grep -o git)" != 'git' ]]; then
+    NEW_GITEXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) git perl-Git")
+    sed -i "s|^exclude=.*|$NEW_GITEXCLUDES|" /etc/yum.conf
+fi
 
 echo
 git --version
@@ -156,4 +167,4 @@ endtime=$(TZ=UTC date +%s.%N)
 
 INSTALLTIME=$(echo "scale=2;$endtime - $starttime"|bc )
 echo "" >> ${CENTMINLOGDIR}/git2u-install_${DT}.log
-echo "Git 2.8.* Install Time: $INSTALLTIME seconds" >> ${CENTMINLOGDIR}/git2u-install_${DT}.log
+echo "Git 2.16+ Install Time: $INSTALLTIME seconds" >> ${CENTMINLOGDIR}/git2u-install_${DT}.log

@@ -122,6 +122,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -227,12 +229,13 @@ cmservice() {
       service "${servicename}" "$action"
     fi
   else
-    if [[ "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
+    if [[ "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
       echo "service ${servicename} $action"
       if [[ "$CMSDEBUG" = [nN] ]]; then
         service "${servicename}" "$action"
       fi
-    else
+    elif [[ "${servicename}" = 'mysql' || "${servicename}" = 'mysqld' ]]; then
+      servicename='mariadb'
       echo "systemctl $action ${servicename}.service"
       if [[ "$CMSDEBUG" = [nN] ]]; then
         systemctl "$action" "${servicename}.service"

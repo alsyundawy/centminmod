@@ -199,6 +199,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -208,13 +210,13 @@ fi
 
 MARIADB55ARCH=`uname -m`
 
-MDB_COUNTRY=$(curl -s https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | awk '/country: / {print $2}')
+MDB_COUNTRY=$(curl -4s https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | awk '/country: / {print $2}')
 
 # MariaDB yum mirrors may have connectivity issues for servers in China (CN)
 # so can use alternative mirrors for better speed and connectivity
 if [[ "$MDB_COUNTRY" = 'CN' ]]; then
-    echo "rpm --import https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum//RPM-GPG-KEY-MariaDB"
-    rpm --import https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum//RPM-GPG-KEY-MariaDB
+    echo "rpm --import https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/RPM-GPG-KEY-MariaDB"
+    rpm --import https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/RPM-GPG-KEY-MariaDB
 else
     echo "rpm --import https://yum.mariadb.org/RPM-GPG-KEY-MariaDB"
     rpm --import https://yum.mariadb.org/RPM-GPG-KEY-MariaDB
@@ -230,7 +232,7 @@ cat > "/etc/yum.repos.d/mariadb.repo" <<EOF
 [mariadb]
 name = MariaDB
 baseurl = https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/10.2/centos7-aarch64
-gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum//RPM-GPG-KEY-MariaDB
+gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/RPM-GPG-KEY-MariaDB
 gpgcheck=1
 EOF
 else
@@ -251,7 +253,7 @@ cat > "/etc/yum.repos.d/mariadb.repo" <<EOF
 [mariadb]
 name = MariaDB
 baseurl = https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/10.2/centos7-amd64
-gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum//RPM-GPG-KEY-MariaDB
+gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/RPM-GPG-KEY-MariaDB
 gpgcheck=1
 EOF
 else
@@ -271,7 +273,7 @@ cat > "/etc/yum.repos.d/mariadb.repo" <<EOF
 [mariadb]
 name = MariaDB
 baseurl = https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/10.2/centos7-amd64
-gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum//RPM-GPG-KEY-MariaDB
+gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/RPM-GPG-KEY-MariaDB
 gpgcheck=1
 EOF
 else
@@ -298,7 +300,7 @@ cat > "/etc/yum.repos.d/mariadb.repo" <<EOF
 [mariadb]
 name = MariaDB
 baseurl = https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/10.2/centos6-amd64
-gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum//RPM-GPG-KEY-MariaDB
+gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/RPM-GPG-KEY-MariaDB
 gpgcheck=1
 EOF
 else
@@ -322,7 +324,7 @@ cat > "/etc/yum.repos.d/mariadb.repo" <<EOF
 [mariadb]
 name = MariaDB
 baseurl = https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/10.2/centos6-x86
-gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum//RPM-GPG-KEY-MariaDB
+gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/RPM-GPG-KEY-MariaDB
 gpgcheck=1
 EOF
 else
@@ -392,7 +394,7 @@ echo
 echo "shut down existing MariaDB server for upgrade.."
 mysql -e "set global innodb_buffer_pool_dump_at_shutdown=0;"
 sleep 10
-service mysql stop
+cmservice mysql stop
 echo
 # move aside existing ib_logfile* files
 cd $MYSQLDATADIR

@@ -37,6 +37,28 @@ VHOST_CFAUTHORIGINPULL='y'
 # integration detection in these menu options
 LETSENCRYPT_DETECT='n'
 ###############################################################
+# Settings for centmin.sh menu option 2 and option 22 for
+# the details of the self-signed SSL certificate that is auto 
+# generated. The default values where vhostname variable is 
+# auto added based on what you input for your site name
+# 
+# -subj "/C=US/ST=California/L=Los Angeles/O=${vhostname}/OU=${vhostname}/CN=${vhostname}"
+# 
+# You can only customise the first 5 variables for 
+# C = Country 2 digit code
+# ST = state 
+# L = Location as in city 
+# 0 = organisation
+# OU = organisational unit
+# 
+# if left blank # defaults to same as vhostname that is your domain
+# if set it overrides that
+SELFSIGNEDSSL_C='US'
+SELFSIGNEDSSL_ST='California'
+SELFSIGNEDSSL_L='Los Angeles'
+SELFSIGNEDSSL_O=''
+SELFSIGNEDSSL_OU=''
+###############################################################
 # Setup Colours
 black='\E[30;40m'
 red='\E[31;40m'
@@ -122,18 +144,27 @@ if [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module
   HTTPTWO_MAXHEADERSIZE='http2_max_header_size 32k;'  
 elif [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]]; then
   HTTPTWO=y
-  if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep reuseport | awk -F ':  ' '{print $2}' | grep -o reuseport)" != 'reuseport' ]]; then
-    # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
-    NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
-    if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
-      ADD_REUSEPORT=' reuseport'
+    # check if backlogg directive is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
+    # CHECK_HTTPSBACKLOG=$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep backlog | awk -F ':  ' '{print $2}' | grep -o backlog)
+    # if [[ "$CHECK_HTTPSBACKLOG" != 'backlog' ]]; then
+    #   if [[ ! -f /proc/user_beancounters ]]; then
+    #       GETSOMAXCON_VALUE=$(sysctl net.core.somaxconn | awk -F  '= ' '{print $2}')
+    #       SET_NGINXBACKLOG=$(($GETSOMAXCON_VALUE/16))
+    #       ADD_BACKLOG=" backlog=$SET_NGINXBACKLOG"
+    #   fi
+    # fi
+    if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep reuseport | awk -F ':  ' '{print $2}' | grep -o reuseport)" != 'reuseport' ]]; then
+      # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
+      NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
+      if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
+        ADD_REUSEPORT=' reuseport'
+      else
+        ADD_REUSEPORT=""
+      fi
+      LISTENOPT="ssl http2${ADD_REUSEPORT}${ADD_BACKLOG}"
     else
-      ADD_REUSEPORT=""
+      LISTENOPT="ssl http2${ADD_BACKLOG}"
     fi
-    LISTENOPT="ssl http2${ADD_REUSEPORT}"
-  else
-    LISTENOPT='ssl http2'
-  fi
   COMP_HEADER='#spdy_headers_comp 5'
   SPDY_HEADER='#add_header Alternate-Protocol  443:npn-spdy/3;'
   HTTPTWO_MAXFIELDSIZE='http2_max_field_size 16k;'
@@ -212,6 +243,11 @@ while getopts ":d:s:u:" opt; do
     case "$opt" in
 	d)
 	 vhostname=${OPTARG}
+   # if checkidn_vhost = 0 then internationalized domain name
+   checkidn_vhost=$(echo $vhostname | idn | grep '^xn--' >/dev/null 2>&1; echo $?)
+   if [[ "$checkidn_vhost" = '0' ]]; then
+     vhostname=$(echo $vhostname | idn)
+   fi
    RUN=y
 	;;
 	s)
@@ -254,6 +290,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -283,12 +321,13 @@ cmservice() {
       service "${servicename}" "$action"
     fi
   else
-    if [[ "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
+    if [[ "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
       echo "service ${servicename} $action"
       if [[ "$CMSDEBUG" = [nN] ]]; then
         service "${servicename}" "$action"
       fi
-    else
+    elif [[ "${servicename}" = 'mysql' || "${servicename}" = 'mysqld' ]]; then
+      servicename='mariadb'
       echo "systemctl $action ${servicename}.service"
       if [[ "$CMSDEBUG" = [nN] ]]; then
         systemctl "$action" "${servicename}.service"
@@ -333,7 +372,7 @@ pureftpinstall() {
     if [ "$SECOND_IP" ]; then
       CNIP="$SECOND_IP"
     else
-      CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+      CNIP=$(curl -4s https://ipinfo.io/ip)
     fi
 
 		yum -q -y install pure-ftpd
@@ -429,7 +468,9 @@ fi
 # setup https://community.centminmod.com/threads/13847/
 if [ ! -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
   mkdir -p /usr/local/nginx/conf/ssl/cloudflare/${vhostname}
-  wget $CLOUDFLARE_AUTHORIGINPULLCERT -O origin.crt
+  wget -4 $CLOUDFLARE_AUTHORIGINPULLCERT -O /usr/local/nginx/conf/ssl/cloudflare/${vhostname}/origin.crt
+elif [ -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
+  wget -4 $CLOUDFLARE_AUTHORIGINPULLCERT -O /usr/local/nginx/conf/ssl/cloudflare/${vhostname}/origin.crt
 fi
 
 if [ ! -f /usr/local/nginx/conf/ssl_include.conf ]; then
@@ -463,8 +504,53 @@ else
   SELFSIGNEDSSL_OU="$SELFSIGNEDSSL_OU"
 fi
 
-openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
-openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt
+# self-signed ssl cert with SANs
+cat > /tmp/req.cnf <<EOF
+[req]
+default_bits       = 2048
+distinguished_name = req_distinguished_name
+req_extensions     = v3_req
+prompt = no
+[req_distinguished_name]
+C = ${SELFSIGNEDSSL_C}
+ST = ${SELFSIGNEDSSL_ST}
+L = ${SELFSIGNEDSSL_L}
+O = ${vhostname}
+OU = ${vhostname}
+CN = ${vhostname}
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = ${vhostname}
+DNS.2 = www.${vhostname}
+EOF
+
+cat > /tmp/v3ext.cnf <<EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${vhostname}
+DNS.2 = www.${vhostname}
+EOF
+
+echo
+cat /tmp/req.cnf
+echo
+cat /tmp/v3ext.cnf
+echo
+openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -config /tmp/req.cnf
+# openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${vhostname}/OU=${vhostname}/CN=${vhostname}"
+openssl req -noout -text -in ${vhostname}.csr | grep DNS
+openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt -extfile /tmp/v3ext.cnf
+# openssl req -x509 -nodes -days 36500 -sha256 -newkey rsa:2048 -keyout ${vhostname}.key -out ${vhostname}.crt -config /tmp/req.cnf
+
+rm -f /tmp/req.cnf
+rm -f /tmp/v3ext.cnf
 
 # echo
 # cecho "---------------------------------------------------------------" $boldyellow
@@ -531,7 +617,7 @@ PUREGROUP=nginx
     if [ "$SECOND_IP" ]; then
       CNIP="$SECOND_IP"
     else
-      CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+      CNIP=$(curl -4s https://ipinfo.io/ip)
     fi
 if [[ "$PUREFTPD_INSTALLED" = [nN] ]]; then
   pureftpinstall
@@ -568,7 +654,7 @@ cecho "---------------------------------------------------------------" $boldyel
 # nginx vhost at /usr/local/nginx/conf/conf.d/virtual.conf
 if [ -f /usr/local/nginx/conf/conf.d/virtual.conf ]; then
   CHECK_MAINHOSTNAME=$(awk '/server_name/ {print $2}' /usr/local/nginx/conf/conf.d/virtual.conf | sed -e 's|;||')
-  if [[ "${CHECK_MAINHOSTNAME}" = "${vhostname}" ]]; then
+  if [[ "${CHECK_MAINHOSTNAME}" = "${vhostname}" && "${ALLOW_MAINHOSTNAME_SSL}" != [yY] ]]; then
     echo
     echo " Error: $vhostname is already setup for server main hostname"
     echo " at /usr/local/nginx/conf/conf.d/virtual.conf"
@@ -581,6 +667,8 @@ if [ -f /usr/local/nginx/conf/conf.d/virtual.conf ]; then
     echo " Aborting nginx vhost creation..."
     echo
     exit 1
+  elif [[ "${CHECK_MAINHOSTNAME}" = "${vhostname}" && "${ALLOW_MAINHOSTNAME_SSL}" = [yY] ]]; then
+    create_mainhostname_ssl=y
   fi
 fi
 
@@ -780,17 +868,19 @@ else
   CHACHACIPHERS=""
 fi
 
-DETECTOPENSSL_ONEZERO=$(echo $OPENSSL_VERSION  | cut -d . -f1-2)
-DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
-if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
-    # openssl 1.1.0 unsupported flag enable-tlsext
-    if [[ "$(grep -w 'tls1_3' "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm")" ]]; then
-        TLSONETHREEOPT=' enable-tls1_3'
-        TLSONETHREE_DETECT='y'
-    else
-        TLSONETHREEOPT=""
-        TLSONETHREE_DETECT='n'
-    fi
+if [ -f "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm" ]; then
+  DETECTOPENSSL_ONEZERO=$(echo $OPENSSL_VERSION  | cut -d . -f1-2)
+  DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
+  if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
+      # openssl 1.1.0 unsupported flag enable-tlsext
+      if [[ "$(grep -w 'tls1_3' "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm")" ]]; then
+          TLSONETHREEOPT=' enable-tls1_3'
+          TLSONETHREE_DETECT='y'
+      else
+          TLSONETHREEOPT=""
+          TLSONETHREE_DETECT='n'
+      fi
+  fi
 fi
 
 if [[ "$TLSONETHREE_DETECT" = [yY] ]]; then
@@ -799,7 +889,26 @@ else
   TLSONETHREE_CIPHERS=""
 fi
 
-if [[ -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
+if [[ -f /usr/bin/php74 && -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;
+  #include /usr/local/nginx/conf/php71-remi.conf;
+  #include /usr/local/nginx/conf/php70-remi.conf;
+  #include /usr/local/nginx/conf/php56-remi.conf;'
+elif [[ -f /usr/bin/php74 && -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && ! -f /usr/bin/php70 && ! -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;
+  #include /usr/local/nginx/conf/php71-remi.conf;'
+elif [[ -f /usr/bin/php74 && -f /usr/bin/php73 && -f /usr/bin/php72 && ! -f /usr/bin/php71 && ! -f /usr/bin/php70 && ! -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;'
+elif [[ -f /usr/bin/php74 && -f /usr/bin/php73 && ! -f /usr/bin/php72 && ! -f /usr/bin/php71 && ! -f /usr/bin/php70 && ! -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;'
+elif [[ -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
   MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php73-remi.conf;
   #include /usr/local/nginx/conf/php72-remi.conf;
   #include /usr/local/nginx/conf/php71-remi.conf;
@@ -844,6 +953,14 @@ else
   CFAUTHORIGINPULL_INCLUDES=""
 fi
 
+# set web root differently if it's main hostname
+
+if [[ "$create_mainhostname_ssl" = [yY] ]]; then
+  PUBLIC_WEBROOT='root   html;'
+else
+  PUBLIC_WEBROOT="root /home/nginx/domains/$vhostname/public;"
+fi
+
 # main non-ssl vhost at yourdomain.com.conf
 cat > "/usr/local/nginx/conf/conf.d/$vhostname.conf"<<ENSS
 # Centmin Mod Getting Started Guide
@@ -879,7 +996,7 @@ server {
   error_log /home/nginx/domains/$vhostname/log/error.log;
 
   include /usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf;
-  root /home/nginx/domains/$vhostname/public;
+  $PUBLIC_WEBROOT
   # uncomment cloudflare.conf include if using cloudflare for
   # server and/or vhost site
   #include /usr/local/nginx/conf/cloudflare.conf;
@@ -985,7 +1102,7 @@ server {
   error_log /home/nginx/domains/$vhostname/log/error.log;
 
   include /usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf;
-  root /home/nginx/domains/$vhostname/public;
+  $PUBLIC_WEBROOT
   # uncomment cloudflare.conf include if using cloudflare for
   # server and/or vhost site
   #include /usr/local/nginx/conf/cloudflare.conf;
@@ -1083,7 +1200,7 @@ server {
   error_log /home/nginx/domains/$vhostname/log/error.log;
 
   include /usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf;
-  root /home/nginx/domains/$vhostname/public;
+  $PUBLIC_WEBROOT
   # uncomment cloudflare.conf include if using cloudflare for
   # server and/or vhost site
   #include /usr/local/nginx/conf/cloudflare.conf;
@@ -1178,7 +1295,7 @@ server {
   error_log /home/nginx/domains/$vhostname/log/error.log;
 
   include /usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf;
-  root /home/nginx/domains/$vhostname/public;
+  $PUBLIC_WEBROOT
   # uncomment cloudflare.conf include if using cloudflare for
   # server and/or vhost site
   #include /usr/local/nginx/conf/cloudflare.conf;
@@ -1248,7 +1365,7 @@ server {
   error_log /home/nginx/domains/$vhostname/log/error.log;
 
   include /usr/local/nginx/conf/autoprotect/$vhostname/autoprotect-$vhostname.conf;
-  root /home/nginx/domains/$vhostname/public;
+  $PUBLIC_WEBROOT
   # uncomment cloudflare.conf include if using cloudflare for
   # server and/or vhost site
   #include /usr/local/nginx/conf/cloudflare.conf;
@@ -1360,9 +1477,13 @@ fi
 cecho "-------------------------------------------------------------" $boldyellow
 cecho "vhost for $vhostname created successfully" $boldwhite
 echo
-if [[ "$sslconfig" != 'yd' ]] || [[ "$sslconfig" != 'ydle' ]]; then
-  cecho "domain: http://$vhostname" $boldyellow
-  cecho "vhost conf file for $vhostname created: /usr/local/nginx/conf/conf.d/$vhostname.conf" $boldwhite
+if [[ "$create_mainhostname_ssl" != [yY] ]]; then
+  if [[ "$sslconfig" != 'yd' ]] || [[ "$sslconfig" != 'ydle' ]]; then
+    cecho "domain: http://$vhostname" $boldyellow
+    cecho "vhost conf file for $vhostname created: /usr/local/nginx/conf/conf.d/$vhostname.conf" $boldwhite
+  fi
+elif [[ "$create_mainhostname_ssl" = [yY] ]]; then
+  rm -f "/usr/local/nginx/conf/conf.d/$vhostname.conf"
 fi
 if [[ "$vhostssl" = [yY] ]]; then
   echo
@@ -1381,7 +1502,11 @@ if [[ "$vhostssl" = [yY] ]]; then
   cecho "Backup SSL CSR File: /usr/local/nginx/conf/ssl/${vhostname}/${vhostname}-backup.csr" $boldyellow    
 fi
 echo
-cecho "upload files to /home/nginx/domains/$vhostname/public" $boldwhite
+if [[ "$create_mainhostname_ssl" != [yY] ]]; then
+  cecho "upload files to /home/nginx/domains/$vhostname/public" $boldwhite
+elif [[ "$create_mainhostname_ssl" = [yY] ]]; then
+  cecho "upload files to /usr/local/nginx/html" $boldwhite
+fi
 cecho "vhost log files directory is /home/nginx/domains/$vhostname/log" $boldwhite
 
 echo

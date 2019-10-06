@@ -33,6 +33,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -59,6 +61,10 @@ fi
 
 if [ ! -f /usr/bin/tree ]; then
     yum -y -q install tree
+fi
+
+if [ ! -f /usr/bin/smem ]; then
+    yum -y -q install smem
 fi
 
 if [ -z $PASS ]; then
@@ -94,6 +100,30 @@ if [[ "$FORCE_IPVFOUR" != [yY] ]]; then
 else
   ipv_forceopt='4'
 fi
+
+cmservice() {
+  servicename=$1
+  action=$2
+  if [[ "$CENTOS_SEVEN" != '7' ]] && [[ "${servicename}" = 'haveged' || "${servicename}" = 'pure-ftpd' || "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' || "${servicename}" = 'memcached' || "${servicename}" = 'nsd' || "${servicename}" = 'csf' || "${servicename}" = 'lfd' ]]; then
+    echo "service ${servicename} $action"
+    if [[ "$CMSDEBUG" = [nN] ]]; then
+      service "${servicename}" "$action"
+    fi
+  else
+    if [[ "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
+      echo "service ${servicename} $action"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        service "${servicename}" "$action"
+      fi
+    elif [[ "${servicename}" = 'mysql' || "${servicename}" = 'mysqld' ]]; then
+      servicename='mariadb'
+      echo "systemctl $action ${servicename}.service"
+      if [[ "$CMSDEBUG" = [nN] ]]; then
+        systemctl "$action" "${servicename}.service"
+      fi
+    fi
+  fi
+}
 
 #####################################################
 top_info() {
@@ -144,8 +174,9 @@ top_info() {
 
     echo " Server Location Info"
     # echo
-    curl -${ipv_forceopt}s${CURL_TIMEOUTS} https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | egrep -v 'ip:|phone|postal|loc'
-    echo "  ASN: $(curl -${ipv_forceopt}s${CURL_TIMEOUTS} https://ipinfo.io/org 2>&1)"
+    CMINFO_IPINFO=$(curl -${ipv_forceopt}s${CURL_TIMEOUTS} https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | egrep -vi 'ip:|phone|postal|loc|readme')
+    echo "$CMINFO_IPINFO" | grep -iv 'readme'
+    echo "  ASN: $(curl -${ipv_forceopt}s${CURL_TIMEOUTS} https://ipinfo.io/org 2>&1 | grep -iv 'readme')"
     
     echo
     echo " Processors" "physical = ${PHYSICALCPUS}, cores = ${CPUCORES}, virtual = ${VIRTUALCORES}, hyperthreading = ${HT}"
@@ -207,20 +238,59 @@ top_info() {
     free -mtl
     echo
     echo "------------------------------------------------------------------"
+    echo "top 10 processes using swap (VmSwap)"
+    echo
+    find /proc -maxdepth 2 -path "/proc/[0-9]*/status" -readable -exec awk -v FS=":" '{process[$1]=$2;sub(/^[ \t]+/,"",process[$1]);} END {if(process["VmSwap"] && process["VmSwap"] != "0 kB") printf "%10s %-30s %20s\n",process["Pid"],process["Name"],process["VmSwap"]}' '{}' \; | awk '{print $(NF-1),$0}' | sort -rh | cut -d " " -f2- | head -n10
+    echo
+    echo "------------------------------------------------------------------"
+    echo "top 10 processes' virtual memory size (VmSize/VSZ)"
+    echo "RSS vs VSZ https://stackoverflow.com/a/21049737/272648"
+    echo "RSS https://en.wikipedia.org/wiki/Resident_set_size"
+    # echo "VSZ https://en.wikipedia.org/wiki/Virtual_memory"
+    echo
+    find /proc -maxdepth 2 -path "/proc/[0-9]*/status" -readable -exec awk -v FS=":" '{process[$1]=$2;sub(/^[ \t]+/,"",process[$1]);} END {if(process["VmSize"] && process["VmSize"] != "0 kB") printf "%10s %-30s %20s\n",process["Pid"],process["Name"],process["VmSize"]}' '{}' \; | awk '{print $(NF-1),$0}' | sort -rh | cut -d " " -f2- | head -n10
+    echo
+    if [ -f /usr/bin/smem ]; then
+        echo "------------------------------------------------------------------"
+        echo "smem process memory info (sorted by RSS)"
+        echo "PSS https://en.wikipedia.org/wiki/Proportional_set_size"
+        echo "USS https://en.wikipedia.org/wiki/Unique_set_size"
+        echo
+        smem -rt -s rss
+        echo
+    fi
+    echo "------------------------------------------------------------------"
     echo "df -hT"
     df -hT
+    if [[ -f /usr/local/nginx/conf/conf.d/virtual.conf && -f /usr/local/nginx/conf/phpstatus.conf && "$(grep '^#include /usr/local/nginx/conf/phpstatus.conf' /usr/local/nginx/conf/conf.d/virtual.conf)" ]]; then
+        sed -i 's|^#include /usr/local/nginx/conf/phpstatus.conf;|include /usr/local/nginx/conf/phpstatus.conf;|' /usr/local/nginx/conf/conf.d/virtual.conf
+        nprestart >/dev/null 2>&1
+    fi
+    if [[ -f /usr/local/nginx/conf/conf.d/virtual.conf && "$(grep '^include /usr/local/nginx/conf/phpstatus.conf' /usr/local/nginx/conf/conf.d/virtual.conf)" && -f /usr/bin/fpmstats ]]; then
+        echo
+        echo "------------------------------------------------------------------"
+        echo "php-fpm stats"
+        echo
+        fpmstats
+    elif [[ -f /usr/local/nginx/conf/conf.d/virtual.conf && "$(grep '^include /usr/local/nginx/conf/phpstatus.conf' /usr/local/nginx/conf/conf.d/virtual.conf)" && ! -f /usr/bin/fpmstats ]]; then
+        echo
+        echo "------------------------------------------------------------------"
+        echo "php-fpm stats"
+        echo
+        curl -s "localhost/phpstatus"
+    fi
     echo
     echo "------------------------------------------------------------------"
     echo "Filter sar -q for times cpu load avg (1min) hit/exceeded cpu threads max"
     loadavg=$(printf "%0.2f" $(nproc))
-    sarfilteredone=$(sar -q | sed -e "s|$(hostname)|hostname|g" | grep -v runq-sz | awk -v lvg=$loadavg '{if ($4>=lvg) print $0}' | grep -v Linux)
+    sarfilteredone=$(sar -q | sed -e "s|$(hostname)|hostname|g" | grep -v runq-sz | awk -v lvg=$loadavg '{if ($5>=lvg) print $0}' | egrep -v 'Linux|Average')
     echo
     echo "${sarfilteredone:-no times found that >= $loadavg}"
     echo
     echo "------------------------------------------------------------------"
     echo "Filter sar -q for times cpu load avg (5min) hit/exceeded cpu threads max"
     loadavg=$(printf "%0.2f" $(nproc))
-    sarfilteredfive=$(sar -q | sed -e "s|$(hostname)|hostname|g" | grep -v runq-sz | awk -v lvg=$loadavg '{if ($5>=lvg) print $0}' | grep -v Linux)
+    sarfilteredfive=$(sar -q | sed -e "s|$(hostname)|hostname|g" | grep -v runq-sz | awk -v lvg=$loadavg '{if ($6>=lvg) print $0}' | egrep -v 'Linux|Average')
     echo
     echo "${sarfilteredfive:-no times found that >= $loadavg}"
     echo
@@ -233,21 +303,43 @@ top_info() {
     sar -r | sed -e "s|$(hostname)|hostname|g"
     echo
     echo "------------------------------------------------------------------"
+    echo "sar -u | sed -e \"s|\$(hostname)|hostname|g\""
+    sar -u | sed -e "s|$(hostname)|hostname|g"
+    echo
+    echo "------------------------------------------------------------------"
     if [ -d /usr/lib/systemd ]; then
-        echo "top -bcn1 -w200"
-        top -bcn1 -w200
+        echo "top -bHn1 -w200"
+        top -bHn1 -w200
     else
-        echo "top -bcn1"
-        top -bcn1
+        echo "top -bHn1"
+        top -bHn1
     fi
     echo
     echo "------------------------------------------------------------------"
     echo "iotop -bton1 -P"
     iotop -bton1 -P
     echo
+    # ensure mysql server is running before triggering mysqlreport output
+    if [[ "$(cmservice mysql status >/dev/null 2>&1; echo $?)" -eq '0' && -f /root/mysqlreport ]]; then
+        echo "------------------------------------------------------------------"
+        echo "mysqlreport"
+        /root/mysqlreport 2>/dev/null
+        echo
+    fi
+    if [[ "$PT_SUMMARY_REPORT" = [Yy] ]]; then
+        if [[ "$(uname -m)" = 'x86_64' && ! -f /usr/bin/pt-summary ]]; then
+            # 64bit OS only
+            yum -q -y install percona-toolkit --enablerepo=percona-release-x86_64
+        fi
+        if [[ "$(cmservice mysql status >/dev/null 2>&1; echo $?)" -eq '0' && -f /usr/bin/pt-summary ]]; then
+            echo "------------------------------------------------------------------"
+            /usr/bin/pt-summary 2>/dev/null | sed -e 's|Percona Toolkit ||g'
+            echo
+        fi
+    fi
     echo "------------------------------------------------------------------"
-    echo "pidstat -durh 1 5 | sed -e \"s|\$(hostname)|hostname|g\""
-    pidstat -durh 1 5 | sed -e "s|$(hostname)|hostname|g"
+    echo "pidstat -durh 1 10 | sed -e \"s|\$(hostname)|hostname|g\""
+    pidstat -durh 1 10 | sed -e "s|$(hostname)|hostname|g"
     echo "------------------------------------------------------------------"
     echo "Stats saved at: ${CENTMINLOGDIR}/cminfo-top-${DT}.log"
     echo "------------------------------------------------------------------"
@@ -448,7 +540,7 @@ echo "------------------------------------------------------------------"
 
 echo "Server Location Info"
 # echo
-curl -${ipv_forceopt}s${CURL_TIMEOUTS} https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | egrep -v 'phone|postal|loc'
+curl -${ipv_forceopt}s${CURL_TIMEOUTS} https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | egrep -v 'phone|postal|loc|readme'
 
 echo
 echo "Processors" "physical = ${PHYSICALCPUS}, cores = ${CPUCORES}, virtual = ${VIRTUALCORES}, hyperthreading = ${HT}"
@@ -525,7 +617,7 @@ for c in $VHOSTSCONF; do
     echo "* /usr/local/nginx/conf/conf.d/$c"; 
 done
 
-if [[ -z "$(service mysql status | grep not)" ]]; then
+if [[ -z "$(cmservice mysql status | grep not)" ]]; then
 echo
 echo "------------------------------------------------------------------"
 echo " MySQL Databases:"
@@ -646,6 +738,20 @@ version_log() {
         echo "error: /etc/centminmod-versionlog is missing"
     fi
 }
+
+check_version() {
+    latest_incre=$(curl -4sL https://github.com/centminmod/centminmod/raw/123.09beta01/centmin.sh | awk -F "=" '/SCRIPT_INCREMENTVER=/ {print $2}' | sed -e "s|'||g")
+    cur_incre=$(awk -F '.b' '{print $3}' /etc/centminmod-release)
+    latest="123.09beta01.b${latest_incre}"
+    current="123.09beta01.b${cur_incre}"
+    if [[ "$cur_incre" -eq "$latest_incre" ]]; then
+        echo "centminmod latest version $current detected"
+        exit 0
+    else
+        echo "your centminmod version $current is older than latest $latest"
+        exit 1
+    fi
+}
 #########
 if [[ -z "$1" ]]; then
     infooutput
@@ -674,8 +780,11 @@ case "$1" in
         ;;
     versions)
     version_log
+        ;;
+    checkver)
+    check_version
     ;;
     *)
-    echo "$0 {info|update|netstat|top|listlogs|debug-menuexit|versions}"
+    echo "$0 {info|update|netstat|top|listlogs|debug-menuexit|versions|checkver}"
         ;;
 esac

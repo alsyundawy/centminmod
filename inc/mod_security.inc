@@ -1,7 +1,7 @@
 modsecurity_install() {
   if [[ "$NGINX_MODSECURITY" = [yY] && "$DYNAMIC_SUPPORT" = [yY] ]]; then
     MODSEC_INSTALLED=y
-    DEVTOOLSETSEVEN='y'
+    # DEVTOOLSETSEVEN='y'
     NGINX_DEVTOOLSETGCC='y'
     CLANG='n'
     # https://www.nginx.com/blog/compiling-and-installing-modsecurity-for-open-source-nginx/
@@ -10,29 +10,32 @@ modsecurity_install() {
     echo "build libmodsecurity..."
     # https://github.com/SpiderLabs/ModSecurity/wiki/Compilation-recipes
 
-    # force devtoolset-6 gcc 6.2.1+ usage
-      if [[ ! -f /opt/rh/devtoolset-6/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-6/root/usr/bin/g++ ]]; then
+    # force devtoolset-8 gcc 8+ usage
+      if [[ ! -f /opt/rh/devtoolset-8/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
         scl_install
         unset CC
         unset CXX
         export CC="ccache gcc"
         export CXX="ccache g++"
+        # export CFLAGS="-Wimplicit-fallthrough=0"
         gcc --version
         g++ --version
-      elif [[ "$DEVTOOLSETSIX" = [yY] && -f /opt/rh/devtoolset-6/root/usr/bin/gcc && -f /opt/rh/devtoolset-6/root/usr/bin/g++ ]]; then
-        source /opt/rh/devtoolset-6/enable
+      elif [[ -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+        source /opt/rh/devtoolset-8/enable
         unset CC
         unset CXX
         export CC="ccache gcc"
         export CXX="ccache g++"
+        # export CFLAGS="-Wimplicit-fallthrough=0"
         gcc --version
         g++ --version
-      elif [[ -f /opt/rh/devtoolset-4/root/usr/bin/gcc && -f /opt/rh/devtoolset-4/root/usr/bin/g++ ]]; then
-        source /opt/rh/devtoolset-4/enable
+      elif [[ -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]]; then
+        source /opt/rh/devtoolset-7/enable
         unset CC
         unset CXX
         export CC="ccache gcc"
         export CXX="ccache g++"
+        # export CFLAGS="-Wimplicit-fallthrough=0"
         gcc --version
         g++ --version
       fi
@@ -46,6 +49,12 @@ modsecurity_install() {
     if [ ! -f /usr/include/yajl/yajl_common.h ]; then
       yum -y install yajl-devel
     fi
+    if [ ! -f /usr/bin/ssdeep ]; then
+      yum -y install ssdeep ssdeep-devel
+    fi
+    if [ ! -f /usr/include/lmdb.h ]; then
+      yum -y install lmdb lmdb-devel
+    fi
     pushd "$DIR_TMP"
     rm -rf ModSecurity
     git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity
@@ -53,7 +62,15 @@ modsecurity_install() {
     git submodule init
     git submodule update
     ./build.sh
-    ./configure
+    if [[ -f /usr/local/lib/libmaxminddb.so && "$NGINX_MODSECURITY_MAXMIND" = [yY] ]]; then
+      export PKG_CONFIG_PATH=/usr/lib64/pkgconfig:/usr/share/pkgconfig:/usr/local/lib/pkgconfig
+      ./configure
+      # ./configure --with-maxmind=/usr/local
+    elif [[ -f /usr/local/lib/libmaxminddb.so && "$NGINX_MODSECURITY_MAXMIND" = [nN] ]]; then
+      ./configure --without-maxmind
+    else
+      ./configure
+    fi
     make${MAKETHREADS}
     make install
     popd
@@ -88,6 +105,7 @@ modsecurity_install() {
       # sed -i 's/SecRuleEngine DetectionOnly/SecRuleEngine On/' /usr/local/nginx/modsec/modsecurity.conf
     fi
     if [ ! -f "/usr/local/nginx/owasp-modsecurity-crs-${MODSECURITY_OWASPVER}/crs-setup.conf" ]; then
+      newowaspver='y'
       pushd "$DIR_TMP"
       wget "https://github.com/SpiderLabs/owasp-modsecurity-crs/archive/v${MODSECURITY_OWASPVER}.tar.gz"
       tar xvzf "v${MODSECURITY_OWASPVER}.tar.gz"
@@ -97,7 +115,16 @@ modsecurity_install() {
       ls -lah "/usr/local/nginx/owasp-modsecurity-crs-${MODSECURITY_OWASPVER}/rules/"
       popd
     fi
-    if [ ! -f /usr/local/nginx/modsec/main.conf ]; then
+    if [[ ! -f /usr/local/nginx/modsec/main.conf || "$newowaspver" = [yY] ]]; then
+      if [ -f /usr/local/nginx/modsec/main.conf ]; then
+        MODSEC_DT=$(date +"%d%m%y-%H%M%S")
+        # backup existing /usr/local/nginx/modsec/main.conf if it exists
+        cp -a /usr/local/nginx/modsec/main.conf "/usr/local/nginx/modsec/main.conf-backup-${MODSEC_DT}"
+        echo
+        echo "detected existing /usr/local/nginx/modsec/main.conf file"
+        echo "backed up to /usr/local/nginx/modsec/main.conf-backup-${MODSEC_DT}"
+        echo
+      fi
 cat > "/usr/local/nginx/modsec/main.conf" <<EOF
 # Edit to set SecRuleEngine On
 Include "/usr/local/nginx/modsec/modsecurity.conf"
@@ -130,10 +157,16 @@ EOF
       sed -i 's|^    modsecurity_rules_file \/usr\/local\/nginx\/modsec\/main.conf;|    #modsecurity_rules_file \/usr\/local\/nginx\/modsec\/main.conf;|g' /usr/local/nginx/conf/conf.d/virtual.conf
     fi
   MODSEC_INSTALLED=y
-  DEVTOOLSETSEVEN='y'
+  # DEVTOOLSETSEVEN='y'
   NGINX_DEVTOOLSETGCC='y'
   CLANG='n'
   export CLANG='n'
   echo "ModSecurity Check for CLANG = $CLANG"
+  else
+    MODSEC_INCLUDECHECK=$(grep '\/usr\/local\/nginx\/modsec\/main.conf' /usr/local/nginx/conf/conf.d/virtual.conf)
+    if [[ "$NGINX_MODSECURITY" != [yY] && "$MODSEC_INCLUDECHECK" ]]; then
+      sed -i 's|^    modsecurity on;|    #modsecurity on;|g' /usr/local/nginx/conf/conf.d/virtual.conf
+      sed -i 's|^    modsecurity_rules_file \/usr\/local\/nginx\/modsec\/main.conf;|    #modsecurity_rules_file \/usr\/local\/nginx\/modsec\/main.conf;|g' /usr/local/nginx/conf/conf.d/virtual.conf
+    fi
   fi
 }

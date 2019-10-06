@@ -275,6 +275,9 @@ if [[ "$REMIREPO_DISABLE" = [nN] &&  "$(uname -m)" != 'aarch64' ]]; then
         ${YUMDNFBIN} -y install ImageMagick6 ImageMagick6-devel ImageMagick6-c++ ImageMagick6-c++-devel --enablerepo=remi --disableplugin=priorities --skip-broken${DISABLEREPO_DNF}
         sar_call
       else
+        if [[ "$(rpm -qa libwebp-devel)" ]]; then
+            yum -y swap libwebp-devel libwebp7-devel --enablerepo=remi
+        fi
         ${YUMDNFBIN} -y install ImageMagick6 ImageMagick6-devel ImageMagick6-c++ ImageMagick6-c++-devel --enablerepo=remi --disableplugin=priorities${DISABLEREPO_DNF}
         sar_call
       fi
@@ -283,6 +286,11 @@ if [[ "$REMIREPO_DISABLE" = [nN] &&  "$(uname -m)" != 'aarch64' ]]; then
     fi
 
     if [[ "$(rpm -qa ImageMagick6)" ]]; then
+      if [[ "$CENTOS_SEVEN" = '7' ]]; then
+        if [[ "$(rpm -qa libwebp-devel)" ]]; then
+            yum -y swap libwebp-devel libwebp7-devel --enablerepo=remi
+        fi
+      fi
       ${YUMDNFBIN} -y update ImageMagick6 ImageMagick6-devel ImageMagick6-c++ ImageMagick6-c++-devel --enablerepo=remi --disableplugin=priorities${DISABLEREPO_DNF}
       sar_call
     fi
@@ -302,7 +310,9 @@ YINSTALLTIME=$(echo "scale=2;$yendtime - $ystarttime"|bc )
 echo "" >> ${CENTMINLOGDIR}/centminmod_yumtimes_${DT}.log
 echo "Total YUM Time: $YINSTALLTIME seconds" >> ${CENTMINLOGDIR}/centminmod_yumtimes_${DT}.log
 echo "Total YUM Time: $YINSTALLTIME seconds" > ${CENTMINLOGDIR}/centminmod_profiletimes_${DT}.log
-\cp /var/cache/yum/timedhosts.txt ${CENTMINLOGDIR}/timedhosts_${DT}.txt
+if [ -f /var/cache/yum/timedhosts.txt ]; then
+  \cp /var/cache/yum/timedhosts.txt ${CENTMINLOGDIR}/timedhosts_${DT}.txt
+fi
 ls -lah ${CENTMINLOGDIR}/centminmod_yumtimes_${DT}.log
 
 }

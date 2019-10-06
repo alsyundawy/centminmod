@@ -6,11 +6,11 @@ if [ "$IGBINARY_INSTALL" == 'y' ]; then
 if [ "$IGBINARYGIT" == 'y' ]; then
     cd $DIR_TMP
 
-    php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2|7.3'
+    php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2|7.3|7.4'
     PHPSEVEN_CHECKVER=$?
     echo $PHPSEVEN_CHECKVER
 
-    if [[ "$PHPMUVER" = '7.3' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]] || [[ "$PHPMUVER" = '7.2' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]] || [[ "$PHPMUVER" = '7.1' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]] || [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]] || [[ "$INITIALINSTALL" = [yY] && "$(echo "$PHP_VERSION" | cut -d . -f1,2)" = '7.0' ]] || [[ "$INITIALINSTALL" = [yY] && "$(echo "$PHP_VERSION" | cut -d . -f1,2)" = '7.1' ]] || [[ "$INITIALINSTALL" = [yY] && "$(echo "$PHP_VERSION" | cut -d . -f1,2)" = '7.2' ]] || [[ "$INITIALINSTALL" = [yY] && "$(echo "$PHP_VERSION" | cut -d . -f1,2)" = '7.3' ]]; then
+    if [[ "$PHPMUVER" = '7.4' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]] || [[ "$PHPMUVER" = '7.3' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]] || [[ "$PHPMUVER" = '7.2' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]] || [[ "$PHPMUVER" = '7.1' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]] || [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = 'NGDEBUG' || "$PHPSEVEN_CHECKVER" = '0' ]] || [[ "$INITIALINSTALL" = [yY] && "$(echo "$PHP_VERSION" | cut -d . -f1,2)" = '7.0' ]] || [[ "$INITIALINSTALL" = [yY] && "$(echo "$PHP_VERSION" | cut -d . -f1,2)" = '7.1' ]] || [[ "$INITIALINSTALL" = [yY] && "$(echo "$PHP_VERSION" | cut -d . -f1,2)" = '7.2' ]] || [[ "$INITIALINSTALL" = [yY] && "$(echo "$PHP_VERSION" | cut -d . -f1,2)" = '7.3' ]]; then
 
         IGBINARYSEVEN_LINK='https://github.com/igbinary/igbinary'
         # fallback mirror if official github is down, use gitlab mirror
@@ -101,7 +101,7 @@ else
     if [ -s igbinary-${IGBINARY_VERSION}.tgz ]; then
         cecho "igbinary-${IGBINARY_VERSION}.tgz Archive found, skipping download..." $boldgreen
     else
-        download_cmd http://pecl.php.net/get/igbinary-${IGBINARY_VERSION}.tgz $WGETRETRY
+        download_cmd https://pecl.php.net/get/igbinary-${IGBINARY_VERSION}.tgz $WGETRETRY
     fi
 
 tar -xzvf igbinary-${IGBINARY_VERSION}.tgz

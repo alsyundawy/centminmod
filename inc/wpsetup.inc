@@ -166,7 +166,9 @@ fi
 # setup https://community.centminmod.com/threads/13847/
 if [ ! -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
   mkdir -p /usr/local/nginx/conf/ssl/cloudflare/${vhostname}
-  wget $CLOUDFLARE_AUTHORIGINPULLCERT -O origin.crt
+  wget -4 $CLOUDFLARE_AUTHORIGINPULLCERT -O /usr/local/nginx/conf/ssl/cloudflare/${vhostname}/origin.crt
+elif [ -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
+  wget -4 $CLOUDFLARE_AUTHORIGINPULLCERT -O /usr/local/nginx/conf/ssl/cloudflare/${vhostname}/origin.crt
 fi
 
 if [ ! -f /usr/local/nginx/conf/ssl_include.conf ]; then
@@ -200,8 +202,53 @@ else
   SELFSIGNEDSSL_OU="$SELFSIGNEDSSL_OU"
 fi
 
-openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
-openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt
+# self-signed ssl cert with SANs
+cat > /tmp/req.cnf <<EOF
+[req]
+default_bits       = 2048
+distinguished_name = req_distinguished_name
+req_extensions     = v3_req
+prompt = no
+[req_distinguished_name]
+C = ${SELFSIGNEDSSL_C}
+ST = ${SELFSIGNEDSSL_ST}
+L = ${SELFSIGNEDSSL_L}
+O = ${vhostname}
+OU = ${vhostname}
+CN = ${vhostname}
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = ${vhostname}
+DNS.2 = www.${vhostname}
+EOF
+
+cat > /tmp/v3ext.cnf <<EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${vhostname}
+DNS.2 = www.${vhostname}
+EOF
+
+echo
+cat /tmp/req.cnf
+echo
+cat /tmp/v3ext.cnf
+echo
+openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -config /tmp/req.cnf
+# openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${vhostname}/OU=${vhostname}/CN=${vhostname}"
+openssl req -noout -text -in ${vhostname}.csr | grep DNS
+openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt -extfile /tmp/v3ext.cnf
+# openssl req -x509 -nodes -days 36500 -sha256 -newkey rsa:2048 -keyout ${vhostname}.key -out ${vhostname}.crt -config /tmp/req.cnf
+
+rm -f /tmp/req.cnf
+rm -f /tmp/v3ext.cnf
 
 # echo
 # cecho "---------------------------------------------------------------" $boldyellow
@@ -268,7 +315,7 @@ PUREGROUP=nginx
     if [ "$SECOND_IP" ]; then
       CNIP="$SECOND_IP"
     else
-      CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+      CNIP=$(curl -4s https://ipinfo.io/ip)
     fi
 pureftpinstall
 
@@ -315,6 +362,12 @@ echo
 wpinfo_notice
 
 read -ep "Enter vhost domain name you want to add (without www. prefix): " vhostname
+
+   # if checkidn_vhost = 0 then internationalized domain name
+   checkidn_vhost=$(echo $vhostname | idn | grep '^xn--' >/dev/null 2>&1; echo $?)
+   if [[ "$checkidn_vhost" = '0' ]]; then
+     vhostname=$(echo $vhostname | idn)
+   fi
 
 # check to make sure you don't add a domain name vhost that matches
 # your server main hostname setup in server_name within main hostname
@@ -370,10 +423,30 @@ if [[ "$NGINX_VHOSTSSL" = [yY] ]]; then
       elif [[ "$vhostssl_opt" = '4' ]]; then
         vhostssl='lelived'
         wpcli_ssldefault=1
+      else
+        vhostssl=invalidopt
       fi
       echo
-    fi
+      if [[ "$vhostssl_opt" -eq '2' || "$vhostssl_opt" -eq '4' ]]; then
+        echo "If using Cloudflare in front of site, disable CF option for"
+        echo "Always Use HTTPS in CF Dashboard Crypto Tab as Nginx will do"
+        echo "the non-https to https redirect on this end and not require"
+        echo "Cloudflare's Always Use HTTPS. If enabled it will cause the"
+        echo "error message: too many redirects"
+        echo
+        echo "Also change Cloudflare SSL from Flexible to Full SSL mode"
+        echo
+        sleep 1
+      fi
+    fi # vhostssl_le
   fi
+fi
+
+if [[ "$vhostssl" = 'invalidopt' ]]; then
+  echo
+  echo "error: you entered invalid option = $vhostssl_opt"
+  echo "aborting run..."
+  exit 1
 fi
 
 echo "Theme Setup: "
@@ -381,6 +454,27 @@ read -ep "Install CyberChimps Responsive Theme (cyberchimps.com/responsive-theme
 
 echo
 echo "Wordpress Setup: "
+echo
+echo "Not a fan of Gutenberg Editor ? You can switch to Classic Editor"
+echo "If you run into Gutenberg Editor issues, you can later switch to"
+echo "the Classic Editor https://wordpress.org/plugins/classic-editor/"
+read -ep "Install Classic Editor Wordpress Plugin ? [y/n]: " -i y wpclassic_editor
+
+echo
+echo "Autoptimize WP Plugin is installed by default. Do you want to install"
+echo "companion Autoptimize Gzip Plugin to precompresses js/css optimized files"
+echo "details at https://community.centminmod.com/threads/15314/"
+read -ep "Install Autoptimize Gzip Companion Wordpress Plugin ? [y/n]: " -i y wpautoptimize_gzip
+
+if [[ "$wpautoptimize_gzip" = [yY] ]]; then
+  WP_AUTOPTIMIZE_GZIP='y'
+fi
+
+echo
+echo "Google Native LazyLoad Plugin https://wordpress.org/plugins/native-lazyload/"
+read -ep "Install Google Native LazyLoad Plugin ? [y/n]: " -i y wp_google_lazyload
+
+echo
 read -ep "Set custom WP Admin Display Name ? [y/n]: " setdisplayname
 if [[ "$setdisplayname" = [yY] ]]; then
   read -ep "Enter Custom WP Admin Display Name: " displayname
@@ -457,37 +551,82 @@ echo
 cecho "--------------------------------------------------------" $boldyellow
 cecho "        Wordpress Caching               " $boldgreen
 cecho "--------------------------------------------------------" $boldyellow
-cecho "1). KeyCDN Cache Enabler (default & recommended)" $boldgreen
-if [[ "$redis_ngx_exists" = [yY] ]]; then
-  cecho "2). Redis Nginx Level Caching (may have issues with some wp plugins)" $boldgreen
-  cecho "3). Wordpress Super Cache" $boldgreen
-  cecho "--------------------------------------------------------" $boldyellow
-  read -ep "Enter option [ 1 - 3 ] " wpcache_option
-else
-  cecho "2). Wordpress Super Cache" $boldgreen
-  cecho "--------------------------------------------------------" $boldyellow
-  read -ep "Enter option [ 1 - 2 ] " wpcache_option
-fi
-
-echo
-
-if [[ "$wpcache_option" = '1' ]]; then
-  wpscache='n'
-elif [[ "$wpcache_option" = '2' ]]; then
+if [[ "$WP_FASTCGI_CACHE" = [yY] ]]; then
   if [[ "$redis_ngx_exists" = [yY] ]]; then
+PS3='--------------------------------------------------------
+Enter option [ 1 - 4 ] '
+select_wpcache_opts=("KeyCDN Cache Enabler" "Redis Nginx Level Caching" "Wordpress Super Cache" "Fastcgi_cache (PHP-FPM)")
+  else
+PS3='--------------------------------------------------------
+Enter option [ 1 - 3 ] '
+select_wpcache_opts=("KeyCDN Cache Enabler" "Wordpress Super Cache" "Fastcgi_cache (PHP-FPM)")
+  fi
+elif [[ "$redis_ngx_exists" = [yY] ]]; then
+PS3='--------------------------------------------------------
+Enter option [ 1 - 3 ] '
+select_wpcache_opts=("KeyCDN Cache Enabler" "Redis Nginx Level Caching" "Wordpress Super Cache")
+else
+PS3='--------------------------------------------------------
+Enter option [ 1 - 2 ] '
+select_wpcache_opts=("KeyCDN Cache Enabler" "Wordpress Super Cache")
+fi
+select optwp in "${select_wpcache_opts[@]}"; do
+case $optwp in
+  "KeyCDN Cache Enabler" )
+    wpscache='n'
+    wpcache_option=$REPLY
+    echo
+    echo "you selected option $wpcache_option (KeyCDN Cache Enabler) [wpscache=$wpscache]"
+    echo
+    break
+    ;;
+  "Redis Nginx Level Caching" )
     wpscache='redis'
-  else
+    wpcache_option=$REPLY
+    echo
+    echo "you selected option $wpcache_option (Redis Nginx Level Cache) [wpscache=$wpscache]"
+    echo
+    break
+    ;;
+  "Wordpress Super Cache" )
     wpscache='y'
-  fi
-elif [[ "$wpcache_option" = '3' ]]; then
-  if [[ "$redis_ngx_exists" = [yY] ]]; then
-    wpscache='y'
-  else
-    wpscache='n'  
-  fi
-else
-  wpscache='n'
-fi
+    wpcache_option=$REPLY
+    echo
+    echo "you selected option $wpcache_option (Wordpress Super Cache) [wpscache=$wpscache]"
+    echo
+    break
+    ;;
+  "Fastcgi_cache (PHP-FPM)" )
+    if [[ "$redis_ngx_exists" = [yY] && "$WP_FASTCGI_CACHE" = [yY] ]]; then
+      wpscache='fastcgicache'
+    elif [[ "$redis_ngx_exists" = [nN] && "$WP_FASTCGI_CACHE" = [yY] ]]; then
+      wpscache='fastcgicache'
+    else
+      wpscache='n'  
+    fi
+    wpcache_option=$REPLY
+    echo
+    echo "you selected option $wpcache_option (Fastcgi_cache PHP-FPM) [wpscache=$wpscache]"
+    echo
+    break
+    ;;
+  * )
+    echo
+    if [[ "$WP_FASTCGI_CACHE" = [yY] ]]; then
+      if [[ "$redis_ngx_exists" = [yY] ]]; then
+        echo "Valid options are 1 - 4"
+      else
+        echo "Valid options are 1 - 3"
+      fi
+    elif [[ "$redis_ngx_exists" = [yY] ]]; then
+      echo "Valid options are 1 - 3"
+    else
+      echo "Valid options are 1 - 2"
+    fi
+    echo
+    ;;
+esac
+done
 
 TESTEMAIL=$(echo "${WPADMINEMAIL}" |  grep '^[a-zA-Z0-9._%+-]*@[a-zA-Z0-9-]*[\.[a-zA-Z0-9]*]*[a-zA-Z0-9]$')
 # echo "$TESTEMAIL"
@@ -653,7 +792,7 @@ cat > "/usr/local/nginx/conf/wpincludes/${vhostname}/wpcacheenabler_${vhostname}
     }
 
     # bypass cache if URLs containing the following strings
-    if (\$request_uri ~* "(\?add-to-cart=|/cart/|/my-account/|/checkout/|/shop/checkout/|/store/checkout/|/customer-dashboard/|/addons/|/wp-admin/|/xmlrpc.php|/wp-(app|cron|login|register|mail).php|wp-.*.php|/feed/|index.php|wp-comments-popup.php|wp-links-opml.php|wp-locations.php|sitemap(_index)?.xml|[a-z0-9_-]+-sitemap([0-9]+)?.xml)") {
+    if (\$request_uri ~* "(\?add-to-cart=|/cart/|/my-account/|/checkout/|/shop/checkout/|/wp-json/|/store/checkout/|/customer-dashboard/|/addons/|/wp-admin/|/xmlrpc.php|/wp-(app|cron|login|register|mail).php|wp-.*.php|/feed/|index.php|wp-comments-popup.php|wp-links-opml.php|wp-locations.php|sitemap(_index)?.xml|[a-z0-9_-]+-sitemap([0-9]+)?.xml)") {
         set \$cache_uri 'nullcache';
     }
 
@@ -663,9 +802,7 @@ cat > "/usr/local/nginx/conf/wpincludes/${vhostname}/wpcacheenabler_${vhostname}
     }
 
     # bypass cache for woocommerce
-    if (\$arg_add-to-cart != "") { 
-        set \$cache_uri 'nullcache';
-    }
+    if (\$arg_add-to-cart != "") { set \$cache_uri 'nullcache'; }
 
     ## bypass cache for empty woocommerce carts
     #if (\$cookie_woocommerce_items_in_cart != "0") { 
@@ -946,17 +1083,19 @@ else
   CHACHACIPHERS=""
 fi
 
-DETECTOPENSSL_ONEZERO=$(echo $OPENSSL_VERSION  | cut -d . -f1-2)
-DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
-if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
-    # openssl 1.1.0 unsupported flag enable-tlsext
-    if [[ "$(grep -w 'tls1_3' "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm")" ]]; then
-        TLSONETHREEOPT=' enable-tls1_3'
-        TLSONETHREE_DETECT='y'
-    else
-        TLSONETHREEOPT=""
-        TLSONETHREE_DETECT='n'
-    fi
+if [ -f "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm" ]; then
+  DETECTOPENSSL_ONEZERO=$(echo $OPENSSL_VERSION  | cut -d . -f1-2)
+  DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
+  if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
+      # openssl 1.1.0 unsupported flag enable-tlsext
+      if [[ "$(grep -w 'tls1_3' "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm")" ]]; then
+          TLSONETHREEOPT=' enable-tls1_3'
+          TLSONETHREE_DETECT='y'
+      else
+          TLSONETHREEOPT=""
+          TLSONETHREE_DETECT='n'
+      fi
+  fi
 fi
 
 if [[ "$TLSONETHREE_DETECT" = [yY] ]]; then
@@ -965,7 +1104,26 @@ else
   TLSONETHREE_CIPHERS=""
 fi
 
-if [[ -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
+if [[ -f /usr/bin/php74 && -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;
+  #include /usr/local/nginx/conf/php71-remi.conf;
+  #include /usr/local/nginx/conf/php70-remi.conf;
+  #include /usr/local/nginx/conf/php56-remi.conf;'
+elif [[ -f /usr/bin/php74 && -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && ! -f /usr/bin/php70 && ! -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;
+  #include /usr/local/nginx/conf/php71-remi.conf;'
+elif [[ -f /usr/bin/php74 && -f /usr/bin/php73 && -f /usr/bin/php72 && ! -f /usr/bin/php71 && ! -f /usr/bin/php70 && ! -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;'
+elif [[ -f /usr/bin/php74 && -f /usr/bin/php73 && ! -f /usr/bin/php72 && ! -f /usr/bin/php71 && ! -f /usr/bin/php70 && ! -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;'
+elif [[ -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
   MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php73-remi.conf;
   #include /usr/local/nginx/conf/php72-remi.conf;
   #include /usr/local/nginx/conf/php71-remi.conf;
@@ -1421,6 +1579,20 @@ location ~ ^${WPSUBDIR}/wp-content/updraft { deny all; }
 # Block nginx-help log from public viewing
 location ~* ${WPSUBDIR}/wp-content/uploads/nginx-helper/ { deny all; }
 
+# WebP extension support if you are converting /uploads images to webp
+location ~ ^${WPSUBDIR}/wp-content/uploads/ {
+  #pagespeed off;
+  #pagespeed unplugged;
+  #autoindex on;
+  #add_header X-Robots-Tag "noindex, nofollow";
+  location ~* ^${WPSUBDIR}/wp-content/uploads/(.+/)?(.+)\.(png|jpe?g)\$ {
+    expires 30d;
+    add_header Vary "Accept-Encoding";
+    add_header Cache-Control "public, no-transform";
+    try_files \$uri\$webp_extension \$uri =404;
+  }
+}
+
 location ~ ^${WPSUBDIR}/(wp-includes/js/tinymce/wp-tinymce.php) {
   include /usr/local/nginx/conf/php.conf;
   include /usr/local/nginx/conf/staticfiles.conf;
@@ -1708,8 +1880,8 @@ location ~ ^${WPSUBDIR}/wp-content/plugins/si-contact-form/ {
 
 # Whitelist Exception for https://wordpress.org/plugins/akismet/
 location ~ ^${WPSUBDIR}/wp-content/plugins/akismet/ {
-  location ~ ^${WPSUBDIR}/wp-content/plugins/akismet/(.+/)?(form|akismet)\.(css|js)\$ { allow all; }
-  location ~ ^${WPSUBDIR}/wp-content/plugins/akismet/(.+/)?(.+)\.(png|gif)\$ { allow all; }
+  location ~ ^${WPSUBDIR}/wp-content/plugins/akismet/(.+/)?(form|akismet)\.(css|js)\$ { allow all; expires 30d;}
+  location ~ ^${WPSUBDIR}/wp-content/plugins/akismet/(.+/)?(.+)\.(png|gif)\$ { allow all; expires 30d;}
   location ~* ${WPSUBDIR}/wp-content/plugins/akismet/akismet/.*\.php\$ {
     include /usr/local/nginx/conf/php.conf;
     include /usr/local/nginx/conf/staticfiles.conf;
@@ -1888,6 +2060,28 @@ location ~ ^${WPSUBDIR}/wp-content/plugins/media-grid/classes/ {
   #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
 }
 
+# Whitelist Exception for webp-express
+location ~ ^${WPSUBDIR}/wp-content/plugins/webp-express/ {
+  include /usr/local/nginx/conf/php.conf;
+  include /usr/local/nginx/conf/staticfiles.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
+# Whitelist Exception for wp-shortcode  
+location ~ ^${WPSUBDIR}/wp-content/plugins/wp-shortcode/ {
+  include /usr/local/nginx/conf/php.conf;
+  include /usr/local/nginx/conf/staticfiles.conf;
+  # below include file needs to be manually created at that path and to be uncommented
+  # by removing the hash # in front of below line to take effect. This wpwhitelist_common.conf
+  # allows you to add commonly shared settings to all wp plugin location matches which
+  # whitelist php processing access at /usr/local/nginx/conf/wpincludes/${vhostname}/wpsecure_${vhostname}.conf
+  #include /usr/local/nginx/conf/wpincludes/${vhostname}/wpwhitelist_common.conf;
+}
+
 # Block PHP files in content directory.
 location ~* ${WPSUBDIR}/wp-content/.*\.php\$ {
   deny all;
@@ -1935,7 +2129,7 @@ if (\$request_method = POST) { set \$cache_uri 'null cache'; }
 
 if (\$query_string != "") { set \$cache_uri 'null cache'; }
 
-if (\$request_uri ~* "/(\?add-to-cart=|cart/|my-account/|checkout/|shop/checkout/|store/checkout/|customer-dashboard/|addons/|wp-admin/.*|xmlrpc\.php|wp-.*\.php|index\.php|feed/|sitemap(_index)?\.xml|[a-z0-9_-]+-sitemap([0-9]+)?\.xml)") { set \$cache_uri 'null cache'; }
+if (\$request_uri ~* "/(\?add-to-cart=|cart/|my-account/|checkout/|shop/checkout/|store/checkout/|wp-json/|customer-dashboard/|addons/|wp-admin/.*|xmlrpc\.php|wp-.*\.php|index\.php|feed/|sitemap(_index)?\.xml|[a-z0-9_-]+-sitemap([0-9]+)?\.xml)") { set \$cache_uri 'null cache'; }
 
 # bypass cache for woocommerce
 if ( \$arg_add-to-cart != "" ) { set \$cache_uri 'null cache'; }
@@ -1966,7 +2160,7 @@ if (\$query_string != "") {
 }
 
 # Don't cache uris containing the following segments
-if (\$request_uri ~* "\?add-to-cart=|/cart/|/my-account/|/checkout/|/shop/checkout/|/store/checkout/|/customer-dashboard/|/addons/|/wp-admin/|/xmlrpc.php|wp-.*.php|/feed/|index.php|sitemap(_index)?.xml") {
+if (\$request_uri ~* "\?add-to-cart=|/cart/|/my-account/|/checkout/|/shop/checkout/|/wp-json/|/store/checkout/|/customer-dashboard/|/addons/|/wp-admin/|/xmlrpc.php|wp-.*.php|/feed/|index.php|sitemap(_index)?.xml") {
   set \$skip_cache 1;
 }
 
@@ -1976,9 +2170,7 @@ if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_n
 }
 
 # bypass cache for woocommerce
-if (\$arg_add-to-cart != "") { 
-  set \$skip_cache 1;
-}
+if (\$arg_add-to-cart != "") { set \$skip_cache 1; }
 
 ## bypass cache for empty woocommerce carts
 #if (\$cookie_woocommerce_items_in_cart != "0") { 
@@ -2073,10 +2265,10 @@ if [[ -d "/home/nginx/domains/${vhostname}/public" ]]; then
     echo "Using full static page caching may cause problems for mobile & tablet device"
     echo "visitors depending on your WP themes used so you may want to exclude those"
     echo
-    read -ep "Do you want to exclude mobile/tablet devices from Cache Enabler caching ? [y/n]: " exclude_mobilecache
+    read -ep "Do you want to exclude mobile/tablet devices from full page caching ? [y/n]: " exclude_mobilecache
     if [[ "$exclude_mobilecache" = [nN] ]]; then
       if [ -f "/usr/local/nginx/conf/wpincludes/${vhostname}/wpcacheenabler_${vhostname}.conf" ]; then
-        sed -i "s|^if (\$cmwpcache_device = mobile) { set \$cache_uri 'nullcache'; }|#if (\$cmwpcache_device = mobile) { set \$cache_uri 'nullcache'; }|" "/usr/local/nginx/conf/wpincludes/${vhostname}/wpcacheenabler_${vhostname}.conf"
+        sed -i "s|^    if (\$cmwpcache_device = mobile) { set \$cache_uri 'nullcache'; }|#    if (\$cmwpcache_device = mobile) { set \$cache_uri 'nullcache'; }|" "/usr/local/nginx/conf/wpincludes/${vhostname}/wpcacheenabler_${vhostname}.conf"
       fi
       if [ -f "/usr/local/nginx/conf/wpincludes/${vhostname}/rediscache_${vhostname}.conf" ]; then
         sed -i "s|^if (\$redis_device = mobile) { set \$skip_cache 1; }|#if (\$redis_device = mobile) { set \$skip_cache 1; }|" "/usr/local/nginx/conf/wpincludes/${vhostname}/rediscache_${vhostname}.conf"
@@ -2161,6 +2353,21 @@ chmod 0400 readme.html
 rm -rf readme.html
 
 # installed + activated by default
+
+# install google native lazy load plugin
+if [[ "$wp_google_lazyload" = [yY] ]]; then
+  cecho "------------------------------------------------------------" $boldgreen
+  \wp plugin install native-lazyload --activate --allow-root
+  cecho "------------------------------------------------------------" $boldgreen
+fi
+
+# install classic editor plugin instead of gutenberg
+if [[ "$wpclassic_editor" = [yY] ]]; then
+  cecho "------------------------------------------------------------" $boldgreen
+  \wp plugin install classic-editor --activate --allow-root
+  cecho "------------------------------------------------------------" $boldgreen
+fi
+
 # wp super cache
 if [[ "$wpscache" = [yY] ]]; then
   cecho "------------------------------------------------------------" $boldgreen
@@ -2208,6 +2415,20 @@ if [[ "$wpscache" = [nN] ]]; then
   # # \wp option update autoptimize_optimize_logged on --allow-root
   # \wp option update autoptimize_show_adv 1 --allow-root
   \wp option list --search=autoptimize_* --allow-root
+  if [[ "$WP_AUTOPTIMIZE_GZIP" = [yY] ]]; then
+    # https://community.centminmod.com/threads/15314/
+    # https://github.com/centminmod/autoptimize-gzip
+    echo
+    echo "configure autoptimize-gzip https://community.centminmod.com/threads/15314/"
+    mkdir -p "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip"
+    wget -4 -cnv -O "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip/autoptimize-gzip.php" https://github.com/centminmod/autoptimize-gzip/raw/master/autoptimize-gzip.php
+    wget -4 -cnv -O "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip/index.html" https://github.com/centminmod/autoptimize-gzip/raw/master/index.html
+    wget -4 -cnv -O "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip/readme.md" https://github.com/centminmod/autoptimize-gzip/blob/master/readme.md
+    wget -4 -cnv -O "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip/LICENSE" https://github.com/centminmod/autoptimize-gzip/raw/master/LICENSE
+    chown -R nginx:nginx "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip"
+    \wp plugin activate autoptimize-gzip --allow-root
+    \wp plugin status autoptimize-gzip --allow-root
+  fi
   cecho "------------------------------------------------------------" $boldgreen
 fi
 
@@ -2635,6 +2856,24 @@ if [[ "$wpcli_ssldefault" = '1' ]]; then
   \wp option update siteurl "https://${vhostname}${WPSUBDIR}"  --allow-root
 fi
 
+# create /usr/local/nginx/conf/wpincludes/${vhostname}/wpinfo.sh
+if [ -d "/usr/local/nginx/conf/wpincludes/${vhostname}" ]; then
+cat > "/usr/local/nginx/conf/wpincludes/${vhostname}/wpinfo.sh" <<EOF
+#!/bin/bash
+WPSITE_INSTALLPATH='/home/nginx/domains/${vhostname}/public'
+cd \$WPSITE_INSTALLPATH;
+wp cli version --allow-root;
+echo "WP-Home    \$(wp option get home --allow-root)";
+echo "WP-SiteURL \$(wp option get siteurl --allow-root)";
+wp core version --extra --allow-root | column -t;
+wp user list --role=administrator --allow-root;
+wp config list --allow-root;
+wp plugin list --allow-root;
+wp theme list --allow-root;
+EOF
+chmod +x /usr/local/nginx/conf/wpincludes/${vhostname}/wpinfo.sh
+fi
+
 {
 echo 
 if [[ "$PUREFTPD_DISABLED" = [nN] ]]; then
@@ -2841,13 +3080,93 @@ rm -rf /tmp/setupwp.log
     fi
   fi
 
+# make sure all wordpress installed files are owned by nginx user/group
+chown -R nginx:nginx /home/nginx/domains/${vhostname}/public
+
 echo
 cecho "-------------------------------------------------------------" $boldyellow
 cecho "vhost for $vhostname wordpress setup successfully" $boldwhite
 cecho "$vhostname setup info log saved at: " $boldwhite
-cecho "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_${vhostname}_wordpress_addvhost.log" $boldwhite
+cecho "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost.log" $boldwhite
+cecho "-------------------------------------------------------------" $boldyellow
+cecho "wpinfo.sh script saved at:" $boldwhite
+cecho "/usr/local/nginx/conf/wpincludes/${vhostname}/wpinfo.sh" $boldwhite
 cecho "-------------------------------------------------------------" $boldyellow
 echo ""
+if [[ -f "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost.log" ]]; then
+  # populate plain text logs for QR Code generation
+  touch "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins.log"  
+if [[ "$PUREFTPD_DISABLED" = [nN] ]]; then
+  touch "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-ftp.log"
+cat >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-ftp.log" <<EOF
+FTP hostname: $CNIP
+FTP port: 21
+FTP mode: FTP (explicit SSL)
+FTP Passive (PASV): ensure is checked/enabled
+FTP username: $ftpuser
+FTP password: $ftppass
+EOF
+fi
+cat >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins.log" <<EOF
+Wordpress Info
+domain: $vhostname
+DB Name: $DB
+DB User: $DBUSER
+DB Pass: $DBPASS
+Admin User: $WPADMINUSER
+Admin Pass: $WPADMINPASS
+Admin Email: $WPADMINEMAIL
+EOF
+if [[ "$setdisplayname" = [yY] ]]; then
+cat >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins.log" <<EOF
+Wordpress Admin Display Name: $WPADMIN_DISPLAYNAME
+EOF
+fi
+if [[ "$disablepwdprotect" != [yY] ]]; then
+  if [[ -f /usr/local/nginx/conf/htpasswd.sh && -f /home/nginx/domains/$vhostname/htpasswd_wplogin ]]; then
+    touch "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    echo  >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    echo "wp-login.php password protection info:" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    echo "wp-login.php protection file /home/nginx/domains/$vhostname/htpasswd_wplogin" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    echo "wp-login.php protection Username: $HTUSER" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    echo "wp-login.php protection Password: $HTPASS" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    if [[ "$wpcli_ssldefault" = '1' ]]; then
+      echo "https://${HTUSER}:${HTPASS}@${vhostname}${WPSUBDIR}/wp-login.php" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    else
+      echo "http://${HTUSER}:${HTPASS}@${vhostname}${WPSUBDIR}/wp-login.php" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    fi
+    # echo >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    # echo "Resetting wp-login.php protection:" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    # echo "Step 1. remove protection file at /home/nginx/domains/$vhostname/htpasswd_wplogin" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    # echo "     rm -rf /home/nginx/domains/$vhostname/htpasswd_wplogin" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    # echo "Step 2. run command:" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    # echo "     /usr/local/nginx/conf/htpasswd.sh create /home/nginx/domains/$vhostname/htpasswd_wplogin YOURUSERNAME YOURPASSWORD" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    # echo "Step 3. restart Nginx + PHP-FPM services" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+    # echo "     nprestart" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log"
+  fi
+fi
+  if [[ "$QRCODE" = [yY] && -f /usr/bin/qrencode ]]; then
+    if [[ -f "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log" ]]; then
+      echo
+      echo "wp-login.php HTTP Password login details QR Code"
+      echo
+      cat -v "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-http-pass.log" | \qrencode -t ansiutf8
+    fi
+    if [[ -f "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-ftp.log" ]]; then
+      echo
+      echo "Pure-FTPD FTP login details QR Code"
+      echo
+      cat -v "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins-ftp.log" | \qrencode -t ansiutf8
+    fi
+    if [[ -f "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins.log" ]]; then
+      echo
+      echo "Wordpress login details QR Code"
+      echo
+      cat -v "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost_${vhostname}-logins.log" | \qrencode -t ansiutf8
+    fi
+    echo
+  fi
+fi
 
 else
 

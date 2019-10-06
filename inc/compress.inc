@@ -1,11 +1,11 @@
-ZSTD_VER='1.3.8'
-LZFOUR_VER='1.8.3'
+ZSTD_VER='1.4.3'
+LZFOUR_VER='1.9.1'
 PIGZ_VER='2.4'
 PBZIP_VER='1.1.13'
 LBZIP_VER='2.5'
-LZIP_VER='1.20'
-LZLIB_VER='1.10'
-PLZIP_VER='1.7'
+LZIP_VER='1.21'
+LZLIB_VER='1.11'
+PLZIP_VER='1.8'
 PZIP_VER='15.14.1'
 
 compgcc_seven() {
@@ -69,6 +69,7 @@ lzfourinstall() {
     tar xvzf lz4-${LZFOUR_VER}.tar.gz
     cd lz4-${LZFOUR_VER}
     make clean
+    rm -f /usr/local/bin/lz4* /usr/local/bin/unlz4*
     make -j$(nproc)
     make install
     if [ -f /usr/local/bin/lz4 ]; then
@@ -184,7 +185,7 @@ function funct_lzipinstall {
       echo "lzip-${LZIP_VER}.tar.gz [found]"
       else
       echo "Error: lzip-${LZIP_VER}.tar.gz not found!!! Downloading now......"
-      wget -c${ipv_forceopt} http://nongnu.askapache.com/lzip/lzip-${LZIP_VER}.tar.gz --tries=3
+      wget -c${ipv_forceopt} https://nongnu.askapache.com/lzip/lzip-${LZIP_VER}.tar.gz --tries=3
     fi
     
     tar xzf lzip-${LZIP_VER}.tar.gz
@@ -214,14 +215,14 @@ function funct_plzipinstall {
       echo "lzlib-${LZLIB_VER}.tar.gz [found]"
       else
       echo "Error: lzlib-${LZLIB_VER}.tar.gz not found!!! Downloading now......"
-      wget -c${ipv_forceopt} http://nongnu.askapache.com/lzip/lzlib/lzlib-${LZLIB_VER}.tar.gz --tries=3
+      wget -c${ipv_forceopt} https://nongnu.askapache.com/lzip/lzlib/lzlib-${LZLIB_VER}.tar.gz --tries=3
     fi
     
     if [ -s plzip-${PLZIP_VER}.tar.gz ]; then
       echo "plzip-${PLZIP_VER}.tar.gz [found]"
       else
       echo "Error: plzip-${PLZIP_VER}.tar.gz not found!!! Downloading now......"
-      wget -c${ipv_forceopt} http://nongnu.askapache.com/lzip/plzip/plzip-${PLZIP_VER}.tar.gz --tries=3
+      wget -c${ipv_forceopt} https://nongnu.askapache.com/lzip/plzip/plzip-${PLZIP_VER}.tar.gz --tries=3
     fi
     
     tar xzf lzlib-${LZLIB_VER}.tar.gz

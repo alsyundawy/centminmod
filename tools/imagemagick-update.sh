@@ -2,7 +2,7 @@
 ######################################################
 # standalone imagemagick + imagick updater
 ######################################################
-IMAGICKPHP_VER='3.4.3'   # PHP extension for imagick
+IMAGICKPHP_VER='3.4.4'   # PHP extension for imagick
 PHP_INSTALL='y'
 PHPIMAGICK='y'
 REMIREPO_DISABLE='n'
@@ -37,6 +37,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 

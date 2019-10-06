@@ -1,7 +1,7 @@
 check_dns() {
   vhostname_dns="$1"
     # if CHECKIDN = 0 then internationalized domain name which not supported by letsencrypt
-    CHECKIDN=$(echo $vhostname_dns | grep '^xn--' >/dev/null 2>&1; echo $?)
+    CHECKIDN=$(echo $vhostname_dns | idn | grep '^xn--' >/dev/null 2>&1; echo $?)
     if [[ "$CHECKIDN" = '0' ]]; then
       TOPLEVELCHECK=$(dig soa @8.8.8.8 $vhostname_dns | grep -v ^\; | grep SOA | awk '{print $1}' | sed 's/\.$//' | idn)
     else
@@ -25,17 +25,63 @@ check_dns() {
     echo
     if [[ "$TOPLEVEL" = [yY] ]]; then
       VHOST_ACHECK=$(dig -t A +short @8.8.8.8 $vhostname_dns)
+      VHOST_ACHECKLIST=$(echo $VHOST_ACHECK | xargs)
+      VHOST_AAAACHECK=$(dig -t AAAA +short @8.8.8.8 $vhostname_dns)
+      VHOST_AAAACHECKLIST=$(echo $VHOST_AAAACHECK | xargs)
       VHOST_AWWWCHECK=$(dig -t A +short @8.8.8.8 www.$vhostname_dns | grep -v $vhostname_dns)
+      VHOST_AWWWCHECKLIST=$(echo $VHOST_AWWWCHECK | xargs)
+      VHOST_AAAAWWWCHECK=$(dig -t AAAA +short @8.8.8.8 www.$vhostname_dns | grep -v $vhostname_dns)
+      VHOST_AAAAWWWCHECKLIST=$(echo $VHOST_AAAAWWWCHECK | xargs)
+      ISCF_ACHECK=$(dig -t A +short @8.8.8.8 $vhostname_dns | while read i; do curl -4s https://ipinfo.io/$i/org; done | uniq | egrep -io 'Cloudflare|Incapsula|Sucuri')
+      ISCF_AWWWCHECK=$(dig -t A +short @8.8.8.8 www.$vhostname_dns | while read i; do curl -4s https://ipinfo.io/$i/org; done | uniq | egrep -io 'Cloudflare|Incapsula|Sucuri')
+      declare -a dnsa=($VHOST_ACHECK)
+      dnsa_noips=${#dnsa[@]}
+      declare -a dnsawww=($VHOST_AWWWCHECK)
+      dnsawww_noips=${#dnsawww[@]}
+
+      ISCF_AAAACHECK=$(dig -t AAAA +short @8.8.8.8 $vhostname_dns | while read i; do curl -4s https://ipinfo.io/$i/org; done | uniq | egrep -io 'Cloudflare|Incapsula|Sucuri')
+      ISCF_AAAAWWWCHECK=$(dig -t AAAA +short @8.8.8.8 www.$vhostname_dns | while read i; do curl -4s https://ipinfo.io/$i/org; done | uniq | egrep -io 'Cloudflare|Incapsula|Sucuri')
+      declare -a dnsaaaa=($VHOST_AAAACHECK)
+      dnsaaaa_noips=${#dnsaaaa[@]}
+      declare -a dnsaaaawww=($VHOST_AAAAWWWCHECK)
+      dnsaaaawww_noips=${#dnsaaaawww[@]}
+      pingcheck_ipfour=$(ping -c1 $vhostname_dns  >/dev/null 2>&1; echo $?)
+      pingcheck_ipsix=$(ping6 -c1 $vhostname_dns  >/dev/null 2>&1; echo $?)
+      pingcheck_ipfour_www=$(ping -c1 www.$vhostname_dns  >/dev/null 2>&1; echo $?)
+      pingcheck_ipsix_www=$(ping6 -c1 www.$vhostname_dns  >/dev/null 2>&1; echo $?)
     else
       VHOST_ACHECK=$(dig -t A +short @8.8.8.8 $vhostname_dns)
+      VHOST_ACHECKLIST=$(echo $VHOST_ACHECK | xargs)
+      VHOST_AAAACHECK=$(dig -t AAAA +short @8.8.8.8 $vhostname_dns)
+      VHOST_AAAACHECKLIST=$(echo $VHOST_AAAACHECK | xargs)
+      ISCF_ACHECK=$(dig -t A +short @8.8.8.8 $vhostname_dns | while read i; do curl -4s https://ipinfo.io/$i/org; done | uniq | egrep -io 'Cloudflare|Incapsula|Sucuri')
+      declare -a dnsa=($VHOST_ACHECK)
+      dnsa_noips=${#dnsa[@]}
+
+      ISCF_AAAACHECK=$(dig -t AAAA +short @8.8.8.8 $vhostname_dns | while read i; do curl -4s https://ipinfo.io/$i/org; done | uniq | egrep -io 'Cloudflare|Incapsula|Sucuri')
+      declare -a dnsaaaa=($VHOST_AAAACHECK)
+      dnsaaaa_noips=${#dnsaaaa[@]}
+
+      pingcheck_ipfour=$(ping -c1 $vhostname_dns  >/dev/null 2>&1; echo $?)
+      pingcheck_ipsix=$(ping6 -c1 $vhostname_dns  >/dev/null 2>&1; echo $?)
     fi
     echo
     if [[ "$TOPLEVEL" = [yY] ]]; then
       cecho "$vhostname_dns is a top level domain" $boldyellow  
       if [ "$VHOST_ACHECK" ]; then
-        cecho "your server IP address: $CNIP" $boldyellow
-        cecho "current DNS A record IP address for $vhostname_dns is: $VHOST_ACHECK" $boldyellow
-        if [[ "$(ifconfig | grep 'inet' | grep $VHOST_ACHECK >/dev/null 2>&1; echo $?)" != '0' ]]; then
+        cecho "your server IPv4 IP address: $CNIP" $boldyellow
+        if [[ "$ISCF_ACHECK" = 'Cloudflare' || "$ISCF_ACHECK" = 'cloudflare' ]]; then
+          echo
+          cecho "$vhostname_dns IPv4 DNS A record is behind Cloudflare IPs" $boldyellow
+        elif [[ "$ISCF_ACHECK" = 'Incapsula' || "$ISCF_ACHECK" = 'Incapsula' ]]; then
+          echo
+          cecho "$vhostname_dns IPv4 DNS A record is behind Incapsula IPs" $boldyellow
+        elif [[ "$ISCF_ACHECK" = 'Sucuri' || "$ISCF_ACHECK" = 'Sucuri' ]]; then
+          echo
+          cecho "$vhostname_dns IPv4 DNS A record is behind Sucuri IPs" $boldyellow
+        fi
+        cecho "current DNS A record IPv4 address for $vhostname_dns is: $VHOST_ACHECKLIST" $boldyellow
+        if [[ -z "$ISCF_ACHECK" && "$(ifconfig | grep 'inet' | grep $VHOST_ACHECK >/dev/null 2>&1; echo $?)" != '0' ]]; then
           echo
           cecho "!! Error: DNS A record IP doesn't match any found on this server" $boldyellow
           echo
@@ -45,8 +91,8 @@ check_dns() {
           fi
         fi
       else
-        cecho "your server IP address: $CNIP" $boldyellow
-        cecho "current DNS A record IP address for $vhostname_dns is: $VHOST_ACHECK" $boldyellow
+        cecho "your server IPv4 IP address: $CNIP" $boldyellow
+        cecho "current DNS A record IPv4 address for $vhostname_dns is: $VHOST_ACHECKLIST" $boldyellow
         cecho "!! Error: missing DNS A record for $vhostname_dns" $boldyellow
         echo
         read -ep "Abort this Nginx vhost domain setup to setup proper DNS A record(s) first? [y/n]: " letabort
@@ -54,9 +100,58 @@ check_dns() {
           exit
         fi
       fi
+      if [ "$VHOST_AAAACHECK" ]; then
+        # cecho "your server IPv6 IP address: $CNIP" $boldyellow
+        if [[ "$ISCF_AAAACHECK" = 'Cloudflare' || "$ISCF_AAAACHECK" = 'cloudflare' ]]; then
+          echo
+          cecho "$vhostname_dns IPv6 DNS AAAA record is behind Cloudflare IPs" $boldyellow
+          if [[ "$pingcheck_ipsix" -ne '0' ]]; then
+            cecho "your server doesn't have IPv6 connectivity, so ensure on your" $boldyellow
+            cecho "Cloudflare account > Network tab you enable Pseudo IPv4" $boldyellow
+            cecho "https://community.centminmod.com/threads/17066/" $boldyellow
+          fi
+        elif [[ "$ISCF_AAAACHECK" = 'Incapsula' || "$ISCF_AAAACHECK" = 'Incapsula' ]]; then
+          echo
+          cecho "$vhostname_dns IPv6 DNS AAAA record is behind Incapsula IPs" $boldyellow
+        elif [[ "$ISCF_AAAACHECK" = 'Sucuri' || "$ISCF_AAAACHECK" = 'Sucuri' ]]; then
+          echo
+          cecho "$vhostname_dns IPv6 DNS AAAA record is behind Sucuri IPs" $boldyellow
+        fi
+        cecho "current DNS AAAA record IPv6 address for $vhostname_dns is: $VHOST_AAAACHECKLIST" $boldyellow
+        # if [[ -z "$ISCF_AAAACHECK" && "$(ifconfig | grep 'inet' | grep $VHOST_AAAACHECK >/dev/null 2>&1; echo $?)" != '0' ]]; then
+        #   echo
+        #   cecho "!! Error: DNS AAAA record IP doesn't match any found on this server" $boldyellow
+        #   cecho "You can ignore this error if you did not setup a DNS AAAA IPv6 record for $vhostname_dns" $boldyellow
+        #   cecho "and did not configure Nginx vhost for IPv6. So you can answer no = n to Abort prompt below" $boldyellow
+        #   echo
+        #   read -ep "Abort this Nginx vhost domain setup to setup updated DNS A record(s) first? [y/n]: " letabort
+        #   if [[ "$letabort" = [yY] ]]; then
+        #     exit
+        #   fi
+        # fi
+      # else
+      #   # cecho "your server IPv6 address: $CNIP" $boldyellow
+      #   cecho "current DNS AAAA record IPv6 address for $vhostname_dns is: $VHOST_AAAACHECKLIST" $boldyellow
+      #   cecho "!! Error: missing DNS AAAA record for $vhostname_dns" $boldyellow
+      #   echo
+      #   read -ep "Abort this Nginx vhost domain setup to setup proper DNS A record(s) first? [y/n]: " letabort
+      #   if [[ "$letabort" = [yY] ]]; then
+      #     exit
+      #   fi
+      fi
       if [ "$VHOST_AWWWCHECK" ]; then
-        cecho "current DNS A record IP address for www.$vhostname_dns is: $VHOST_AWWWCHECK" $boldyellow
-        if [[ "$(ifconfig | grep 'inet' | grep $VHOST_AWWWCHECK >/dev/null 2>&1; echo $?)" != '0' ]]; then
+        if [[ "$ISCF_AWWWCHECK" = 'Cloudflare' || "$ISCF_AWWWCHECK" = 'cloudflare' ]]; then
+          echo
+          cecho "www.$vhostname_dns IPv4 DNS A record is behind Cloudflare IPs" $boldyellow
+        elif [[ "$ISCF_AWWWCHECK" = 'Incapsula' || "$ISCF_AWWWCHECK" = 'Incapsula' ]]; then
+          echo
+          cecho "www.$vhostname_dns IPv4 DNS A record is behind Incapsula IPs" $boldyellow
+        elif [[ "$ISCF_AWWWCHECK" = 'Sucuri' || "$ISCF_AWWWCHECK" = 'Sucuri' ]]; then
+          echo
+          cecho "www.$vhostname_dns IPv4 DNS A record is behind Sucuri IPs" $boldyellow
+        fi
+        cecho "current DNS A record IP address for www.$vhostname_dns is: $VHOST_AWWWCHECKLIST" $boldyellow
+        if [[ -z "$ISCF_AWWWCHECK" && "$(ifconfig | grep 'inet' | grep $VHOST_AWWWCHECK >/dev/null 2>&1; echo $?)" != '0' ]]; then
           echo
           cecho "!! Error: DNS A record IP doesn't match any found on this server" $boldyellow
           echo
@@ -66,13 +161,52 @@ check_dns() {
           fi
         fi
       else
-        cecho "current DNS A record IP address for www.$vhostname_dns is: $VHOST_AWWWCHECK" $boldyellow
+        cecho "current DNS A record IP address for www.$vhostname_dns is: $VHOST_AWWWCHECKLIST" $boldyellow
         cecho "!! Error: missing DNS A record for www.$vhostname_dns" $boldyellow
         echo
         read -ep "Abort this Nginx vhost domain setup to setup proper DNS A record(s) first? [y/n]: " letabort
         if [[ "$letabort" = [yY] ]]; then
           exit
         fi
+      fi
+      if [ "$VHOST_AAAAWWWCHECK" ]; then
+        if [[ "$ISCF_AAAAWWWCHECK" = 'Cloudflare' || "$ISCF_AAAAWWWCHECK" = 'cloudflare' ]]; then
+          echo
+          cecho "www.$vhostname_dns IPv6 DNS AAAA record is behind Cloudflare IPs" $boldyellow
+          if [[ "$pingcheck_ipsix_www" -ne '0' ]]; then
+            cecho "your server doesn't have IPv6 connectivity, so ensure on your" $boldyellow
+            cecho "Cloudflare account > Network tab you enable Pseudo IPv4" $boldyellow
+            cecho "https://community.centminmod.com/threads/17066/" $boldyellow
+          fi
+        elif [[ "$ISCF_AAAAWWWCHECK" = 'Incapsula' || "$ISCF_AAAAWWWCHECK" = 'Incapsula' ]]; then
+          echo
+          cecho "www.$vhostname_dns IPv6 DNS A record is behind Incapsula IPs" $boldyellow
+        elif [[ "$ISCF_AAAAWWWCHECK" = 'Sucuri' || "$ISCF_AAAAWWWCHECK" = 'Sucuri' ]]; then
+          echo
+          cecho "www.$vhostname_dns IPv6 DNS A record is behind Sucuri IPs" $boldyellow
+        fi
+        cecho "current DNS AAAA record IPv6 address for www.$vhostname_dns is: $VHOST_AAAAWWWCHECKLIST" $boldyellow
+        # if [[ -z "$ISCF_AAAAWWWCHECK" && "$(ifconfig | grep 'inet' | grep $VHOST_AAAAWWWCHECK >/dev/null 2>&1; echo $?)" != '0' ]]; then
+        #   echo
+        #   cecho "!! Error: DNS AAAA record IP doesn't match any found on this server" $boldyellow
+        #   cecho "You can ignore this error if you did not setup a DNS AAAA IPv6 record for www.$vhostname_dns" $boldyellow
+        #   cecho "and did not configure Nginx vhost for IPv6. So you can answer no = n to Abort prompt below" $boldyellow
+        #   echo
+        #   read -ep "Abort this Nginx vhost domain setup to setup updated DNS A record(s) first? [y/n]: " letabort
+        #   if [[ "$letabort" = [yY] ]]; then
+        #     exit
+        #   fi
+        # fi
+      # else
+      #   cecho "current DNS AAAA record IPv6 address for www.$vhostname_dns is: $VHOST_AAAAWWWCHECKLIST" $boldyellow
+      #   cecho "!! Error: missing DNS AAAA record for www.$vhostname_dns" $boldyellow
+      #   cecho "You can ignore this error if you did not setup a DNS AAAA IPv6 record for www.$vhostname_dns" $boldyellow
+      #   cecho "and did not configure Nginx vhost for IPv6. So you can answer no = n to Abort prompt below" $boldyellow
+      #   echo
+      #   read -ep "Abort this Nginx vhost domain setup to setup proper DNS AAAA record(s) first? [y/n]: " letabort
+      #   if [[ "$letabort" = [yY] ]]; then
+      #     exit
+      #   fi
       fi
     elif [[ "$TOPLEVEL" = 'z' ]]; then
       cecho "!! Error: $vhostname_dns DNS records not found or setup properly yet or $vhostname_dns invalid" $boldyellow
@@ -84,9 +218,19 @@ check_dns() {
     else
       cecho "$vhostname_dns is not a top level domain" $boldyellow
       if [ "$VHOST_ACHECK" ]; then
-        cecho "your server IP address: $CNIP" $boldyellow
-        cecho "current DNS A record IP address for $vhostname_dns is: $VHOST_ACHECK" $boldyellow
-        if [[ "$(ifconfig | grep 'inet' | grep $VHOST_ACHECK >/dev/null 2>&1; echo $?)" != '0' ]]; then
+        cecho "your server IPv4 IP address: $CNIP" $boldyellow
+        if [[ "$ISCF_ACHECK" = 'Cloudflare' || "$ISCF_ACHECK" = 'cloudflare' ]]; then
+          echo
+          cecho "$vhostname_dns IPv4 DNS A record is behind Cloudflare IPs" $boldyellow
+        elif [[ "$ISCF_ACHECK" = 'Incapsula' || "$ISCF_ACHECK" = 'Incapsula' ]]; then
+          echo
+          cecho "$vhostname_dns IPv4 DNS A record is behind Incapsula IPs" $boldyellow
+        elif [[ "$ISCF_ACHECK" = 'Sucuri' || "$ISCF_ACHECK" = 'Sucuri' ]]; then
+          echo
+          cecho "$vhostname_dns IPv4 DNS A record is behind Sucuri IPs" $boldyellow
+        fi
+        cecho "current DNS A rv4ecord IP address for $vhostname_dns is: $VHOST_ACHECKLIST" $boldyellow
+        if [[ -z "$ISCF_ACHECK" && "$(ifconfig | grep 'inet' | grep $VHOST_ACHECK >/dev/null 2>&1; echo $?)" != '0' ]]; then
           echo
           cecho "!! Error: DNS A record IP doesn't match any found on this server" $boldyellow
           echo
@@ -96,13 +240,54 @@ check_dns() {
           fi
         fi
       else
-        cecho "current DNS A record IP address for $vhostname_dns is: $VHOST_ACHECK" $boldyellow
+        cecho "current DNS A record IPv4 address for $vhostname_dns is: $VHOST_ACHECKLIST" $boldyellow
         cecho "!! Error: missing DNS A record for $vhostname_dns" $boldyellow
         echo
         read -ep "Abort this Nginx vhost domain setup to setup proper DNS A record(s) first? [y/n]: " letabort
         if [[ "$letabort" = [yY] ]]; then
           exit
         fi
+      fi
+      if [ "$VHOST_AAAACHECK" ]; then
+        # cecho "your server IPv6 IP address: $CNIP" $boldyellow
+        if [[ "$ISCF_AAAACHECK" = 'Cloudflare' || "$ISCF_AAAACHECK" = 'cloudflare' ]]; then
+          echo
+          cecho "$vhostname_dns IPv6 DNS AAAA record is behind Cloudflare IPs" $boldyellow
+          if [[ "$pingcheck_ipsix" -ne '0' ]]; then
+            cecho "your server doesn't have IPv6 connectivity, so ensure on your" $boldyellow
+            cecho "Cloudflare account > Network tab you enable Pseudo IPv4" $boldyellow
+            cecho "https://community.centminmod.com/threads/17066/" $boldyellow
+          fi
+        elif [[ "$ISCF_AAAACHECK" = 'Incapsula' || "$ISCF_AAAACHECK" = 'Incapsula' ]]; then
+          echo
+          cecho "$vhostname_dns IPv6 DNS A record is behind Incapsula IPs" $boldyellow
+        elif [[ "$ISCF_AAAACHECK" = 'Sucuri' || "$ISCF_AAAACHECK" = 'Sucuri' ]]; then
+          echo
+          cecho "$vhostname_dns IPv6 DNS A record is behind Sucuri IPs" $boldyellow
+        fi
+        cecho "current DNS AAAA record IPv6 address for $vhostname_dns is: $VHOST_AAAACHECKLIST" $boldyellow
+        # if [[ -z "$ISCF_AAAACHECK" && "$(ifconfig | grep 'inet' | grep $VHOST_AAAACHECK >/dev/null 2>&1; echo $?)" != '0' ]]; then
+        #   echo
+        #   cecho "!! Error: DNS AAAA record IP doesn't match any found on this server" $boldyellow
+        #   cecho "You can ignore this error if you did not setup a DNS AAAA IPv6 record for $vhostname_dns" $boldyellow
+        #   cecho "and did not configure Nginx vhost for IPv6. So you can answer no = n to Abort prompt below" $boldyellow
+        #   echo
+        #   read -ep "Abort this Nginx vhost domain setup to setup updated DNS A record(s) first? [y/n]: " letabort
+        #   if [[ "$letabort" = [yY] ]]; then
+        #     exit
+        #   fi
+        # fi
+      # else
+      #   # cecho "your server IPv6 IP address: $CNIP" $boldyellow
+      #   cecho "current DNS AAAA record IPv6 address for $vhostname_dns is: $VHOST_AAAACHECKLIST" $boldyellow
+      #   cecho "!! Error: missing DNS AAAA record for $vhostname_dns" $boldyellow
+      #   cecho "You can ignore this error if you did not setup a DNS AAAA IPv6 record for $vhostname_dns" $boldyellow
+      #   cecho "and did not configure Nginx vhost for IPv6. So you can answer no = n to Abort prompt below" $boldyellow
+      #   echo
+      #   read -ep "Abort this Nginx vhost domain setup to setup proper DNS AAAA record(s) first? [y/n]: " letabort
+      #   if [[ "$letabort" = [yY] ]]; then
+      #     exit
+      #   fi
       fi
     fi
     echo
@@ -188,7 +373,9 @@ fi
 # setup https://community.centminmod.com/threads/13847/
 if [ ! -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
   mkdir -p /usr/local/nginx/conf/ssl/cloudflare/${vhostname}
-  wget $CLOUDFLARE_AUTHORIGINPULLCERT -O origin.crt
+  wget -4 $CLOUDFLARE_AUTHORIGINPULLCERT -O /usr/local/nginx/conf/ssl/cloudflare/${vhostname}/origin.crt
+elif [ -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
+  wget -4 $CLOUDFLARE_AUTHORIGINPULLCERT -O /usr/local/nginx/conf/ssl/cloudflare/${vhostname}/origin.crt
 fi
 
 if [ ! -f /usr/local/nginx/conf/ssl_include.conf ]; then
@@ -222,8 +409,53 @@ else
   SELFSIGNEDSSL_OU="$SELFSIGNEDSSL_OU"
 fi
 
-openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
-openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt
+# self-signed ssl cert with SANs
+cat > /tmp/req.cnf <<EOF
+[req]
+default_bits       = 2048
+distinguished_name = req_distinguished_name
+req_extensions     = v3_req
+prompt = no
+[req_distinguished_name]
+C = ${SELFSIGNEDSSL_C}
+ST = ${SELFSIGNEDSSL_ST}
+L = ${SELFSIGNEDSSL_L}
+O = ${vhostname}
+OU = ${vhostname}
+CN = ${vhostname}
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = ${vhostname}
+DNS.2 = www.${vhostname}
+EOF
+
+cat > /tmp/v3ext.cnf <<EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${vhostname}
+DNS.2 = www.${vhostname}
+EOF
+
+echo
+cat /tmp/req.cnf
+echo
+cat /tmp/v3ext.cnf
+echo
+openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -config /tmp/req.cnf
+# openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${vhostname}/OU=${vhostname}/CN=${vhostname}"
+openssl req -noout -text -in ${vhostname}.csr | grep DNS
+openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt -extfile /tmp/v3ext.cnf
+# openssl req -x509 -nodes -days 36500 -sha256 -newkey rsa:2048 -keyout ${vhostname}.key -out ${vhostname}.crt -config /tmp/req.cnf
+
+rm -f /tmp/req.cnf
+rm -f /tmp/v3ext.cnf
 
 # echo
 # cecho "---------------------------------------------------------------" $boldyellow
@@ -289,10 +521,10 @@ PUREGROUP=nginx
     if [ "$SECOND_IP" ]; then
       CNIP="$SECOND_IP"
     else
-      CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+      CNIP=$(curl -4s https://ipinfo.io/ip)
     fi
 # CURRENTIP=$(echo $SSH_CLIENT | awk '{print $1}')
-# CURRENTCOUNTRY=$(curl -s https://ipinfo.io/$CURRENTIP/country)
+# CURRENTCOUNTRY=$(curl -4s https://ipinfo.io/$CURRENTIP/country)
 pureftpinstall
 
 # Support secondary dedicated IP configuration for centmin mod
@@ -322,6 +554,12 @@ echo
 info_notice
 
 read -ep "Enter vhost domain name to add (without www. prefix): " vhostname
+
+   # if checkidn_vhost = 0 then internationalized domain name
+   checkidn_vhost=$(echo $vhostname | idn | grep '^xn--' >/dev/null 2>&1; echo $?)
+   if [[ "$checkidn_vhost" = '0' ]]; then
+     vhostname=$(echo $vhostname | idn)
+   fi
 
 if [ -d "/home/nginx/domains/$vhostname" ]; then
   echo ""
@@ -395,10 +633,30 @@ if [[ "$NGINX_VHOSTSSL" = [yY] ]]; then
         vhostssl='lelive'
       elif [[ "$vhostssl_opt" = '4' ]]; then
         vhostssl='lelived'
+      else
+        vhostssl=invalidopt
       fi
       echo
-    fi
+      if [[ "$vhostssl_opt" -eq '2' || "$vhostssl_opt" -eq '4' ]]; then
+        echo "If using Cloudflare in front of site, disable CF option for"
+        echo "Always Use HTTPS in CF Dashboard Crypto Tab as Nginx will do"
+        echo "the non-https to https redirect on this end and not require"
+        echo "Cloudflare's Always Use HTTPS. If enabled it will cause the"
+        echo "error message: too many redirects"
+        echo
+        echo "Also change Cloudflare SSL from Flexible to Full SSL mode"
+        echo
+        sleep 1
+      fi
+    fi # vhostssl_le
   fi
+fi
+
+if [[ "$vhostssl" = 'invalidopt' ]]; then
+  echo
+  echo "error: you entered invalid option = $vhostssl_opt"
+  echo "aborting run..."
+  exit 1
 fi
 
 if [[ "$PUREFTPD_DISABLED" = [nN] ]]; then
@@ -615,17 +873,19 @@ else
   CHACHACIPHERS=""
 fi
 
-DETECTOPENSSL_ONEZERO=$(echo $OPENSSL_VERSION  | cut -d . -f1-2)
-DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
-if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
-    # openssl 1.1.0 unsupported flag enable-tlsext
-    if [[ "$(grep -w 'tls1_3' "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm")" ]]; then
-        TLSONETHREEOPT=' enable-tls1_3'
-        TLSONETHREE_DETECT='y'
-    else
-        TLSONETHREEOPT=""
-        TLSONETHREE_DETECT='n'
-    fi
+if [ -f "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm" ]; then
+  DETECTOPENSSL_ONEZERO=$(echo $OPENSSL_VERSION  | cut -d . -f1-2)
+  DETECTOPENSSL_ONEONE=$(echo $OPENSSL_VERSION  | cut -d . -f1-3 | grep -o 1.1.1)
+  if [[ "$DETECTOPENSSL_ONEZERO" = '1.1' ]] || [[ "$DETECTOPENSSL_ONEONE" = '1.1.1' ]]; then
+      # openssl 1.1.0 unsupported flag enable-tlsext
+      if [[ "$(grep -w 'tls1_3' "${DIR_TMP}/openssl-${OPENSSL_VERSION}/configdata.pm")" ]]; then
+          TLSONETHREEOPT=' enable-tls1_3'
+          TLSONETHREE_DETECT='y'
+      else
+          TLSONETHREEOPT=""
+          TLSONETHREE_DETECT='n'
+      fi
+  fi
 fi
 
 if [[ "$TLSONETHREE_DETECT" = [yY] ]]; then
@@ -643,18 +903,27 @@ if [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module
   HTTPTWO_MAXHEADERSIZE='http2_max_header_size 32k;'  
 elif [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]]; then
   HTTPTWO=y
-  if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep reuseport | awk -F ':  ' '{print $2}' | grep -o reuseport)" != 'reuseport' ]]; then
-    # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
-    NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
-    if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
-      ADD_REUSEPORT=' reuseport'
+    # check if backlogg directive is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
+    # CHECK_HTTPSBACKLOG=$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep backlog | awk -F ':  ' '{print $2}' | grep -o backlog)
+    # if [[ "$CHECK_HTTPSBACKLOG" != 'backlog' ]]; then
+    #   if [[ ! -f /proc/user_beancounters ]]; then
+    #       GETSOMAXCON_VALUE=$(sysctl net.core.somaxconn | awk -F  '= ' '{print $2}')
+    #       SET_NGINXBACKLOG=$(($GETSOMAXCON_VALUE/16))
+    #       ADD_BACKLOG=" backlog=$SET_NGINXBACKLOG"
+    #   fi
+    # fi
+    if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep reuseport | awk -F ':  ' '{print $2}' | grep -o reuseport)" != 'reuseport' ]]; then
+      # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
+      NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
+      if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
+        ADD_REUSEPORT=' reuseport'
+      else
+        ADD_REUSEPORT=""
+      fi
+      LISTENOPT="ssl http2${ADD_REUSEPORT}${ADD_BACKLOG}"
     else
-      ADD_REUSEPORT=""
+      LISTENOPT="ssl http2${ADD_BACKLOG}"
     fi
-    LISTENOPT="ssl http2${ADD_REUSEPORT}"
-  else
-    LISTENOPT='ssl http2'
-  fi
   COMP_HEADER='#spdy_headers_comp 5'
   SPDY_HEADER='#add_header Alternate-Protocol  443:npn-spdy/3;'
   HTTPTWO_MAXFIELDSIZE='http2_max_field_size 16k;'
@@ -666,7 +935,26 @@ else
   SPDY_HEADER='add_header Alternate-Protocol  443:npn-spdy/3;'
 fi
 
-if [[ -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
+if [[ -f /usr/bin/php74 && -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;
+  #include /usr/local/nginx/conf/php71-remi.conf;
+  #include /usr/local/nginx/conf/php70-remi.conf;
+  #include /usr/local/nginx/conf/php56-remi.conf;'
+elif [[ -f /usr/bin/php74 && -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && ! -f /usr/bin/php70 && ! -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;
+  #include /usr/local/nginx/conf/php71-remi.conf;'
+elif [[ -f /usr/bin/php74 && -f /usr/bin/php73 && -f /usr/bin/php72 && ! -f /usr/bin/php71 && ! -f /usr/bin/php70 && ! -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;
+  #include /usr/local/nginx/conf/php72-remi.conf;'
+elif [[ -f /usr/bin/php74 && -f /usr/bin/php73 && ! -f /usr/bin/php72 && ! -f /usr/bin/php71 && ! -f /usr/bin/php70 && ! -f /usr/bin/php56 ]]; then
+  MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php74-remi.conf;
+  #include /usr/local/nginx/conf/php73-remi.conf;'
+elif [[ -f /usr/bin/php73 && -f /usr/bin/php72 && -f /usr/bin/php71 && -f /usr/bin/php70 && -f /usr/bin/php56 ]]; then
   MULTIPHP_INCLUDES='#include /usr/local/nginx/conf/php73-remi.conf;
   #include /usr/local/nginx/conf/php72-remi.conf;
   #include /usr/local/nginx/conf/php71-remi.conf;

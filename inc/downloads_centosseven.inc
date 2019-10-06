@@ -108,8 +108,10 @@ if [[ "$REMIREPO_DISABLE" = [nN] ]]; then
 
   if [ -s "${CENTOSSEVENREMIFILE}" ]; then
     echo "${CENTOSSEVENREMIFILE} [found]"
-    rpm --import http://rpms.remirepo.net/RPM-GPG-KEY-remi
+    rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi
     rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2017
+    rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2018
+    rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2019
     rpm -q gpg-pubkey --qf "%{summary} ->%{version}-%{release}\n"
     rpm -Uvh --nosignature ${CENTOSSEVENREMIFILE}
     ERR=$?
@@ -133,8 +135,10 @@ if [[ "$REMIREPO_DISABLE" = [nN] ]]; then
     # exit #$ERROR
   else 
     cecho "Download done." $boldyellow
-    rpm --import http://rpms.remirepo.net/RPM-GPG-KEY-remi
+    rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi
     rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2017
+    rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2018
+    rpm --import https://rpms.remirepo.net/RPM-GPG-KEY-remi2019
     rpm -q gpg-pubkey --qf "%{summary} ->%{version}-%{release}\n"
     rpm -Uvh --nosignature ${CENTOSSEVENREMIFILE}
     ERR=$?
@@ -297,6 +301,7 @@ if [ -s "${CENTOSSEVENPERCONALRELEASEFILE}" ]; then
   CCPERCONACHECK="$ERR"
     if [ "$CCPERCONACHECK" == '0' ]; then
       yumpriorpercona
+      yum-config-manager --disable percona-release-noarch
       echo ""
     else
       cecho "Error: problem with ${CENTOSSEVENPERCONALRELEASEFILE} install." $boldgreen
@@ -320,6 +325,7 @@ rpm -Uvh ${CENTOSSEVENPERCONALRELEASEFILE}
   CCPERCONACHECK="$ERR"
     if [ "$CCPERCONACHECK" == '0' ]; then
       yumpriorpercona
+      yum-config-manager --disable percona-release-noarch
       echo ""
     else
       cecho "Error: problem with ${CENTOSSEVENPERCONALRELEASEFILE} install." $boldgreen
@@ -348,7 +354,7 @@ if [[ "$(uname -m)" != 'aarch64' ]]; then
 fi
 
 # CentOS 7 repo mirrors aren't fully updated so need to specify actual kernel-headers version
-PACKAGEEXTRA='figlet moreutils nghttp2 libnghttp2 libnghttp2-devel clang clang-devel jemalloc jemalloc-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 uw-imap-devel libtidy libtidy-devel libJudy axel glances bash-completion bash-completion-extras mlocate re2c libmcrypt libmcrypt-devel kernel-headers kernel-devel cmake28'
+PACKAGEEXTRA='figlet moreutils nghttp2 libnghttp2 libnghttp2-devel jq clang clang-devel jemalloc jemalloc-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 uw-imap-devel libtidy libtidy-devel libJudy axel bash-completion bash-completion-extras mlocate re2c libmcrypt libmcrypt-devel kernel-headers kernel-devel cmake28'
 
 declare -a arrays
 arrays=(${PACKAGEEXTRA})

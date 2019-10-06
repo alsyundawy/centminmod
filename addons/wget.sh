@@ -25,7 +25,8 @@ ALTPCRE_VERSION='8.43'
 ALTPCRELINKFILE="pcre-${ALTPCRE_VERSION}.tar.gz"
 ALTPCRELINK="${LOCALCENTMINMOD_MIRROR}/centminmodparts/pcre/${ALTPCRELINKFILE}"
 
-WGET_VERSION='1.20.1'
+WGET_VERSION='1.20.3'
+WGET_VERSION_SEVEN='1.20.3'
 WGET_FILENAME="wget-${WGET_VERSION}.tar.gz"
 WGET_LINK="https://centminmod.com/centminmodparts/wget/${WGET_FILENAME}"
 WGET_LINKLOCAL="${LOCALCENTMINMOD_MIRROR}/centminmodparts/wget/${WGET_FILENAME}"
@@ -56,6 +57,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -74,6 +77,13 @@ fi
 
 if [[ -f /etc/system-release && "$(awk '{print $1,$2,$3}' /etc/system-release)" = 'Amazon Linux AMI' ]]; then
     CENTOS_SIX='6'
+fi
+
+if [[ "$CENTOS_SEVEN" -eq '7' ]]; then
+  WGET_VERSION=$WGET_VERSION_SEVEN
+fi
+if [[ "$CENTOS_EIGHT" -eq '8' ]]; then
+  WGET_VERSION=$WGET_VERSION_SEVEN
 fi
 
 if [ -f /usr/local/lib/libssl.a ]; then
@@ -253,6 +263,15 @@ return
 ###########################################################
 sar_call() {
   $SARCALL 1 1
+}
+
+patch_wget() {
+  if [[ "$WGET_VERSION" = '1.20.2' && -f /usr/local/src/centminmod/patches/wget/x509_v_flag_partial_chain.patch ]]; then
+    if [ ! -f x509_v_flag_partial_chain.patch ]; then
+      cp -a /usr/local/src/centminmod/patches/wget/x509_v_flag_partial_chain.patch x509_v_flag_partial_chain.patch
+      patch -p1 < x509_v_flag_partial_chain.patch
+    fi
+  fi
 }
 
 scl_install() {
@@ -480,6 +499,7 @@ source_wgetinstall() {
   if [ -f config.status ]; then
     make clean
   fi
+  patch_wget
   if [[ "$(uname -m)" = 'x86_64' ]]; then
     export CFLAGS="-O2 -g -pipe -Wall -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector-strong --param=ssp-buffer-size=4 -grecord-gcc-switches -m64 -mtune=generic"
     export PCRE_CFLAGS="-I /usr/local/include"

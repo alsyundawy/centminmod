@@ -49,6 +49,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -159,6 +161,19 @@ cecho "*************************************************" $boldgreen
 # install Python 3.4 besides system default Python 2.6
 yum -y install python34u python34u-devel python34u-pip python34u-setuptools python34u-tools --enablerepo=ius
 rpm -ql python34u python34u-devel python34u-pip python34u-setuptools python34u-tools python34u-tkinter | grep bin
+
+# switch in favour of epel python34 version
+if [[ "$(rpm -qa python34u)" ]]; then
+  # remove ius community python34u
+  yum -y remove python34u python34u-devel python34u-pip python34u-setuptools python34u-tools python34u-libs python34u-tkinter
+  # install epel python34
+  yum -y install python34 python34-devel python34-pip python34-setuptools python34-tools python34-libs python34-tkinter
+fi
+if [[ ! "$(rpm -qa cmake3)" || ! "$(rpm -qa cmake3-data)" ]]; then
+  # reinstall removed dependencies from above removed ius community packages
+  yum -y install cmake3 cmake3-data
+fi
+
 
 } 2>&1 | tee ${CENTMINLOGDIR}/python34-install_${DT}.log
 

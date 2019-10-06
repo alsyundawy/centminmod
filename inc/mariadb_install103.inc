@@ -27,7 +27,7 @@ chmod 600 /var/log/mysqld.log
 ls -lah /var/log/mysqld.log
 echo
 
-MDB_COUNTRY=$(curl -s https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | awk '/country: / {print $2}')
+MDB_COUNTRY=$(curl -4s https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | awk '/country: / {print $2}')
 
 # MariaDB yum mirrors may have connectivity issues for servers in China (CN)
 # so can use alternative mirrors for better speed and connectivity
@@ -550,7 +550,7 @@ if [[ "$MDB_INSTALL" = [yY] ]]; then
     cecho "* Installing MariaDB " $boldgreen
     echo "*************************************************"
 
-cmservice mysqld stop
+cmservice mysql stop
 
 ${YUMDNFBIN}${CACHESKIP} -y remove mysql mysql-libs
 
@@ -583,7 +583,7 @@ fi
 
 perdbiinstall
 
-cmservice mysqld stop
+cmservice mysql stop
 
 #yum -y remove mysql mysql-libs
 
@@ -672,6 +672,7 @@ cmservice mysql restart
     echo "*************************************************"
     
     /etc/init.d/mysql stop
+    /etc/init.d/mysql start
 fi
 
 if [[ "$MDB_YUMREPOINSTALL" = [yY] && "$MDB_INSTALL" = [nN] ]]; then
@@ -749,6 +750,7 @@ fi
     echo "*************************************************"
     
     cmservice mysql stop
+    cmservice mysql start
 fi
 
 }

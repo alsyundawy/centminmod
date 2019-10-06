@@ -60,6 +60,9 @@ fi
 fi
         ulimit -n 524288
         echo "ulimit -n 524288" >> /etc/rc.local
+        if [[ ! "$(grep '/var/run/php-fpm' /etc/rc.local)" ]]; then
+          echo 'if [ ! -d /var/run/php-fpm/ ]; then mkdir -p /var/run/php-fpm/; fi' >> /etc/rc.local
+        fi
     fi # check if custom open file descriptor limits already exist
 
     if [[ "$CENTOS_SEVEN" = '7' ]]; then
@@ -154,6 +157,7 @@ if [[ ! -f /proc/user_beancounters ]]; then
             if [[ "$(grep 'centminmod added' /etc/sysctl.d/101-sysctl.conf >/dev/null 2>&1; echo $?)" != '0' ]]; then
 cat >> "/etc/sysctl.d/101-sysctl.conf" <<EOF
 # centminmod added
+kernel.printk=4 1 1 7
 fs.nr_open=12000000
 fs.file-max=9000000
 fs.inotify.max_queued_events=32768
@@ -163,14 +167,14 @@ net.core.wmem_max=16777216
 net.core.rmem_max=16777216
 net.ipv4.tcp_rmem=8192 87380 16777216                                          
 net.ipv4.tcp_wmem=8192 65536 16777216
-net.core.netdev_max_backlog=8192
-net.core.somaxconn=8151
+net.core.netdev_max_backlog=65536
+net.core.somaxconn=65535
 net.core.optmem_max=8192
 net.ipv4.tcp_fin_timeout=10
 net.ipv4.tcp_keepalive_intvl=30
 net.ipv4.tcp_keepalive_probes=3
 net.ipv4.tcp_keepalive_time=240
-net.ipv4.tcp_max_syn_backlog=8192
+net.ipv4.tcp_max_syn_backlog=65536
 net.ipv4.tcp_sack=1
 net.ipv4.tcp_syn_retries=3
 net.ipv4.tcp_synack_retries = 2
@@ -223,6 +227,7 @@ EOF
             fi
 cat >> "/etc/sysctl.conf" <<EOF
 # centminmod added
+kernel.printk=4 1 1 7
 fs.nr_open=12000000
 fs.file-max=9000000
 fs.inotify.max_queued_events=32768
@@ -232,14 +237,14 @@ net.core.wmem_max=16777216
 net.core.rmem_max=16777216
 net.ipv4.tcp_rmem=8192 87380 16777216                                          
 net.ipv4.tcp_wmem=8192 65536 16777216
-net.core.netdev_max_backlog=8192
-net.core.somaxconn=8151
+net.core.netdev_max_backlog=65536
+net.core.somaxconn=65535
 net.core.optmem_max=8192
 net.ipv4.tcp_fin_timeout=10
 net.ipv4.tcp_keepalive_intvl=30
 net.ipv4.tcp_keepalive_probes=3
 net.ipv4.tcp_keepalive_time=240
-net.ipv4.tcp_max_syn_backlog=8192
+net.ipv4.tcp_max_syn_backlog=65536
 net.ipv4.tcp_sack=1
 net.ipv4.tcp_syn_retries=3
 net.ipv4.tcp_synack_retries = 2

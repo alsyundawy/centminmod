@@ -24,6 +24,7 @@ FORCE_IPVFOUR='y' # curl/wget commands through script force IPv4
 ###############################################################################
 # GCC options
 GCC_SEVEN='n'
+GCC_EIGHT='n'
 OPT_LEVEL='-O3'
 MARCH_TARGETNATIVE='n' # for intel 64bit only set march=native, if no set to x86-64
 ###############################################################################
@@ -31,6 +32,7 @@ FFMPEG_DEBUG='n'
 DISABLE_NETWORKFFMPEG='n'
 ENABLE_FBTRANSFORM='n'
 ENABLE_AVONE='n'
+ENABLE_DAVONED='n'
 ENABLE_FPIC='n'
 ENABLE_FONTCONFIG='n'
 ENABLE_LIBASS='y'
@@ -42,11 +44,11 @@ LIBOGG_VER='1.3.3'
 LIBVORBIS_VER='1.3.6'
 GD_ENABLE='n'
 NASM_SOURCEINSTALL='n'
-NASM_VER='2.14rc16'
+NASM_VER='2.14'
 YASM_VER='1.3.0'
 FDKAAC_VER='0.1.6'
 FONTCONFIG_VER='2.13.1'
-FREETYPE_VER='2.9'
+FREETYPE_VER='2.10.0'
 ###############################################################################
 
 shopt -s expand_aliases
@@ -175,6 +177,13 @@ else
   ENABLE_AVONEOPT=""
 fi
 
+if [[ "$ENABLE_DAVONED" = [yY] ]]; then
+  ENABLE_DAVONEDOPT=' --enable-libdav1d'
+  ENABLE_FPIC='y'
+else
+  ENABLE_DAVONEDOPT=""
+fi
+
 if [[ "$ENABLE_FPIC" = [yY] ]]; then
   ENABLE_FPICOPT=' --enable-pic --extra-ldexeflags=-pie'
   EXTRACFLAG_FPICOPTS='-fPIC'
@@ -197,22 +206,28 @@ if [[ "$GCC_SEVEN" = [yY] && "$(uname -m)" = 'x86_64' && -f /opt/rh/devtoolset-7
   export CXXFLAGS="${CFLAGS}"
 fi
 
+if [[ "$GCC_EIGHT" = [yY] && "$(uname -m)" = 'x86_64' && -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+  source /opt/rh/devtoolset-8/enable
+  export CFLAGS="${OPT_LEVEL} -march=${MARCH_TARGET} -Wimplicit-fallthrough=0"
+  export CXXFLAGS="${CFLAGS}"
+fi
+
 do_continue() {
+	# echo
+	# echo "-------------------------------------------------------------------------"
+	# echo "Installing ffmpeg-php extension relies on the ffmpeg-php developer"
+	# echo "to keep ffmpeg-php updated for ffmpeg compatibility and that has"
+	# echo "been flaky with various compatibility issues. There have been work"
+	# echo "arounds like https://community.centminmod.com/posts/24018/ but "
+	# echo "there are no guarantees due to issues outlined in this thread post"
+	# echo "at https://community.centminmod.com/posts/7078/"
+	# echo
+	# echo "if ffmpeg-php fails to compile, you can unload it by removing the"
+	# echo "settings file at /etc/centminmod/php.d/ffmpeg.ini and restarting"
+	# echo "php-fpm service"
+	# echo "-------------------------------------------------------------------------"
 	echo
-	echo "-------------------------------------------------------------------------"
-	echo "Installing ffmpeg-php extension relies on the ffmpeg-php developer"
-	echo "to keep ffmpeg-php updated for ffmpeg compatibility and that has"
-	echo "been flaky with various compatibility issues. There have been work"
-	echo "arounds like https://community.centminmod.com/posts/24018/ but "
-	echo "there are no guarantees due to issues outlined in this thread post"
-	echo "at https://community.centminmod.com/posts/7078/"
-	echo
-	echo "if ffmpeg-php fails to compile, you can unload it by removing the"
-	echo "settings file at /etc/centminmod/php.d/ffmpeg.ini and restarting"
-	echo "php-fpm service"
-	echo "-------------------------------------------------------------------------"
-	echo
-	read -ep "Do you want to continue with ffmpeg-php + ffmpeg install ? [y/n] " cont_install
+	read -ep "Do you want to continue with ffmpeg binary only install ? [y/n] " cont_install
 	echo
 
 if [[ "$cont_install" != [yY] ]]; then
@@ -242,7 +257,7 @@ install_nasm() {
 			hash -r
 		fi
 		# install from official nasm yum repo
-		yum-config-manager --add-repo http://www.nasm.us/nasm.repo
+		yum-config-manager --add-repo https://www.nasm.us/nasm.repo
 		yum -y install nasm --disableplugin=priorities
 	fi
 }
@@ -374,7 +389,7 @@ make install
 make distclean
 
 cd ${OPT}/ffmpeg_sources
-curl -L -O http://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz
+curl -L -O https://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz
 tar xzvf lame-3.99.5.tar.gz
 cd lame-3.99.5
 ./configure --prefix="${OPT}/ffmpeg" --bindir="${OPT}/bin" --enable-shared --enable-nasm
@@ -427,16 +442,57 @@ git clone --depth 1 https://aomedia.googlesource.com/aom libaom
 mkdir -p ${OPT}/ffmpeg_sources/aom_build
 cd aom_build
 # build/cmake/aom_config_defaults.cmake
-cmake3 -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="${OPT}/ffmpeg" -DBUILD_SHARED_LIBS=1 -DENABLE_NASM=on -DENABLE_CCACHE=on ../libaom
+cmake3 -G "Unix Makefiles" -DCMAKE_INSTALL_PREFIX="${OPT}/ffmpeg" -DCMAKE_INSTALL_LIBDIR="lib" -DBUILD_SHARED_LIBS=1 -DENABLE_NASM=on -DENABLE_CCACHE=on ../libaom
 make${MAKETHREADS}
 make install
+fi
+
+if [[ "$ENABLE_DAVONED" = [yY] ]]; then
+  cd ${OPT}/ffmpeg_sources
+  if [[ ! "$(rpm -qa meson)" ]]; then
+    yum -q -y install meson ninja-build SDL2-devel
+  fi
+  if [[ ! "$(rpm -qa ninja-build)" ]]; then
+    yum -q -y install ninja-build
+  fi
+  if [[ ! "$(rpm -qa SDL2-devel)" ]]; then
+    yum -q -y install SDL2-devel
+  fi
+  # if [[ ! "$(rpm -qa libplacebo-devel)" ]]; then
+  #   yum -q -y install libplacebo-devel
+  # fi
+  
+  cd ${OPT}/ffmpeg_sources
+  rm -rf shaderc
+  git clone --depth 1 https://github.com/google/shaderc
+  mkdir -p "${OPT}/ffmpeg_sources/shaderc/build"
+  cd "${OPT}/ffmpeg_sources/shaderc"
+  ./utils/git-sync-deps
+  cd "${OPT}/ffmpeg_sources/shaderc/build"
+  PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" LD_LIBRARY_PATH=${OPT}/ffmpeg/lib LDFLAGS="-L${OPT}/ffmpeg/lib" CPPFLAGS="-I${OPT}/ffmpeg/include" cmake3 -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="${OPT}/ffmpeg" -DCMAKE_INSTALL_LIBDIR="${OPT}/ffmpeg/lib" ../
+  ninja-build install
+  
+  cd ${OPT}/ffmpeg_sources
+  rm -rf libplacebo
+  git clone --depth 1 https://code.videolan.org/videolan/libplacebo.git
+  mkdir -p libplacebo/build
+  cd libplacebo
+  PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" LD_LIBRARY_PATH=${OPT}/ffmpeg/lib LDFLAGS="-L${OPT}/ffmpeg/lib" CPPFLAGS="-I${OPT}/ffmpeg/include" meson build --buildtype release --prefix="${OPT}/ffmpeg" --libdir="${OPT}/ffmpeg/lib"
+  ninja-build -C build install
+  
+  cd ${OPT}/ffmpeg_sources
+  rm -rf dav1d
+  git clone --depth 1 https://code.videolan.org/videolan/dav1d.git
+  cd dav1d
+  PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" LD_LIBRARY_PATH=${OPT}/ffmpeg/lib LDFLAGS="-L${OPT}/ffmpeg/lib" CPPFLAGS="-I${OPT}/ffmpeg/include" meson build --buildtype release --prefix="${OPT}/ffmpeg" --libdir="${OPT}/ffmpeg/lib"
+  ninja-build -C build install
 fi
 
 cd ${OPT}/ffmpeg_sources
 rm -rf ffmpeg
 git clone --depth 1 git://source.ffmpeg.org/ffmpeg
 cd ffmpeg
-LD_LIBRARY_PATH=${OPT}/ffmpeg/lib PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --extra-cflags="${EXTRACFLAG_FPICOPTS} -I${OPT}/ffmpeg/include" --extra-ldflags="-L${OPT}/ffmpeg/lib${LDFLAG_FPIC}" --bindir="${OPT}/bin" --pkg-config-flags="--static" --extra-libs=-lpthread --extra-libs=-lm --enable-gpl${FFMPEG_DEBUGOPT} --enable-nonfree --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265${ENABLE_AVONEOPT}${ENABLE_LIBASSOPT}${ENABLE_ZIMGOPT}${ENABLE_OPENCVOPT} --enable-swscale${ENABLE_FONTCONFIGOPT}${ENABLE_FPICOPT} --enable-shared${DISABLE_FFMPEGNETWORK}
+LD_LIBRARY_PATH=${OPT}/ffmpeg/lib PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --extra-cflags="${EXTRACFLAG_FPICOPTS} -I${OPT}/ffmpeg/include" --extra-ldflags="-L${OPT}/ffmpeg/lib${LDFLAG_FPIC}" --bindir="${OPT}/bin" --pkg-config-flags="--static" --extra-libs=-lpthread --extra-libs=-lm --enable-gpl${FFMPEG_DEBUGOPT} --enable-nonfree --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265${ENABLE_AVONEOPT}${ENABLE_DAVONEDOPT}${ENABLE_LIBASSOPT}${ENABLE_ZIMGOPT}${ENABLE_OPENCVOPT} --enable-swscale${ENABLE_FONTCONFIGOPT}${ENABLE_FPICOPT} --enable-shared${DISABLE_FFMPEGNETWORK}
 make${MAKETHREADS}
 make install
 make distclean
@@ -555,7 +611,7 @@ fi
 cd ${OPT}/ffmpeg_sources/ffmpeg
 make distclean
 git pull
-LD_LIBRARY_PATH=${OPT}/ffmpeg/lib PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --extra-cflags="${EXTRACFLAG_FPICOPTS} -I${OPT}/ffmpeg/include" --extra-ldflags="-L${OPT}/ffmpeg/lib${LDFLAG_FPIC}" --bindir="${OPT}/bin" --pkg-config-flags="--static" --extra-libs=-lpthread --extra-libs=-lm --enable-gpl${FFMPEG_DEBUGOPT} --enable-nonfree --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265${ENABLE_AVONEOPT}${ENABLE_LIBASSOPT}${ENABLE_ZIMGOPT}${ENABLE_OPENCVOPT} --enable-swscale${ENABLE_FONTCONFIGOPT}${ENABLE_FPICOPT} --enable-shared
+LD_LIBRARY_PATH=${OPT}/ffmpeg/lib PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --extra-cflags="${EXTRACFLAG_FPICOPTS} -I${OPT}/ffmpeg/include" --extra-ldflags="-L${OPT}/ffmpeg/lib${LDFLAG_FPIC}" --bindir="${OPT}/bin" --pkg-config-flags="--static" --extra-libs=-lpthread --extra-libs=-lm --enable-gpl${FFMPEG_DEBUGOPT} --enable-nonfree --enable-libfdk-aac --enable-libfreetype --enable-libmp3lame --enable-libopus --enable-libvorbis --enable-libvpx --enable-libx264 --enable-libx265${ENABLE_AVONEOPT}${ENABLE_DAVONEDOPT}${ENABLE_LIBASSOPT}${ENABLE_ZIMGOPT}${ENABLE_OPENCVOPT} --enable-swscale${ENABLE_FONTCONFIGOPT}${ENABLE_FPICOPT} --enable-shared
 make${MAKETHREADS}
 make install
 make distclean
@@ -576,6 +632,18 @@ echo
 echo
 /opt/bin/ffmpeg -formats
 	
+}
+
+phpext_no() {
+  echo
+  echo "The ffmpeg php extension is no longer supported due to developer support ending"
+  echo "If you have ran centmin.sh menu option 19 submenu option 1, then you have installed"
+  echo "ffmpeg binary at /opt/bin/ffmpeg and can use that with some web apps only requiring"
+  echo "pointing to the full path of ffmpeg binary at /opt/bin/ffmpeg"
+  echo
+  if [ -f "${CONFIGSCANDIR}/ffmpeg.ini" ]; then
+    rm -f "${CONFIGSCANDIR}/ffmpeg.ini"
+  fi
 }
 
 phpext() {
@@ -667,7 +735,7 @@ phpext() {
 	else
 		echo ""
 		echo "FFMPEG php extension does not support PHP 7.x"
-		echo ""		
+		echo ""
   fi # php version check
 
 }
@@ -678,7 +746,7 @@ case "$1" in
 		{
 		do_continue
 		install
-		phpext
+		# phpext
 		} 2>&1 | tee ${CENTMINLOGDIR}/centminmod_ffmpeg_install_${DT}.log
 
 endtime=$(TZ=UTC date +%s.%N)
@@ -705,9 +773,9 @@ echo "Total FFMPEG Source Compile Install Time: $INSTALLTIME seconds" >> ${CENTM
 		{
 		# php_quite=$2
 		# if [[ "$php_quite" != 'silent' ]]; then
-			do_continue
+			# do_continue
 		# fi
-		phpext
+		phpext_no
 		} 2>&1 | tee ${CENTMINLOGDIR}/centminmod_ffmpeg_phpext_install_${DT}.log
 
 endtime=$(TZ=UTC date +%s.%N)

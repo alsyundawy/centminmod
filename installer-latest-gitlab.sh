@@ -45,7 +45,8 @@ ALTPCRE_VERSION='8.43'
 ALTPCRELINKFILE="pcre-${ALTPCRE_VERSION}.tar.gz"
 ALTPCRELINK="${LOCALCENTMINMOD_MIRROR}/centminmodparts/pcre/${ALTPCRELINKFILE}"
 
-WGET_VERSION='1.20.1'
+WGET_VERSION='1.20.3'
+WGET_VERSION_SEVEN='1.20.3'
 WGET_FILENAME="wget-${WGET_VERSION}.tar.gz"
 WGET_LINK="https://centminmod.com/centminmodparts/wget/${WGET_FILENAME}"
 
@@ -101,6 +102,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -119,6 +122,13 @@ fi
 
 if [[ -f /etc/system-release && "$(awk '{print $1,$2,$3}' /etc/system-release)" = 'Amazon Linux AMI' ]]; then
     CENTOS_SIX='6'
+fi
+
+if [[ "$CENTOS_SEVEN" -eq '7' ]]; then
+  WGET_VERSION=$WGET_VERSION_SEVEN
+fi
+if [[ "$CENTOS_EIGHT" -eq '8' ]]; then
+  WGET_VERSION=$WGET_VERSION_SEVEN
 fi
 
 if [ -f /proc/user_beancounters ]; then
@@ -214,12 +224,12 @@ else
   ipv_forceopt='4'
 fi
 
-if [[ -f /usr/bin/systemd-detect-virt && "$(/usr/bin/systemd-detect-virt)" = 'lxc' ]] || [[ -f $(which virt-what) && $(virt-what | head -n1) = 'lxc' ]]; then
+if [[ ! -f /proc/user_beancounters && -f /usr/bin/systemd-detect-virt && "$(/usr/bin/systemd-detect-virt)" = 'lxc' ]] || [[ ! -f /proc/user_beancounters && -f $(which virt-what) && $(virt-what | xargs | grep -o lxc) = 'lxc' ]]; then
   CHECK_LXD='y'
 fi
 
 if [[ "$(uname -m)" = 'x86_64' ]]; then
-  if [ ! "$(grep -w 'exclude' /etc/yum.conf)" ]; then
+  if [[ "$CENTOS_SIX" = '6' || "$CENTOS_SEVEN" = '7' ]] && [ ! "$(grep -w 'exclude' /etc/yum.conf)" ]; then
 ex -s /etc/yum.conf << EOF
 :/plugins=1/
 :a
@@ -228,11 +238,22 @@ exclude=*.i386 *.i586 *.i686
 :w
 :q
 EOF
+  elif [[ "$CENTOS_EIGHT" = '8' ]] && [ ! "$(grep -w 'exclude' /etc/yum.conf)" ]; then
+ex -s /etc/yum.conf << EOF
+:/best=True/
+:a
+exclude=*.i686
+.
+:w
+:q
+EOF
   fi
 fi
 
 # some centos images don't even install tar by default !
-if [[ "$CENTOS_SEVEN" = '7' && ! -f /usr/bin/tar ]]; then
+if [[ "$CENTOS_EIGHT" = '8' && ! -f /usr/bin/tar ]]; then
+  yum -y -q install tar
+elif [[ "$CENTOS_SEVEN" = '7' && ! -f /usr/bin/tar ]]; then
   yum -y -q install tar
 elif [[ "$CENTOS_SIX" = '6' && ! -f /bin/tar ]]; then
   yum -y -q install tar
@@ -290,18 +311,26 @@ if [ ! -f /usr/bin/sar ]; then
   else
     SARCALL='/usr/lib/sa/sa1'
   fi
-  if [[ "$CENTOS_SEVEN" != '7' ]]; then
+  if [[ "$CENTOS_SIX" = '6' ]]; then
     sed -i 's|10|5|g' /etc/cron.d/sysstat
     if [ -d /etc/cron.d ]; then
       echo '* * * * * root /usr/lib64/sa/sa1 1 1' > /etc/cron.d/cmsar
     fi
     service sysstat restart
     chkconfig sysstat on
-  else
+  elif [[ "$CENTOS_SEVEN" = '7' ]]; then
     sed -i 's|10|5|g' /etc/cron.d/sysstat
     if [ -d /etc/cron.d ]; then
       echo '* * * * * root /usr/lib64/sa/sa1 1 1' > /etc/cron.d/cmsar
     fi
+    systemctl restart sysstat.service
+    systemctl enable sysstat.service
+  elif [[ "$CENTOS_EIGHT" = '8' ]]; then
+    sed -i 's|10|5|g' /usr/lib/systemd/system/sysstat-collect.timer
+    #if [ -d /etc/cron.d ]; then
+    #  echo '* * * * * root /usr/lib64/sa/sa1 1 1' > /etc/cron.d/cmsar
+    #fi
+    systemctl daemon-reload
     systemctl restart sysstat.service
     systemctl enable sysstat.service
   fi
@@ -311,18 +340,26 @@ elif [ -f /usr/bin/sar ]; then
   else
     SARCALL='/usr/lib/sa/sa1'
   fi
-  if [[ "$CENTOS_SEVEN" != '7' ]]; then
+  if [[ "$CENTOS_SIX" = '6' ]]; then
     sed -i 's|10|5|g' /etc/cron.d/sysstat
     if [ -d /etc/cron.d ]; then
       echo '* * * * * root /usr/lib64/sa/sa1 1 1' > /etc/cron.d/cmsar
     fi
     service sysstat restart
     chkconfig sysstat on
-  else
+  elif [[ "$CENTOS_SEVEN" = '7' ]]; then
     sed -i 's|10|5|g' /etc/cron.d/sysstat
     if [ -d /etc/cron.d ]; then
       echo '* * * * * root /usr/lib64/sa/sa1 1 1' > /etc/cron.d/cmsar
     fi
+    systemctl restart sysstat.service
+    systemctl enable sysstat.service
+  elif [[ "$CENTOS_EIGHT" = '8' ]]; then
+    sed -i 's|10|5|g' /usr/lib/systemd/system/sysstat-collect.timer
+    #if [ -d /etc/cron.d ]; then
+    #  echo '* * * * * root /usr/lib64/sa/sa1 1 1' > /etc/cron.d/cmsar
+    #fi
+    systemctl daemon-reload
     systemctl restart sysstat.service
     systemctl enable sysstat.service
   fi
@@ -339,47 +376,57 @@ if [ -f /proc/user_beancounters ]; then
 elif [[ "$CHECK_LXD" = [yY] ]]; then
     echo "LXC/LXD container system detected, NTP not installed"
 else
-  if [ ! -f /usr/sbin/ntpd ]; then
-    echo "*************************************************"
-    echo "* Installing NTP (and syncing time)"
-    echo "*************************************************"
-    echo "The date/time before was:"
-    date
-    echo
-    time $YUMDNFBIN -y install ntp${DISABLEREPO_DNF}
-    chkconfig ntpd on
-    if [ -f /etc/ntp.conf ]; then
-    if [[ -z "$(grep 'logfile' /etc/ntp.conf)" ]]; then
-        echo "logfile /var/log/ntpd.log" >> /etc/ntp.conf
-        ls -lahrt /var/log | grep 'ntpd.log'
-    fi
-    echo "current ntp servers"
-    NTPSERVERS=$(awk '/server / {print $2}' /etc/ntp.conf | grep ntp.org | sort -r)
-    for s in $NTPSERVERS; do
-      if [ -f /usr/bin/nc ]; then
-        echo -ne "\n$s test connectivity: "
-        if [[ "$(echo | nc -u -w1 $s 53 >/dev/null 2>&1 ;echo $?)" = '0' ]]; then
-        echo " ok"
-        else
-        echo " error"
+  if [[ "$CENTOS_EIGHT" = '8' ]]; then
+      echo
+      time $YUMDNFBIN -y install chrony
+      systemctl start chronyd
+      systemctl enable chronyd
+      systemctl status chronyd
+      echo "current chrony ntp servers"
+      chronyc sources
+  else
+    if [ ! -f /usr/sbin/ntpd ]; then
+      echo "*************************************************"
+      echo "* Installing NTP (and syncing time)"
+      echo "*************************************************"
+      echo "The date/time before was:"
+      date
+      echo
+      time $YUMDNFBIN -y install ntp
+      chkconfig ntpd on
+      if [ -f /etc/ntp.conf ]; then
+        if [[ -z "$(grep 'logfile' /etc/ntp.conf)" ]]; then
+            echo "logfile /var/log/ntpd.log" >> /etc/ntp.conf
+            ls -lahrt /var/log | grep 'ntpd.log'
         fi
+        echo "current ntp servers"
+        NTPSERVERS=$(awk '/server / {print $2}' /etc/ntp.conf | grep ntp.org | sort -r)
+        for s in $NTPSERVERS; do
+          if [ -f /usr/bin/nc ]; then
+            echo -ne "\n$s test connectivity: "
+            if [[ "$(echo | nc -u -w1 $s 53 >/dev/null 2>&1 ;echo $?)" = '0' ]]; then
+            echo " ok"
+            else
+            echo " error"
+            fi
+          fi
+            ntpdate -q $s | tail -1
+            if [[ -f /etc/ntp/step-tickers && -z "$(grep $s /etc/ntp/step-tickers )" ]]; then
+            echo "$s" >> /etc/ntp/step-tickers
+            fi
+        done
+        if [ -f /etc/ntp/step-tickers ]; then
+            echo -e "\nsetup /etc/ntp/step-tickers server list\n"
+            cat /etc/ntp/step-tickers
+        fi
+        service ntpd restart >/dev/null 2>&1
+        echo -e "\ncheck ntpd peers list"
+        ntpdc -p
       fi
-        ntpdate -q $s | tail -1
-        if [[ -f /etc/ntp/step-tickers && -z "$(grep $s /etc/ntp/step-tickers )" ]]; then
-        echo "$s" >> /etc/ntp/step-tickers
-        fi
-    done
-    if [ -f /etc/ntp/step-tickers ]; then
-        echo -e "\nsetup /etc/ntp/step-tickers server list\n"
-        cat /etc/ntp/step-tickers
     fi
-    service ntpd restart >/dev/null 2>&1
-    echo -e "\ncheck ntpd peers list"
-    ntpdc -p
-    fi
-    echo "The date/time is now:"
-    date
   fi
+  echo "The date/time is now:"
+  date
 fi
 
 # only run for CentOS 6.x
@@ -799,6 +846,9 @@ fi
 fi
         ulimit -n 524288
         echo "ulimit -n 524288" >> /etc/rc.local
+        if [[ ! "$(grep '/var/run/php-fpm' /etc/rc.local)" ]]; then
+          echo 'if [ ! -d /var/run/php-fpm/ ]; then mkdir -p /var/run/php-fpm/; fi' >> /etc/rc.local
+        fi
     fi # check if custom open file descriptor limits already exist
 
     if [[ "$CENTOS_SEVEN" = '7' ]]; then
@@ -846,20 +896,21 @@ if [[ ! -f /proc/user_beancounters ]]; then
             fi
 cat >> "/etc/sysctl.d/101-sysctl.conf" <<EOF
 # centminmod added
+kernel.printk=4 1 1 7
 fs.nr_open=12000000
 fs.file-max=9000000
 net.core.wmem_max=16777216
 net.core.rmem_max=16777216
 net.ipv4.tcp_rmem=8192 87380 16777216                                          
 net.ipv4.tcp_wmem=8192 65536 16777216
-net.core.netdev_max_backlog=8192
-net.core.somaxconn=8151
+net.core.netdev_max_backlog=65536
+net.core.somaxconn=65535
 net.core.optmem_max=8192
 net.ipv4.tcp_fin_timeout=10
 net.ipv4.tcp_keepalive_intvl=30
 net.ipv4.tcp_keepalive_probes=3
 net.ipv4.tcp_keepalive_time=240
-net.ipv4.tcp_max_syn_backlog=8192
+net.ipv4.tcp_max_syn_backlog=65536
 net.ipv4.tcp_sack=1
 net.ipv4.tcp_syn_retries=3
 net.ipv4.tcp_synack_retries = 2
@@ -911,20 +962,21 @@ EOF
             fi
 cat >> "/etc/sysctl.conf" <<EOF
 # centminmod added
+kernel.printk=4 1 1 7
 fs.nr_open=12000000
 fs.file-max=9000000
 net.core.wmem_max=16777216
 net.core.rmem_max=16777216
 net.ipv4.tcp_rmem=8192 87380 16777216                                          
 net.ipv4.tcp_wmem=8192 65536 16777216
-net.core.netdev_max_backlog=8192
-net.core.somaxconn=8151
+net.core.netdev_max_backlog=65536
+net.core.somaxconn=65535
 net.core.optmem_max=8192
 net.ipv4.tcp_fin_timeout=10
 net.ipv4.tcp_keepalive_intvl=30
 net.ipv4.tcp_keepalive_probes=3
 net.ipv4.tcp_keepalive_time=240
-net.ipv4.tcp_max_syn_backlog=8192
+net.ipv4.tcp_max_syn_backlog=65536
 net.ipv4.tcp_sack=1
 net.ipv4.tcp_syn_retries=3
 net.ipv4.tcp_synack_retries = 2
@@ -992,7 +1044,7 @@ if [[ ! -f /usr/bin/git || ! -f /usr/bin/bc || ! -f /usr/bin/wget || ! -f /bin/n
   if [[ -f /etc/machine-info && "$(grep -qi 'OVH bhs' /etc/machine-info; echo $?)" -eq '0' ]]; then
     # detected OVH BHS based server so disable slower babylon network mirror
     # https://community.centminmod.com/posts/47320/
-    if [ -f /etc/yum/pluginconf.d/fastestmirror.conf ]; then
+    if [[ "$CENTOS_SEVEN" = '7' && -f /etc/yum/pluginconf.d/fastestmirror.conf ]]; then
       echo "exclude=ca.mirror.babylon.network" >> /etc/yum/pluginconf.d/fastestmirror.conf
       cat /etc/yum/pluginconf.d/fastestmirror.conf
     fi
@@ -1018,7 +1070,7 @@ if [[ ! -f /usr/bin/git || ! -f /usr/bin/bc || ! -f /usr/bin/wget || ! -f /bin/n
     fi
   fi
 
-  if [[ "$CENTOS_SEVEN" = '7' ]]; then
+  if [[ "$CENTOS_SEVEN" = '7' || "$CENTOS_EIGHT" = '8' ]]; then
     if [[ $(rpm -q nmap-ncat >/dev/null 2>&1; echo $?) != '0' ]]; then
       time $YUMDNFBIN -y install nmap-ncat${DISABLEREPO_DNF}
       sar_call
@@ -1032,13 +1084,16 @@ if [[ ! -f /usr/bin/git || ! -f /usr/bin/bc || ! -f /usr/bin/wget || ! -f /bin/n
 
   # ensure ipset doesn't get caught in autoremove list
   # https://community.centminmod.com/posts/48144/
+  KERNEL_NUMERICVER=$(uname -r | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }')
   if [ -f /proc/user_beancounters ]; then
     USER_PKGS=""
+  elif [[ -f /proc/user_beancounters && "$KERNEL_NUMERICVER" -ge '3000000000' ]]; then
+    USER_PKGS=" ipset ipset-devel"  
   else
     USER_PKGS=" ipset ipset-devel"
   fi
 
-  time $YUMDNFBIN -y install virt-what python-devel gawk unzip pyOpenSSL python-dateutil libuuid-devel bc wget lynx screen deltarpm ca-certificates yum-utils bash mlocate subversion rsyslog dos2unix boost-program-options net-tools imake bind-utils libatomic_ops-devel time coreutils autoconf cronie crontabs cronie-anacron gcc gcc-c++ automake libtool make libXext-devel unzip patch sysstat openssh flex bison file libtool-ltdl-devel  krb5-devel libXpm-devel nano gmp-devel aspell-devel numactl lsof pkgconfig gdbm-devel tk-devel bluez-libs-devel iptables* rrdtool diffutils which perl-Test-Simple perl-ExtUtils-Embed perl-ExtUtils-MakeMaker perl-Time-HiRes perl-libwww-perl perl-Crypt-SSLeay perl-Net-SSLeay cyrus-imapd cyrus-sasl-md5 cyrus-sasl-plain strace cmake git net-snmp-libs net-snmp-utils iotop libvpx libvpx-devel t1lib t1lib-devel expect expect-devel readline readline-devel libedit libedit-devel libxslt libxslt-devel openssl openssl-devel curl curl-devel openldap openldap-devel zlib zlib-devel gd gd-devel pcre pcre-devel gettext gettext-devel libidn libidn-devel libjpeg libjpeg-devel libpng libpng-devel freetype freetype-devel libxml2 libxml2-devel glib2 glib2-devel bzip2 bzip2-devel ncurses ncurses-devel e2fsprogs e2fsprogs-devel libc-client libc-client-devel cyrus-sasl cyrus-sasl-devel pam pam-devel libaio libaio-devel libevent libevent-devel recode recode-devel libtidy libtidy-devel net-snmp net-snmp-devel enchant enchant-devel lua lua-devel mailx perl-LWP-Protocol-https OpenEXR-devel OpenEXR-libs atk cups-libs fftw-libs-double fribidi gdk-pixbuf2 ghostscript-devel ghostscript-fonts gl-manpages graphviz gtk2 hicolor-icon-theme ilmbase ilmbase-devel jasper-devel jasper-libs jbigkit-devel jbigkit-libs lcms2 lcms2-devel libICE-devel libSM-devel libXaw libXcomposite libXcursor libXdamage-devel libXfixes-devel libXfont libXi libXinerama libXmu libXrandr libXt-devel libXxf86vm-devel libdrm-devel libfontenc librsvg2 libtiff libtiff-devel libwebp libwebp-devel libwmf-lite mesa-libGL-devel mesa-libGLU mesa-libGLU-devel poppler-data urw-fonts xorg-x11-font-utils${USER_PKGS}${DISABLEREPO_DNF}
+  time $YUMDNFBIN -y install virt-what python-devel gawk unzip pyOpenSSL python-dateutil libuuid-devel sqlite-devel bc wget lynx screen deltarpm ca-certificates yum-utils bash mlocate subversion rsyslog dos2unix boost-program-options net-tools imake bind-utils libatomic_ops-devel time coreutils autoconf cronie crontabs cronie-anacron gcc gcc-c++ automake libtool make libXext-devel unzip patch sysstat openssh flex bison file libtool-ltdl-devel  krb5-devel libXpm-devel nano gmp-devel aspell-devel numactl lsof pkgconfig gdbm-devel tk-devel bluez-libs-devel iptables* rrdtool diffutils which perl-Test-Simple perl-ExtUtils-Embed perl-ExtUtils-MakeMaker perl-Time-HiRes perl-libwww-perl perl-Crypt-SSLeay perl-Net-SSLeay cyrus-imapd cyrus-sasl-md5 cyrus-sasl-plain strace cmake git net-snmp-libs net-snmp-utils iotop libvpx libvpx-devel t1lib t1lib-devel expect expect-devel readline readline-devel libedit libedit-devel libxslt libxslt-devel openssl openssl-devel curl curl-devel openldap openldap-devel zlib zlib-devel gd gd-devel pcre pcre-devel gettext gettext-devel libidn libidn-devel libjpeg libjpeg-devel libpng libpng-devel freetype freetype-devel libxml2 libxml2-devel glib2 glib2-devel bzip2 bzip2-devel ncurses ncurses-devel e2fsprogs e2fsprogs-devel libc-client libc-client-devel cyrus-sasl cyrus-sasl-devel pam pam-devel libaio libaio-devel libevent libevent-devel recode recode-devel libtidy libtidy-devel net-snmp net-snmp-devel enchant enchant-devel lua lua-devel mailx perl-LWP-Protocol-https OpenEXR-devel OpenEXR-libs atk cups-libs fftw-libs-double fribidi gdk-pixbuf2 ghostscript-devel ghostscript-fonts gl-manpages graphviz gtk2 hicolor-icon-theme ilmbase ilmbase-devel jasper-devel jasper-libs jbigkit-devel jbigkit-libs lcms2 lcms2-devel libICE-devel libSM-devel libXaw libXcomposite libXcursor libXdamage-devel libXfixes-devel libXfont libXi libXinerama libXmu libXrandr libXt-devel libXxf86vm-devel libdrm-devel libfontenc librsvg2 libtiff libtiff-devel libwebp libwebp-devel libwmf-lite mesa-libGL-devel mesa-libGLU mesa-libGLU-devel poppler-data urw-fonts xorg-x11-font-utils${USER_PKGS}${DISABLEREPO_DNF}
   sar_call
   # allows curl install to skip checking for already installed yum packages 
   # later on in initial curl installations
@@ -1046,14 +1101,14 @@ if [[ ! -f /usr/bin/git || ! -f /usr/bin/bc || ! -f /usr/bin/wget || ! -f /bin/n
   time $YUMDNFBIN -y install epel-release${DISABLEREPO_DNF}
   sar_call
   if [[ "$CENTOS_SEVEN" = '7' ]]; then
-    time $YUMDNFBIN -y install clang clang-devel jemalloc jemalloc-devel zstd python2-pip libmcrypt libmcrypt-devel libraqm figlet moreutils nghttp2 libnghttp2 libnghttp2-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 glances bash-completion bash-completion-extras mlocate re2c kernel-headers kernel-devel${DISABLEREPO_DNF} --enablerepo=epel
+    time $YUMDNFBIN -y install qrencode jq clang clang-devel jemalloc jemalloc-devel zstd python2-pip libmcrypt libmcrypt-devel libraqm figlet moreutils nghttp2 libnghttp2 libnghttp2-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 bash-completion bash-completion-extras mlocate re2c kernel-headers kernel-devel${DISABLEREPO_DNF} --enablerepo=epel
     libc_fix
     if [ -f /usr/bin/pip ]; then
       PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install --upgrade pip
     fi
     sar_call
   else
-    time $YUMDNFBIN -y install clang clang-devel jemalloc jemalloc-devel zstd python-pip libmcrypt libmcrypt-devel libraqm figlet moreutils nghttp2 libnghttp2 libnghttp2-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 libJudy glances bash-completion bash-completion-extras mlocate re2c kernel-headers kernel-devel cmake28 uw-imap-devel${DISABLEREPO_DNF} --enablerepo=epel
+    time $YUMDNFBIN -y install qrencode jq clang clang-devel jemalloc jemalloc-devel zstd python-pip libmcrypt libmcrypt-devel libraqm figlet moreutils nghttp2 libnghttp2 libnghttp2-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 libJudy bash-completion bash-completion-extras mlocate re2c kernel-headers kernel-devel cmake28 uw-imap-devel${DISABLEREPO_DNF} --enablerepo=epel
     if [ -f /usr/bin/pip ]; then
       PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install --upgrade pip
     fi
@@ -1200,7 +1255,8 @@ cd $INSTALLDIR
 #sed -i "s|PHPREDIS='y'|PHPREDIS='n'|" centmin.sh
 
 # switch from PHP 5.4.41 to 5.6.9 default with Zend Opcache
-PHPVERLATEST=$(curl -${ipv_forceopt}s http://php.net/downloads.php | egrep -o "php\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "php-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | uniq | grep '7.2' | head -n1)
+PHPVERLATEST=$(curl -${ipv_forceopt}sL https://www.php.net/downloads.php| egrep -o "php\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "php-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | uniq | grep '7.2' | head -n1)
+PHPVERLATEST=${PHPVERLATEST:-"7.2.22"}
 sed -i "s|^PHP_VERSION='.*'|PHP_VERSION='$PHPVERLATEST'|" centmin.sh
 sed -i "s|ZOPCACHEDFT='n'|ZOPCACHEDFT='y'|" centmin.sh
 

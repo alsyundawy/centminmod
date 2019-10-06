@@ -60,85 +60,85 @@ phpgeolocation() {
   # determine server geo location country wise and setup php download mirror 
   # closest to that country for faster downloads to speed up installs
   # upgrades
-  # PHP_MIRRORURL='http://php.net'
+  # PHP_MIRRORURL='https://www.php.net'
   # PHPUPGRADE_MIRRORURL='http://php.net'
   
   # Get server's 2 digit country code
   SERVER_COUNTRY=$(curl -${ipv_forceopt}s https://ipinfo.io/geo 2>&1 | sed -e 's|[{}]||' -e 's/\(^"\|"\)//g' -e 's|,||' | egrep -v 'phone|postal|loc' | awk -F ": " '/country/ {print $2}')
 
   if [[ -z "$SERVER_COUNTRY" ]]; then
-    PHP_MIRRORURL="http://php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'AU' ]]; then
     echo "AU server detected"
-    PHP_MIRRORURL="http://au2.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'BR' ]]; then
     echo "BR server detected"
-    PHP_MIRRORURL="http://br2.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'CA' ]]; then
     echo "CA server detected"
-    PHP_MIRRORURL="http://ca1.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'CN' ]]; then
     echo "CN server detected"
-    PHP_MIRRORURL="http://cn2.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'DE' ]]; then
     echo "DE server detected"
-    PHP_MIRRORURL="http://de2.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'FR' ]]; then
     echo "FR server detected"
-    PHP_MIRRORURL="http://fr2.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'GB' ]]; then
     echo "GB server detected"
-    PHP_MIRRORURL="http://uk1.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'HK' ]]; then
     echo "HK server detected"
-    PHP_MIRRORURL="http://hk1.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'ID' ]]; then
     echo "ID server detected"
-    PHP_MIRRORURL="http://id1.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'IN' ]]; then
     echo "IN server detected"
-    PHP_MIRRORURL="http://in3.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'JP' ]]; then
     echo "JP server detected"
-    PHP_MIRRORURL="http://jp2.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'PH' ]]; then
     echo "PH server detected"
-    PHP_MIRRORURL="http://sg2.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'RU' ]]; then
     echo "RU server detected"
-    PHP_MIRRORURL="http://lt1.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'SG' ]]; then
     echo "SG server detected"
-    PHP_MIRRORURL="http://sg2.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'TH' ]]; then
     echo "TH server detected"
-    PHP_MIRRORURL="http://th1.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'US' ]]; then
     echo "US server detected"
-    PHP_MIRRORURL="http://php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   elif [[ "$SERVER_COUNTRY" = 'VN' ]]; then
     echo "VN server detected"
-    PHP_MIRRORURL="http://my1.php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   else
-    PHP_MIRRORURL="http://php.net"
+    PHP_MIRRORURL="https://www.php.net"
     PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
   fi
 }
@@ -566,7 +566,7 @@ libresslgeolocation() {
           curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "$LIBRESSL_LINK" | grep 'HTTP\/' | grep '200'
           LIBRESSL_CURLCHECK=$?
           if [[ "$LIBRESSL_CURLCHECK" != '0' ]]; then
-            LIBRESSL_MIRRORURL="http://mirrors.mit.edu/pub/OpenBSD/LibreSSL"
+            LIBRESSL_MIRRORURL="https://mirrors.mit.edu/pub/OpenBSD/LibreSSL"
             LIBRESSL_LINK="${LIBRESSL_MIRRORURL}/libressl-${LIBRESSL_VERSION}.tar.gz"
             curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "$LIBRESSL_LINK" | grep 'HTTP\/' | grep '200'
             LIBRESSL_CURLCHECK=$?
@@ -615,7 +615,7 @@ libresslgeolocation() {
           curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "$LIBRESSL_LINK" | grep 'HTTP\/' | grep '200'
           LIBRESSL_CURLCHECK=$?
           if [[ "$LIBRESSL_CURLCHECK" != '0' ]]; then
-            LIBRESSL_MIRRORURL="http://mirrors.mit.edu/pub/OpenBSD/LibreSSL"
+            LIBRESSL_MIRRORURL="https://mirrors.mit.edu/pub/OpenBSD/LibreSSL"
             LIBRESSL_LINK="${LIBRESSL_MIRRORURL}/libressl-${LIBRESSL_VERSION}.tar.gz"
             curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "$LIBRESSL_LINK" | grep 'HTTP\/' | grep '200'
             LIBRESSL_CURLCHECK=$?
@@ -637,14 +637,14 @@ if [[ "$PHP_INSTALL" = [yY] ]];
 then
 
     phpgeolocation
-    curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/get/php-${PHP_VERSION}.tar.${PHPEXTSION}/from/this/mirror" | grep 'HTTP\/' | grep '404'
+    curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/distributions/php-${PHP_VERSION}.tar.${PHPEXTSION}" | grep 'HTTP\/' | grep '404'
     PHPGEO_CURLCHECK=$?
-    curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/get/php-${PHP_VERSION}.tar.${PHPEXTSION}/from/this/mirror" | grep 'HTTP\/' | egrep '200|301|302'
+    curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "${PHP_MIRRORURL}/distributions/php-${PHP_VERSION}.tar.${PHPEXTSION}" | grep 'HTTP\/' | egrep '200|301|302'
     PHPGEO_CURLCHECKOK=$?
     # check if download url is 404 not found but also 
     # check for valid status header 200, 301 or 302
     if [[ "$PHPGEO_CURLCHECK" = '0' || "$PHPGEO_CURLCHECKOK" != '0' ]]; then
-        PHP_MIRRORURL="http://php.net"
+        PHP_MIRRORURL="https://www.php.net"
         PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
     fi
     cd "$DIR_TMP"
@@ -653,8 +653,8 @@ then
     if [ -s "php-${PHP_VERSION}.tar.${PHPEXTSION}" ]; then
         cecho "php-${PHP_VERSION}.tar.${PHPEXTSION} found, skipping download..." $boldgreen
     else
-        echo "$DOWNLOADAPP "${PHP_MIRRORURL}/get/php-${PHP_VERSION}.tar.${PHPEXTSION}/from/this/mirror" $AXELPHPTARGZ $WGETRETRY"
-        $DOWNLOADAPP "${PHP_MIRRORURL}/get/php-${PHP_VERSION}.tar.${PHPEXTSION}/from/this/mirror" $AXELPHPTARGZ $WGETRETRY
+        echo "$DOWNLOADAPP "${PHP_MIRRORURL}/distributions/php-${PHP_VERSION}.tar.${PHPEXTSION}" $AXELPHPTARGZ $WGETRETRY"
+        $DOWNLOADAPP "${PHP_MIRRORURL}/distributions/php-${PHP_VERSION}.tar.${PHPEXTSION}" $AXELPHPTARGZ $WGETRETRY
 ERROR=$?
   if [[ "$ERROR" != '0' ]]; then
   cecho "Error: php-${PHP_VERSION}.tar.${PHPEXTSION} download failed." $boldgreen
@@ -674,15 +674,15 @@ ERROR=$?
     checklogdetails
     # exit #$ERROR
     if [[ "$ERROR" -eq '2' ]]; then
-      PHP_MIRRORURL="http://php.net"
+      PHP_MIRRORURL="https://www.php.net"
       PHPUPGRADE_MIRRORURL="$PHP_MIRRORURL"
       rm -rf "php-${PHP_VERSION}.tar.${PHPEXTSION}"
       cecho "Download again php-${PHP_VERSION}.tar.${PHPEXTSION} ..." $boldyellow
       if [ -s "php-${PHP_VERSION}.tar.${PHPEXTSION}" ]; then
         cecho "php-${PHP_VERSION}.tar.${PHPEXTSION} found, skipping download..." $boldgreen
       else
-        echo "$DOWNLOADAPP "${PHP_MIRRORURL}/get/php-${PHP_VERSION}.tar.${PHPEXTSION}/from/this/mirror" $AXELPHPTARGZ $WGETRETRY"
-        $DOWNLOADAPP "${PHP_MIRRORURL}/get/php-${PHP_VERSION}.tar.${PHPEXTSION}/from/this/mirror" $AXELPHPTARGZ $WGETRETRY
+        echo "$DOWNLOADAPP "${PHP_MIRRORURL}/distributions/php-${PHP_VERSION}.tar.${PHPEXTSION}" $AXELPHPTARGZ $WGETRETRY"
+        $DOWNLOADAPP "${PHP_MIRRORURL}/distributions/php-${PHP_VERSION}.tar.${PHPEXTSION}" $AXELPHPTARGZ $WGETRETRY
         ERROR=$?
         if [[ "$ERROR" != '0' ]]; then
           cecho "Error: php-${PHP_VERSION}.tar.${PHPEXTSION} download again failed." $boldgreen
@@ -809,7 +809,7 @@ echo ""
 nginxpgspeedtarball() {
 
   if [[ "$NGINX_PAGESPEED" = [yY] ]]; then
-
+    # NGINX_PAGESPEEDGITMASTER='n'
     cd "$DIR_TMP"
 
     # official github master zip renamed
@@ -817,8 +817,12 @@ nginxpgspeedtarball() {
 
             cecho "Download ${NGX_PAGESPEEDGITLINKFILE} ..." $boldyellow
         if [ -s "${NGX_PAGESPEEDGITLINKFILE}" ]; then
+          echo '#1'
           cecho "${NGX_PAGESPEEDGITLINKFILE} Archive found, skipping download..." $boldgreen
+          echo "ls -lah ${NGX_PAGESPEEDGITLINKFILE}"
+          ls -lah "${NGX_PAGESPEEDGITLINKFILE}"
     else
+          echo '#1'
           echo "wget -c${ipv_forceopt} --progress=bar ${NGX_PAGESPEEDGITLINK} -O ${NGX_PAGESPEEDGITLINKFILE} --tries=3"
           wget -c${ipv_forceopt} --progress=bar "${NGX_PAGESPEEDGITLINK}" -O "${NGX_PAGESPEEDGITLINKFILE}" --tries=3
       ERROR=$?
@@ -831,7 +835,7 @@ nginxpgspeedtarball() {
           #echo ""
         fi
     fi
-    tar xzf "${NGX_PAGESPEEDGITLINKFILE}"
+    tar xvzf "${NGX_PAGESPEEDGITLINKFILE}"
 
     ERROR=$?
       if [[ "$ERROR" != '0' ]]; then
@@ -844,41 +848,50 @@ nginxpgspeedtarball() {
       fi
   fi # NGINX_PAGESPEEDGITMASTER
 
-        cecho "Download ${NGX_PAGESPEEDLINKFILE} ..." $boldyellow
-    if [[ "$NGINX_PAGESPEEDGITMASTER" != [yY] && -s "${NGX_PAGESPEEDLINKFILE}" && "$(tar -tzf ${NGX_PAGESPEEDLINKFILE} >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
-        cecho "${NGX_PAGESPEEDLINKFILE} Archive found, skipping download..." $boldgreen
-    else
-        echo "wget -c${ipv_forceopt} --progress=bar ${NGX_PAGESPEEDLINK} -O ${NGX_PAGESPEEDLINKFILE} --tries=3"
-        wget -c${ipv_forceopt} --progress=bar "${NGX_PAGESPEEDLINK}" -O "${NGX_PAGESPEEDLINKFILE}" --tries=3
-ERROR=$?
-  if [[ "$ERROR" != '0' ]]; then
-  cecho "Error: ${NGX_PAGESPEEDLINKFILE} download failed." $boldgreen
-checklogdetails
-  exit #$ERROR
-else 
-         cecho "Download done." $boldyellow
-#echo ""
-  fi
+if [[ "$NGINX_PAGESPEEDGITMASTER" = [nN] ]]; then
+          rm -rf "${NGX_PAGESPEEDLINKFILE}"
+          cecho "Download ${NGX_PAGESPEEDLINKFILE} ..." $boldyellow
+      if [[ "$NGINX_PAGESPEEDGITMASTER" != [yY] && -s "${NGX_PAGESPEEDLINKFILE}" && "$(tar -tzf ${NGX_PAGESPEEDLINKFILE} >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+          echo '#2'
+          cecho "${NGX_PAGESPEEDLINKFILE} Archive found, skipping download..." $boldgreen
+          echo "ls -lah ${NGX_PAGESPEEDLINKFILE}"
+          ls -lah ${NGX_PAGESPEEDLINKFILE}
+      else
+          echo '#2'
+          echo "wget -c${ipv_forceopt} --progress=bar ${NGX_PAGESPEEDLINK} -O ${NGX_PAGESPEEDLINKFILE} --tries=3"
+          wget -c${ipv_forceopt} --progress=bar "${NGX_PAGESPEEDLINK}" -O "${NGX_PAGESPEEDLINKFILE}" --tries=3
+  ERROR=$?
+    if [[ "$ERROR" != '0' ]]; then
+    cecho "Error: ${NGX_PAGESPEEDLINKFILE} download failed." $boldgreen
+  checklogdetails
+    exit #$ERROR
+  else 
+          cecho "Download done." $boldyellow
+  #echo ""
     fi
-
-tar xzf "${NGX_PAGESPEEDLINKFILE}"
-
-ERROR=$?
-  if [[ "$ERROR" != '0' ]]; then
-  cecho "Error: ${NGX_PAGESPEEDLINKFILE} extraction failed." $boldgreen
-checklogdetails
-  exit #$ERROR
-else 
-         cecho "${NGX_PAGESPEEDLINKFILE} valid file." $boldyellow
-echo ""
-  fi
+      fi
+  
+  tar xvzf "${NGX_PAGESPEEDLINKFILE}"
+  
+  ERROR=$?
+    if [[ "$ERROR" != '0' ]]; then
+    cecho "Error: ${NGX_PAGESPEEDLINKFILE} extraction failed." $boldgreen
+  checklogdetails
+    exit #$ERROR
+  else 
+          cecho "${NGX_PAGESPEEDLINKFILE} valid file." $boldyellow
+  echo ""
+    fi
+fi
 
 # determine top level extracted directory name for $DIR_TMP/${NGX_PAGESPEEDLINKFILE}
 if [[ "$NGINX_PAGESPEEDGITMASTER" = [yY] ]]; then
   # NGXPGSPEED_DIR=$(tar -tzf "$DIR_TMP/${NGX_PAGESPEEDGITLINKFILE}" | head -1 | cut -f1 -d"/")
   NGXPGSPEED_DIR=$(tar -tzf "$DIR_TMP/${NGX_PAGESPEEDLINKFILE}" | head -1 | cut -f1 -d"/")
+  echo "$NGXPGSPEED_DIR"
 else
   NGXPGSPEED_DIR=$(tar -tzf "$DIR_TMP/${NGX_PAGESPEEDLINKFILE}" | head -1 | cut -f1 -d"/")
+  echo "$NGXPGSPEED_DIR"
 fi
 
 #if [[ "$NGINX_PAGESPEEDGITMASTER" = [yY] ]]; then
@@ -898,6 +911,9 @@ fi
       # 1.12+ new method https://github.com/pagespeed/ngx_pagespeed/issues/1337
       PS_BRANCHVER=$(echo $NGXPGSPEED_VER | cut -c1-4| sed -e 's|\.|00|')
       if [[ "$PS_BRANCHVER" -ge '10013' ]]; then
+        if [[ "$(uname -m)" = 'x86_64' && "$PSOL_MIRROR" = [yY] ]] || [[ "$(uname -m)" = 'x86_64' && "$NGINX_PAGESPEEDGITMASTER" = [yY] ]]; then
+          echo 'https://github.com/centminmod/centminmod-ngx-pagespeed/raw/master/downloads/1.13.35.2-x64.tar.gz' > PSOL_BINARY_URL
+        fi
         psol_url=$(scripts/format_binary_url.sh PSOL_BINARY_URL)
         wget -c $psol_url
         ERROR=$?

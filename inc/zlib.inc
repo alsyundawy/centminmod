@@ -77,6 +77,47 @@ install_cfzlib() {
             CLANG='n'
             DEVTOOLSETSEVEN='y'
         fi
+
+    if [[ "$DEVTOOLSETSEVEN" = [yY] && -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1,2 | sed "s|\.|0|")" -gt '407' ]]; then
+        source /opt/rh/devtoolset-7/enable
+        unset CC
+        unset CXX
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        gcc --version
+        g++ --version
+    fi
+
+    if [[ "$DEVTOOLSETEIGHT" = [yY] && -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1,2 | sed "s|\.|0|")" -gt '407' ]]; then
+        source /opt/rh/devtoolset-8/enable
+        unset CC
+        unset CXX
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        gcc --version
+        g++ --version
+    fi
+
+    if [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1,2 | sed "s|\.|0|")" -gt '407' ]]; then
+        source /opt/gcc8/enable
+        unset CC
+        unset CXX
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        gcc --version
+        g++ --version
+    fi
+
+    if [[ "$DEVTOOLSETNINE" = [yY] ]] && [[ -f /opt/gcc9/bin/gcc && -f /opt/gcc9/bin/g++ ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1,2 | sed "s|\.|0|")" -gt '407' ]]; then
+        source /opt/gcc9/enable
+        unset CC
+        unset CXX
+        export CC="ccache gcc"
+        export CXX="ccache g++"
+        gcc --version
+        g++ --version
+    fi
+
         install_cfzlibstartdir=$(pwd)
         echo
         echo "install zlib cloudflare..."
@@ -137,8 +178,8 @@ install_cfzlib() {
                     echo "mysqladmin flush-tables"
                     mysqladmin flush-tables
                     sleep 10s
-                    service mysql status;
-                    service mysql restart;
+                    cmservice mysql status;
+                    cmservice mysql restart;
                 elif [[ "$i" = 'pickup' || "$i" = 'qmgr' ]]; then
                     service postfix status;
                     service postfix restart;
@@ -203,6 +244,26 @@ install_cfzlib() {
         echo
         echo "zlib cloudflare installed"
         echo
+
+    if [[ "$DEVTOOLSETSEVEN" = [yY] && -f /opt/rh/devtoolset-7/root/usr/bin/gcc && -f /opt/rh/devtoolset-7/root/usr/bin/g++ ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1,2 | sed "s|\.|0|")" -gt '407' ]]; then
+      unset CC
+      unset CXX
+    fi
+
+    if [[ "$DEVTOOLSETEIGHT" = [yY] && -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1,2 | sed "s|\.|0|")" -gt '407' ]]; then
+      unset CC
+      unset CXX
+    fi
+
+    if [[ "$DEVTOOLSETEIGHT" = [yY] ]] && [[ -f /opt/gcc8/bin/gcc && -f /opt/gcc8/bin/g++ ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1,2 | sed "s|\.|0|")" -gt '407' ]]; then
+      unset CC
+      unset CXX 
+    fi
+    if [[ "$DEVTOOLSETNINE" = [yY] ]] && [[ -f /opt/gcc9/bin/gcc && -f /opt/gcc9/bin/g++ ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1,2 | sed "s|\.|0|")" -gt '407' ]]; then
+      unset CC
+      unset CXX 
+    fi
+
     fi
 }
 
@@ -241,7 +302,7 @@ install_stdzlib() {
                     echo "mysqladmin flush-tables"
                     mysqladmin flush-tables
                     sleep 10s
-                    service mysql status;
+                    service mysqld status;
                     service mysql restart;
                 elif [[ "$i" = 'pickup' || "$i" = 'qmgr' ]]; then
                     service postfix status;

@@ -45,6 +45,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -101,6 +103,20 @@ return
 starttime=$(TZ=UTC date +%s.%N)
 {
 
+check_pythonthree_six() {
+  if [[ "$CENTOS_SEVEN" -eq '7' ]]; then
+  # if [[ "$(echo "$CENTOSVER" | sed -e 's|\.||g')" -ge '77' ]]; then
+    # CentOS 7.7+ already have native python 3.6 yum packages
+    # via python3 and python3-libs so no longer require EPEL python36 packages
+    if [[ "$CENTOS_SEVEN" -eq '7' && -z "$(rpm -qa python3)" ]]; then
+      yum -q -y install python3
+    fi
+    if [[ "$CENTOS_SEVEN" -eq '7' && -z "$(rpm -qa python3-libs)" ]]; then
+      yum -q -y install python3-libs
+    fi
+  fi
+}
+
 if [[ "$CENTOS_SIX" = '6' ]]; then
     rpm --import https://dl.iuscommunity.org/pub/ius/IUS-COMMUNITY-GPG-KEY
     yum -y install https://centos6.iuscommunity.org/ius-release.rpm
@@ -152,9 +168,64 @@ cecho "*************************************************" $boldgreen
 cecho "Installing Python 3.6" $boldgreen
 cecho "*************************************************" $boldgreen
 
-# install Python 3.4 besides system default Python 2.6
-yum -y install python36u python36u-devel python36u-pip python36u-setuptools python36u-tools --enablerepo=ius
-rpm -ql python36u python36u-devel python36u-pip python36u-setuptools python36u-tools python36u-tkinter | grep bin
+if [[ "$CENTOS_SEVEN" -eq '7' ]]; then
+# if [[ "$(echo "$CENTOSVER" | sed -e 's|\.||g')" -ge '77' ]]; then
+  # prefer CentOS 7.7+ native python3 packages for python 3.6
+    if [[ -f /bin/systemctl && "$(rpm -qa python36u)" ]]; then
+      # remove ius community python36u
+      yum -y remove python36u python36u-devel python36u-pip python36u-setuptools python36u-tools python36u-libs python36u-tkinter
+      if [[ ! "$(rpm -qa cmake3)" || ! "$(rpm -qa cmake3-data)" ]]; then
+        check_pythonthree_six
+        # reinstall removed dependencies from above removed ius community packages
+        yum -y install cmake3 cmake3-data
+      fi
+    fi
+    if [[ -f /bin/systemctl && "$(rpm -qa python36)" ]]; then
+      # remove epel python36
+      yum -y remove python36 python36-devel python36-pip python36-setuptools python36-tools python36-libs python36-tkinter
+      if [[ ! "$(rpm -qa cmake3)" || ! "$(rpm -qa cmake3-data)" ]]; then
+        check_pythonthree_six
+        # reinstall removed dependencies from above removed ius community packages
+        yum -y install cmake3 cmake3-data
+      fi
+    fi
+    yum -y install python3 python3-devel python3-pip python3-setuptools python3-tools python3-libs python3-tkinter
+    rpm -ql python3 python3-devel python3-pip python3-setuptools python3-tools python3-tkinter | grep bin
+    if [[ ! "$(rpm -qa cmake3)" || ! "$(rpm -qa cmake3-data)" ]]; then
+      # reinstall removed dependencies from above removed ius community packages
+      yum -y install cmake3 cmake3-data
+    fi
+# elif [[ "$(echo "$CENTOSVER" | sed -e 's|\.||g')" -lt '77' ]]; then
+#   # install Python 3.6 besides system default Python 2.6
+#   if [[ -f /bin/systemctl && -z "$(rpm -qa python36u)" ]] && [[ -z "$(rpm -qa python36)" ]]; then
+#     # only install python36u if python36 isn't installed
+#     yum -y install python36u python36u-devel python36u-pip python36u-setuptools python36u-tools --enablerepo=ius
+#     rpm -ql python36u python36u-devel python36u-pip python36u-setuptools python36u-tools python36u-tkinter | grep bin
+#   elif [[ -f /bin/systemctl && "$(rpm -qa python36)" && -z "$(rpm -qa python36-tools)" ]]; then
+#     # install epel python36
+#     yum -y install python36 python36-devel python36-pip python36-setuptools python36-tools python36-libs python36-tkinter
+#     rpm -ql python36 python36-devel python36-pip python36-setuptools python36-tools python36-tkinter | grep bin
+#   elif [[ -f /bin/systemctl && -z "$(rpm -qa python36)" ]]; then
+#     # install epel python36
+#     yum -y install python36 python36-devel python36-pip python36-setuptools python36-tools python36-libs python36-tkinter
+#     rpm -ql python36 python36-devel python36-pip python36-setuptools python36-tools python36-tkinter | grep bin
+#   fi
+  
+#   # switch in favour of epel python36 version
+#   # only apply to centos 7 as centos 6 epel doesn't have python36
+#   if [[ -f /bin/systemctl && "$(rpm -qa python36u)" ]]; then
+#     # remove ius community python36u
+#     yum -y remove python36u python36u-devel python36u-pip python36u-setuptools python36u-tools python36u-libs python36u-tkinter
+#     # install epel python36
+#     yum -y install python36 python36-devel python36-pip python36-setuptools python36-tools python36-libs python36-tkinter
+#     rpm -ql python36 python36-devel python36-pip python36-setuptools python36-tools python36-tkinter | grep bin
+#   fi
+#   if [[ ! "$(rpm -qa cmake3)" || ! "$(rpm -qa cmake3-data)" ]]; then
+#     check_pythonthree_six
+#     # reinstall removed dependencies from above removed ius community packages
+#     yum -y install cmake3 cmake3-data
+#   fi
+fi
 
 } 2>&1 | tee ${CENTMINLOGDIR}/python36-install_${DT}.log
 
@@ -162,4 +233,4 @@ endtime=$(TZ=UTC date +%s.%N)
 
 INSTALLTIME=$(echo "scale=2;$endtime - $starttime"|bc )
 echo "" >> ${CENTMINLOGDIR}/python36-install_${DT}.log
-echo "Python 3.5 Install Time: $INSTALLTIME seconds" >> ${CENTMINLOGDIR}/python36-install_${DT}.log
+echo "Python 3.6 Install Time: $INSTALLTIME seconds" >> ${CENTMINLOGDIR}/python36-install_${DT}.log

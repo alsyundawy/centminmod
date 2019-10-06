@@ -28,7 +28,29 @@ SCRIPT_DIR=$(readlink -f $(dirname ${BASH_SOURCE[0]}))
 LOGPATH="${CENTMINLOGDIR}/centminmod_${DT}_nginx_addvhost_nvwp.log"
 USE_NGINXMAINEXTLOGFORMAT='n'
 CLOUDFLARE_AUTHORIGINPULLCERT='https://support.cloudflare.com/hc/en-us/article_attachments/201243967/origin-pull-ca.pem'
-################################################################
+###############################################################
+# Settings for centmin.sh menu option 2 and option 22 for
+# the details of the self-signed SSL certificate that is auto 
+# generated. The default values where vhostname variable is 
+# auto added based on what you input for your site name
+# 
+# -subj "/C=US/ST=California/L=Los Angeles/O=${vhostname}/OU=${vhostname}/CN=${vhostname}"
+# 
+# You can only customise the first 5 variables for 
+# C = Country 2 digit code
+# ST = state 
+# L = Location as in city 
+# 0 = organisation
+# OU = organisational unit
+# 
+# if left blank # defaults to same as vhostname that is your domain
+# if set it overrides that
+SELFSIGNEDSSL_C='US'
+SELFSIGNEDSSL_ST='California'
+SELFSIGNEDSSL_L='Los Angeles'
+SELFSIGNEDSSL_O=''
+SELFSIGNEDSSL_OU=''
+###############################################################
 # Setup Colours
 black='\E[30;40m'
 red='\E[31;40m'
@@ -200,6 +222,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -229,12 +253,13 @@ cmservice() {
       service "${servicename}" "$action"
     fi
   else
-    if [[ "${servicename}" = 'mysql' || "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
+    if [[ "${servicename}" = 'php-fpm' || "${servicename}" = 'nginx' ]]; then
       echo "service ${servicename} $action"
       if [[ "$CMSDEBUG" = [nN] ]]; then
         service "${servicename}" "$action"
       fi
-    else
+    elif [[ "${servicename}" = 'mysql' || "${servicename}" = 'mysqld' ]]; then
+      servicename='mariadb'
       echo "systemctl $action ${servicename}.service"
       if [[ "$CMSDEBUG" = [nN] ]]; then
         systemctl "$action" "${servicename}.service"
@@ -294,7 +319,7 @@ pureftpinstall() {
     if [ "$SECOND_IP" ]; then
       CNIP="$SECOND_IP"
     else
-      CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+      CNIP=$(curl -4s https://ipinfo.io/ip)
     fi
 
 		yum -q -y install pure-ftpd
@@ -390,7 +415,9 @@ fi
 # setup https://community.centminmod.com/threads/13847/
 if [ ! -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
   mkdir -p /usr/local/nginx/conf/ssl/cloudflare/${vhostname}
-  wget $CLOUDFLARE_AUTHORIGINPULLCERT -O origin.crt
+  wget -4 $CLOUDFLARE_AUTHORIGINPULLCERT -O /usr/local/nginx/conf/ssl/cloudflare/${vhostname}/origin.crt
+elif [ -d /usr/local/nginx/conf/ssl/cloudflare/${vhostname} ]; then
+  wget -4 $CLOUDFLARE_AUTHORIGINPULLCERT -O /usr/local/nginx/conf/ssl/cloudflare/${vhostname}/origin.crt
 fi
 
 if [ ! -f /usr/local/nginx/conf/ssl_include.conf ]; then
@@ -424,8 +451,53 @@ else
   SELFSIGNEDSSL_OU="$SELFSIGNEDSSL_OU"
 fi
 
-openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${SELFSIGNEDSSL_O}/OU=${SELFSIGNEDSSL_OU}/CN=${vhostname}"
-openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt
+# self-signed ssl cert with SANs
+cat > /tmp/req.cnf <<EOF
+[req]
+default_bits       = 2048
+distinguished_name = req_distinguished_name
+req_extensions     = v3_req
+prompt = no
+[req_distinguished_name]
+C = ${SELFSIGNEDSSL_C}
+ST = ${SELFSIGNEDSSL_ST}
+L = ${SELFSIGNEDSSL_L}
+O = ${vhostname}
+OU = ${vhostname}
+CN = ${vhostname}
+[v3_req]
+keyUsage = keyEncipherment, dataEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = ${vhostname}
+DNS.2 = www.${vhostname}
+EOF
+
+cat > /tmp/v3ext.cnf <<EOF
+authorityKeyIdentifier=keyid,issuer
+basicConstraints=CA:FALSE
+keyUsage = digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = ${vhostname}
+DNS.2 = www.${vhostname}
+EOF
+
+echo
+cat /tmp/req.cnf
+echo
+cat /tmp/v3ext.cnf
+echo
+openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -config /tmp/req.cnf
+# openssl req -new -newkey rsa:2048 -sha256 -nodes -out ${vhostname}.csr -keyout ${vhostname}.key -subj "/C=${SELFSIGNEDSSL_C}/ST=${SELFSIGNEDSSL_ST}/L=${SELFSIGNEDSSL_L}/O=${vhostname}/OU=${vhostname}/CN=${vhostname}"
+openssl req -noout -text -in ${vhostname}.csr | grep DNS
+openssl x509 -req -days 36500 -sha256 -in ${vhostname}.csr -signkey ${vhostname}.key -out ${vhostname}.crt -extfile /tmp/v3ext.cnf
+# openssl req -x509 -nodes -days 36500 -sha256 -newkey rsa:2048 -keyout ${vhostname}.key -out ${vhostname}.crt -config /tmp/req.cnf
+
+rm -f /tmp/req.cnf
+rm -f /tmp/v3ext.cnf
 
 echo
 cecho "---------------------------------------------------------------" $boldyellow
@@ -489,7 +561,7 @@ PUREGROUP=nginx
     if [ "$SECOND_IP" ]; then
       CNIP="$SECOND_IP"
     else
-      CNIP=$(ip route get 8.8.8.8 | awk 'NR==1 {print $NF}')
+      CNIP=$(curl -4s https://ipinfo.io/ip)
     fi
 if [[ "$PUREFTPD_INSTALLED" = [nN] ]]; then
   pureftpinstall
@@ -1447,7 +1519,7 @@ if (\$request_method = POST) { set \$cache_uri 'null cache'; }
 
 if (\$query_string != "") { set \$cache_uri 'null cache'; }
 
-if (\$request_uri ~* "/(\?add-to-cart=|cart/|my-account/|checkout/|shop/checkout/|store/checkout/|customer-dashboard/|addons/|wp-admin/.*|xmlrpc\.php|wp-.*\.php|index\.php|feed/|sitemap(_index)?\.xml|[a-z0-9_-]+-sitemap([0-9]+)?\.xml)") { set \$cache_uri 'null cache'; }
+if (\$request_uri ~* "/(\?add-to-cart=|cart/|my-account/|checkout/|shop/checkout/|store/checkout/|wp-json/|customer-dashboard/|addons/|wp-admin/.*|xmlrpc\.php|wp-.*\.php|index\.php|feed/|sitemap(_index)?\.xml|[a-z0-9_-]+-sitemap([0-9]+)?\.xml)") { set \$cache_uri 'null cache'; }
 
 if (\$http_cookie ~* "comment_author|wordpress_[a-f0-9]+|wp-postpass|wordpress_logged_in|edd_items_in_cart|woocommerce_items_in_cart|woocommerce_cart_hash|woocommerce_recently_viewed|wc_session_cookie_HASH|wp_woocommerce_session_|wptouch_switch_toggle") { set \$cache_uri 'null cache'; }
 EFF

@@ -11,15 +11,21 @@ phpfpm_setup_systemd() {
     fi
   mkdir -p /etc/systemd/system/php-fpm.service.d
   echo "d      /var/run/php-fpm/         0755 root root" > /etc/tmpfiles.d/php-fpm.conf
+  if [ ! -d /var/run/php-fpm/ ]; then mkdir -p /var/run/php-fpm/; fi
+  if [[ ! "$(grep '/var/run/php-fpm' /etc/rc.local)" ]]; then
+    echo 'if [ ! -d /var/run/php-fpm/ ]; then mkdir -p /var/run/php-fpm/; fi' >> /etc/rc.local
+  fi
 
-  if [ -f /proc/user_beancounters ]; then
+  if [[ -f /proc/user_beancounters || "$(virt-what | grep -o lxc )" = 'lxc' ]]; then
 cat > /etc/systemd/system/php-fpm.service.d/limit.conf <<EOF
 [Service]
 LimitNOFILE=262144
 LimitNPROC=16384
 LimitSTACK=262144
 #LimitNICE=-15
-Nice=-10
+# disable Nice for bug workaround
+# https://community.centminmod.com/threads/17045/
+# Nice=-10
 StartLimitBurst=50
 #CPUShares=1500
 #CPUSchedulingPolicy=fifo

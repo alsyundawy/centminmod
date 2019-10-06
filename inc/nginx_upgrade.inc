@@ -228,7 +228,7 @@ fi
 
 if [[ ! -f "${DIR_TMP}/${NGX_FANCYINDEXLINKFILE}" || ! -f "${DIR_TMP}/${NGX_CACHEPURGEFILE}" || ! -f "${DIR_TMP}/${NGX_ACCESSKEYLINKFILE}" || ! -f "${DIR_TMP}/${NGX_CONCATLINKFILE}" || ! -f "${DIR_TMP}/${OPENSSL_LINKFILE}" || ! -f "${DIR_TMP}/${PCRELINKFILE}" || ! -f "${DIR_TMP}/${NGX_WEBDAVLINKFILE}" || ! -f "${DIR_TMP}/${NGX_HEADERSMORELINKFILE}" || ! -f "${DIR_TMP}/${NGX_STICKYLINKFILE}" || ! -f "${DIR_TMP}/${NGX_UPSTREAMCHECKLINKFILE}" || ! -f "${DIR_TMP}/${NGX_HTTPREDISLINKFILE}" ]] || [[ ! -d "${DIR_TMP}/${NGX_FANCYINDEXDIR}" || ! -d "${DIR_TMP}/${NGX_CACHEPURGEDIR}" || ! -d "${DIR_TMP}/nginx-accesskey-2.0.3" || ! -d "${DIR_TMP}/${NGX_CONCATDIR}" || ! -d "${DIR_TMP}/${OPENSSLDIR}" || ! -d "${DIR_TMP}/${PCRELINKDIR}" || ! -d "${DIR_TMP}/${NGX_WEBDAVLINKDIR}" || ! -d "${DIR_TMP}/${NGX_HEADERSMOREDIR}" || ! -d "${DIR_TMP}/${NGX_STICKYDIR}" || ! -d "${DIR_TMP}/${NGX_UPSTREAMCHECKDIR}" || ! -d "${DIR_TMP}/${NGX_HTTPREDISDIR}" ]]; then
 
-    if [[ "$PARALLEL_MODE" = [yY] ]] && [[ "$(grep "processor" /proc/cpuinfo |wc -l)" -gt '1' ]]; then
+    if [[ "$PARALLEL_MODE" = [yY] ]] && [[ "$(grep -c "processor" /proc/cpuinfo)" -gt '1' ]]; then
         ngxmoduletarball &
         if [[ "$LIBRESSL_SWITCH" = 'n' ]]; then
             openssldownload &
@@ -390,8 +390,17 @@ if [[ "$UALL" = 'y' ]]; then
     ngver=$NGINX_VERSION
     recompileopenssl='n'
 else
-    echo ""
+    echo
+    echo "Current Nginx Version: $(nginx -v 2>&1 | awk -F "/" '{print $2}' | head -n1)"
+    echo
     read -ep "Install which version of Nginx? (version i.e. type $NGINX_VERSION): " ngver
+    echo
+    read -ep "Do you still want to continue? [y/n] " ngx_stillcont
+    echo
+    if [[ "$ngx_stillcont" = [nN] ]];then
+        exit 0
+    fi
+
     service nginx reload >/dev/null 2>&1
 
     # if user forgets to type in nginx version and hits
@@ -564,6 +573,7 @@ fi
                 echo "try again by running centmin.sh menu option 4"
                 echo "make sure you type the correct nginx version"
                 echo "report errors on the forums at community.centminmod.com/forums/8/"
+                echo "with info asked at community.centminmod.com/threads/17778/"
             echo
             free -m
             echo
@@ -598,6 +608,7 @@ fi
             echo "try again by running centmin.sh menu option 4"
             echo "make sure you type the correct nginx version"
             echo "report errors on the forums at community.centminmod.com/forums/8/"
+            echo "with info asked at community.centminmod.com/threads/17778/"
             echo
             free -m
             echo
@@ -652,6 +663,7 @@ fi
   if [ $ERR != 0 ]; then
       echo -e "\n`date`\nError: $ERR, Nginx configure failed\n"
         echo "report errors on the forums at community.centminmod.com/forums/8/"
+        echo "with info asked at community.centminmod.com/threads/17778/"
         echo
         free -m
         echo
@@ -722,6 +734,7 @@ fi
   if [ $ERR != 0 ]; then
       echo -e "\n`date`\nError: $ERR, Nginx make failed\n"
         echo "report errors on the forums at community.centminmod.com/forums/8/"
+        echo "with info asked at community.centminmod.com/threads/17778/"
         echo
         free -m
         echo
@@ -814,6 +827,7 @@ fi
   if [ $ERR != 0 ]; then
       echo -e "\n`date`\nError: $ERR, Nginx wasn't installed properly\n"
         echo "report errors on the forums at community.centminmod.com/forums/8/"
+        echo "with info asked at community.centminmod.com/threads/17778/"
         echo
         free -m
         echo
@@ -970,8 +984,8 @@ find "$DIR_TMP" -maxdepth 1 \( -name 'nginx-1*' ! -name "nginx-${ngver}*" \) -pr
 find "$DIR_TMP" -maxdepth 1 \( -name 'nginx-1*' ! -name "nginx-${ngver}*" \) -exec rm -rf {} \;
 find "$DIR_TMP" -maxdepth 1 \( -name 'ngx_pagespeed*' ! -name "ngx_pagespeed-${NGXPGSPEED_VER}*" \) -print
 find "$DIR_TMP" -maxdepth 1 \( -name 'ngx_pagespeed*' ! -name "ngx_pagespeed-${NGXPGSPEED_VER}*" \) -exec rm -rf {} \;
-find "$DIR_TMP" -maxdepth 1 \( -name 'incubator-pagespeed-ngx*' ! -name "incubator-pagespeed-ngx-${NGXPGSPEED_VER}*" \) -print
-find "$DIR_TMP" -maxdepth 1 \( -name 'incubator-pagespeed-ngx*' ! -name "incubator-pagespeed-ngx-${NGXPGSPEED_VER}*" \) -exec rm -rf {} \;
+find "$DIR_TMP" -maxdepth 1 \( -name 'incubator-pagespeed-ngx*' ! -name "incubator-pagespeed-ngx-${NGXPGSPEED_VER}*" ! -name "incubator-pagespeed-ngx-master" \) -print
+find "$DIR_TMP" -maxdepth 1 \( -name 'incubator-pagespeed-ngx*' ! -name "incubator-pagespeed-ngx-${NGXPGSPEED_VER}*" ! -name "incubator-pagespeed-ngx-master" \) -exec rm -rf {} \;
 find "$DIR_TMP" -maxdepth 1 \( -name 'libressl*' ! -name "libressl-${LIBRESSL_VERSION}*" \) -print
 find "$DIR_TMP" -maxdepth 1 \( -name 'libressl*' ! -name "libressl-${LIBRESSL_VERSION}*" \) -exec rm -rf {} \;
 find "$DIR_TMP" -maxdepth 1 \( -name 'openssl*' ! -name "openssl-${OPENSSL_VERSION}*" \) -print
@@ -1043,7 +1057,9 @@ fi
             /usr/bin/sitestatus on
         fi
     fi
-
+    if [[ "$NGINX_NJS" = [yY] && -f "$DIR_TMP/njs/build/njs" ]]; then
+        cp -af "$DIR_TMP/njs/build/njs" /usr/local/bin/njs
+    fi
     if [ -f "$(which figlet)" ]; then
         figlet -ckf standard "Nginx Updated"
     fi

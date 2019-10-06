@@ -96,6 +96,14 @@ LOAD15=$(cat /proc/loadavg | awk {'print $3'})
 MEM=$(free -m)
 DF=$(df -hT)
 
+if [[ "$FORCE_IPVFOUR" != [yY] ]]; then
+  ipv_forceopt=""
+  ipv_forceopt_wget=""
+else
+  ipv_forceopt='4'
+  ipv_forceopt_wget=' -4'
+fi
+
 motd_output() {
 echo "
 ===============================================================================
@@ -158,7 +166,7 @@ gitenv_askupdate() {
       # if git remote repo url is not same as one defined in giturl.txt then pull a new copy of
       # centmin mod code locally using giturl.txt defined git repo name
       GET_GITVER=$(git --version | awk '{print $3}' | sed -e 's|\.||g' | cut -c1,2)
-      CURL_GITURL=$(curl -s${ipv_forceopt} https://raw.githubusercontent.com/centminmod/centminmod/$(awk -F "=" '/branchname=/ {print $2}' ${CMSCRIPT_GITDIR}/centmin.sh | sed -e "s|'||g" )/giturl.txt)
+      CURL_GITURL=$(curl -sk${ipv_forceopt} https://raw.githubusercontent.com/centminmod/centminmod/$(awk -F "=" '/branchname=/ {print $2}' ${CMSCRIPT_GITDIR}/centmin.sh | sed -e "s|'||g" )/giturl.txt)
       # if git version >1.8 use supported ls-remote --get-url flag otherwise use alternative
       if [[ -d "${CMSCRIPT_GITDIR}" ]]; then
         if [[ "$GET_GITVER" -ge '18' ]]; then

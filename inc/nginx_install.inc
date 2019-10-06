@@ -133,9 +133,6 @@ fi # CENTOS_SEVEN = 7
 #######################################################
 # tcp optimisations
 opt_tcp
-if [[ ! -f /proc/user_beancounters ]]; then
-    sed -i 's/backlog=256/backlog=2048/g' $CM_INSTALLDIR/config/nginx/conf.d/virtual.conf
-fi
 
     # nginx Modules / Prerequisites
   cecho "Installing nginx Modules / Prerequisites..." $boldgreen
@@ -284,6 +281,7 @@ fi
     cp -R $CUR_DIR/htdocs/custom_errorpages/* /usr/local/nginx/html
     #rm -rf $CUR_DIR/htdocs
     cp -R $CUR_DIR/config/nginx/* /usr/local/nginx/conf
+    opt_sslcache silent
 
     #################################################################################
     ngx_dynamicfunction
@@ -362,6 +360,9 @@ geoipphp
     detect_tlsonethree
 
     # zlibsymlink_fix
+    if [[ "$NGINX_NJS" = [yY] && -f "$DIR_TMP/njs/build/njs" ]]; then
+        cp -af "$DIR_TMP/njs/build/njs" /usr/local/bin/njs
+    fi
 
     echo "*************************************************"
     cecho "* nginx installed, Apache disabled" $boldgreen

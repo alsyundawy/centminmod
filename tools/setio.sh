@@ -13,7 +13,7 @@ export LC_CTYPE=en_US.UTF-8
 DT=$(date +"%d%m%y-%H%M%S")
 VER=0.4
 DEBUG='n'
-CPUS=$(grep "processor" /proc/cpuinfo |wc -l)
+CPUS=$(grep -c "processor" /proc/cpuinfo)
 TIME='n'
 MDB_SVER=$(/usr/bin/mysql -V | awk '{print $5}' | cut -d . -f1,2 | head -n1)
 MDB_DATADIRSIZE=$(df $(mysqladmin var | grep datadir | tr -s ' ' | awk '{print $4}') | tail -1 | awk '{print $4}')
@@ -66,6 +66,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -116,7 +118,7 @@ baseinfo() {
 
 fiosetup() {
   cd ${FIOBASEDIR}
-  if [[ ! -f "${FIOBASEDIR}/reads.ini" || ! -f "${FIOBASEDIR}/reads.ini" || ! -f "${FIOBASEDIR}/reads-16k.ini" || ! -f "${FIOBASEDIR}/writes-16k.ini" ]]; then
+  if [[ ! -f "${FIOBASEDIR}/reads.ini" || ! -f "${FIOBASEDIR}/writes.ini" || ! -f "${FIOBASEDIR}/reads-16k.ini" || ! -f "${FIOBASEDIR}/writes-16k.ini" ]]; then
     rm -rf reads.ini writes.ini reads-16k.ini writes-16k.ini
     \cp -f "${SCRIPT_DIR}/config/setio/reads.ini" reads.ini
     \cp -f "${SCRIPT_DIR}/config/setio/writes.ini" writes.ini

@@ -52,8 +52,8 @@ if [[ "$CSFINSTALLOK" = [yY] ]]; then
     echo "CSF adding memcached, varnish ports to csf.allow list..."
     sed -i 's/20,21,22,25,53,80,110,143,443,465,587,993,995/20,21,22,25,53,80,110,111,143,161,443,465,587,993,995,1110,1186,1194,2049,81,9418,30001:50011/g' /etc/csf/csf.conf
 
-sed -i "s/TCP_OUT = \"/TCP_OUT = \"2525,465,111,2049,1110,1194,9418,/g" /etc/csf/csf.conf
-sed -i "s/TCP6_OUT = \"/TCP6_OUT = \"2525,465,/g" /etc/csf/csf.conf
+sed -i "s/TCP_OUT = \"/TCP_OUT = \"8080,2525,465,111,2049,1110,1194,9418,/g" /etc/csf/csf.conf
+sed -i "s/TCP6_OUT = \"/TCP6_OUT = \"8080,2525,465,/g" /etc/csf/csf.conf
 sed -i "s/UDP_IN = \"/UDP_IN = \"67,68,111,2049,1110,33434:33534,/g" /etc/csf/csf.conf
 sed -i "s/UDP_OUT = \"/UDP_OUT = \"67,68,111,2049,1110,33434:33534,/g" /etc/csf/csf.conf
 sed -i "s/DROP_NOLOG = \"67,68,/DROP_NOLOG = \"/g" /etc/csf/csf.conf
@@ -203,9 +203,9 @@ if [[ "$CENTOS_SEVEN" = '7' ]]; then
         # number is whitelisted by firewalld
         FWDDETECTED_PORT=$(awk '/^Port / {print $2}' /etc/ssh/sshd_config)
         if [[ "$FWDDETECTED_PORT" = '22' ]]; then
-          FIREWALLD_PORTS='8080 8888 81 9312 9418 30001-50011'
+          FIREWALLD_PORTS='8080 8888 81 9418 30001-50011'
         else
-          FIREWALLD_PORTS="$FWDDETECTED_PORT 8080 8888 81 9312 9418 30001-50011"
+          FIREWALLD_PORTS="$FWDDETECTED_PORT 8080 8888 81 9418 30001-50011"
         fi
 
         for fp in $FIREWALLD_PORTS

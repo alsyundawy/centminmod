@@ -1,3 +1,97 @@
+symlink_setup_emailnotify() {
+  if [[ -f "${SCRIPT_DIR}/tools/emailnotify.sh" && ! -h /usr/local/bin/emailnotify ]]; then
+    ln -s "${SCRIPT_DIR}/tools/emailnotify.sh" /usr/local/bin/emailnotify >/dev/null 2>&1
+  fi
+}
+
+add_versionlocks() {
+  if [[ ! "$(yum versionlock list | grep 'LibRaw')" ]]; then
+    yum -q versionlock LibRaw >/dev/null 2>&1
+  fi
+}
+
+opt_sslcache() {
+  opt_sslcache_silent=$1
+  # dynamically tune nginx ssl_session_cache based on system detected memory installed
+  TOTALMEM_SSLCACHE=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
+  if [[ "$TOTALMEM_SSLCACHE" -gt '500000' && "$TOTALMEM_SSLCACHE" -le '800000' ]]; then
+    # (20x4000)/(60x60) = 22.22 sessions/sec on 60 min ssl session cache timeout
+    sslcachesize=20
+  elif [[ "$TOTALMEM_SSLCACHE" -gt '800000' && "$TOTALMEM_SSLCACHE" -le '1000000' ]]; then
+    # (40x4000)/(60x60) = 44.44 sessions/sec on 60 min ssl session cache timeout
+    sslcachesize=40
+  elif [[ "$TOTALMEM_SSLCACHE" -gt '1000000' && "$TOTALMEM_SSLCACHE" -le '1880000' ]]; then
+    # (60x4000)/(60x60) = 66.67 sessions/sec on 60 min ssl session cache timeout
+    sslcachesize=60
+  elif [[ "$TOTALMEM_SSLCACHE" -gt '1880000' && "$TOTALMEM_SSLCACHE" -le '2890000' ]]; then
+    # (80x4000)/(60x60) = 88.88 sessions/sec on 60 min ssl session cache timeout
+    sslcachesize=80
+  elif [[ "$TOTALMEM_SSLCACHE" -gt '2890000' && "$TOTALMEM_SSLCACHE" -le '3890000' ]]; then
+    # (150x4000)/(60x60) = 166.67 sessions/sec on 60 min ssl session cache timeout
+    sslcachesize=150
+  elif [[ "$TOTALMEM_SSLCACHE" -gt '3890000' && "$TOTALMEM_SSLCACHE" -le '7800000' ]]; then
+    # (300x4000)/(60x60) = 333.33 sessions/sec on 60 min ssl session cache timeout
+    sslcachesize=300
+  elif [[ "$TOTALMEM_SSLCACHE" -gt '7800000' && "$TOTALMEM_SSLCACHE" -le '15600000' ]]; then
+    # (500x4000)/(60x60) = 555.55 sessions/sec on 60 min ssl session cache timeout
+    sslcachesize=500
+  elif [[ "$TOTALMEM_SSLCACHE" -gt '15600000' && "$TOTALMEM_SSLCACHE" -le '23600000' ]]; then
+    # (1000x4000)/(60x60) = 1,111.11 sessions/sec on 60 min ssl session cache timeout
+    sslcachesize=1000
+  elif [[ "$TOTALMEM_SSLCACHE" -gt '23600000' ]]; then
+    # (2000x4000)/(60x60) = 2,222.22 sessions/sec on 60 min ssl session cache timeout
+    sslcachesize=2000
+  fi
+  if [[ "$NGINX_SSLCACHE_ALLOWOVERRIDE" = [yY] && ! -f /proc/user_beancounters && -f /usr/local/nginx/conf/ssl_include.conf ]]; then
+    # create new nginx shared ssl cache name SSLv2 so not to conflict with any existing
+    # shared ssl cache from existing ssl cache name = SSL
+    sed -i "s|shared:SSL:.*|shared:SSLv2:${sslcachesize}m;|" /usr/local/nginx/conf/ssl_include.conf
+    if [[ "$opt_sslcache_silent" != 'silent' ]]; then
+      service nginx restart >/dev/null 2>&1
+    fi
+  fi
+}
+
+less_console_verbose() {
+  if [ ! -f /proc/user_beancounters ]; then
+    if [[ ! "$(grep 'kernel.printk' /etc/sysctl.d/101-sysctl.conf)" && -f /etc/sysctl.d/101-sysctl.conf ]]; then
+      echo 'kernel.printk=4 1 1 7' >> /etc/sysctl.d/101-sysctl.conf
+      sysctl --system >/dev/null 2>&1
+    elif [[ ! "$(grep 'kernel.printk' /etc/sysctl.conf)" && -f /etc/sysctl.conf && ! -f /etc/sysctl.d/101-sysctl.conf ]]; then
+      echo 'kernel.printk=4 1 1 7' >> /etc/sysctl.conf
+      sysctl -p >/dev/null 2>&1
+    fi
+  fi
+}
+
+mysql_charset_default() {
+  # if you set SET_DEFAULT_MYSQLCHARSET='utf8mb4' in persistent config file
+  # /etc/centminmod/custom_config.inc prior to initial Centmin Mod install
+  # this routine allows changing MariaDB MySQL /etc/my.cnf default characterset
+  # & collation from utf8 defaults to utf8mb4 defaults 
+  # https://community.centminmod.com/posts/76010/
+  if [[ -f /etc/my.cnf && "$SET_DEFAULT_MYSQLCHARSET" = 'utf8mb4' ]]; then
+    sed -i 's|default-character-set=.*|default-character-set=utf8mb4|g' /etc/my.cnf
+    sed -i 's|character-set-server=.*|character-set-server=utf8mb4|g' /etc/my.cnf
+  elif [[ -f /etc/my.cnf && "$SET_DEFAULT_MYSQLCHARSET" = 'utf8' ]]; then
+    sed -i 's|default-character-set=.*|default-character-set=utf8|g' /etc/my.cnf
+    sed -i 's|character-set-server=.*|character-set-server=utf8|g' /etc/my.cnf
+  fi
+}
+
+disable_avahi() {
+  if [[ "$(pgrep avahi)" && -f /usr/lib/systemd/system/avahi-daemon.service ]]; then
+        systemctl disable avahi-daemon.socket avahi-daemon.service >/dev/null 2>&1
+        systemctl mask avahi-daemon.socket avahi-daemon.service >/dev/null 2>&1
+        systemctl stop avahi-daemon.socket avahi-daemon.service >/dev/null 2>&1
+        # systemctl status avahi-daemon.socket avahi-daemon.service >/dev/null 2>&1
+  elif [[ "$(pgrep avahi)" && -f /etc/rc.d/init.d/avahi-daemon ]]; then
+        service avahi-daemon stop >/dev/null 2>&1
+        chkconfig avahi-daemon off >/dev/null 2>&1
+        # service avahi-daemon status >/dev/null 2>&1
+  fi
+}
+
 dft_phpupstream() {
   if [ ! -f /usr/local/nginx/conf/default_phpupstream.conf ]; then
 cat > "/usr/local/nginx/conf/default_phpupstream.conf"<<EOF
@@ -159,22 +253,65 @@ ngx_brotlibuffersfix() {
   fi
 }
 
+python_centossix_sclfix() {
+  if [[ "$CENTOX_SIX" -eq '6' ]]; then
+    if [[ -f /etc/yum.repos.d/CentOS-SCLo-scl.repo && ! "$(grep 'exclude =' /etc/yum.repos.d/CentOS-SCLo-scl.repo)" ]]; then
+      yum-config-manager -q --save --setopt=centos-sclo-sclo.exclude=python27* >/dev/null 2>&1
+    fi
+    if [[ -f /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo && ! "$(grep 'exclude =' /etc/yum.repos.d/CentOS-SCLo-scl-rh.repo)" ]]; then
+      yum-config-manager -q --save --setopt=centos-sclo-rh.exclude=python27* >/dev/null 2>&1
+    fi
+  fi
+}
+
 pip_updates() {
-  if [[ "$(date "+%u")" -eq '4' || "$(date "+%u")" -eq '6' ]]; then
+  if [[ "$(date "+%u")" -eq '3' || "$(date "+%u")" -eq '4' || "$(date "+%u")" -eq '6' ]]; then
     # for glances and psutil as glances is installed via outdated EPEL
     # yum repo but there's a new version available
     if [[ ! -f /usr/bin/python-config ]]; then
       $YUMDNFBIN -q -y install python-devel
     fi
+    if [[ "$CENTOS_SEVEN" -eq '7' && ! -f /usr/lib/python2.7/site-packages/urllib3/packages/ssl_match_hostname ]]; then
+        # $YUMDNFBIN -q -y install python-urllib3 >/dev/null 2>&1
+        # yum -q -y versionlock python-urllib3 >/dev/null 2>&1
+        if [[ ! "$(grep 'python-urllib3' /etc/yum.conf)" ]]; then
+          NEW_PYTHONURLLIB_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) python-urllib3")
+          sed -i "s|^exclude=.*|$NEW_PYTHONURLLIB_EXCLUDES|" /etc/yum.conf
+        fi
+        export CC='gcc'
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade urllib3
+    elif [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/lib/python2.7/site-packages/urllib3/packages/ssl_match_hostname ]]; then
+        CHECK_PIPALL_UPDATES=$(PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip list -o --format columns)
+        CHECK_PIPURLLIBUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -o urllib3)
+        if [[ "$(rpm -qa python-urllib3 | grep -o python-urllib3)" = 'python-urllib3' ]]; then
+          yum -q -y remove python-urllib3 >/dev/null 2>&1
+          yum versionlock delete python-urllib3 >/dev/null 2>&1
+          PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq urllib3
+        fi
+        if [[ ! "$(grep 'python-urllib3' /etc/yum.conf)" ]]; then
+          NEW_PYTHONURLLIB_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) python-urllib3")
+          sed -i "s|^exclude=.*|$NEW_PYTHONURLLIB_EXCLUDES|" /etc/yum.conf
+        fi
+        export CC='gcc'
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade urllib3
+    fi
     if [[ "$CENTOS_SEVEN" -eq '7' && ! -f /usr/bin/pip ]] || [[ "$CENTOS_SIX" -eq '6' &&  ! -f /usr/bin/pip2.7 ]]; then
       if [[ "$CENTOS_SEVEN" -eq '7' ]]; then
         $YUMDNFBIN -q -y install python2-pip >/dev/null 2>&1
         yum -q -y versionlock python2-pip >/dev/null 2>&1
+        if [[ ! "$(grep 'python2-pip' /etc/yum.conf)" ]]; then
+          NEW_PYTHONPIP_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) python2-pip")
+          sed -i "s|^exclude=.*|$NEW_PYTHONPIP_EXCLUDES|" /etc/yum.conf
+        fi
         export CC='gcc'
         PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
       else
         $YUMDNFBIN -q -y install python-pip >/dev/null 2>&1
         yum -q -y versionlock python-pip >/dev/null 2>&1
+        if [[ ! "$(grep 'python-pip' /etc/yum.conf)" ]]; then
+          NEW_PYTHONPIP_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) python-pip")
+          sed -i "s|^exclude=.*|$NEW_PYTHONPIP_EXCLUDES|" /etc/yum.conf
+        fi
         export CC='gcc'
         PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
         if [[ "$CENTOS_SIX" -eq '6' && -f "${SCRIPT_DIR}/addons/python27_install.sh" && ! -f /usr/bin/pip2.7 ]]; then
@@ -203,21 +340,73 @@ pip_updates() {
       CHECK_PIPUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -o pip)
       CHECK_PSUTILUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -o psutil)
       CHECK_GLANCESUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -io glances)
+      if [[ "$(yum versionlock list | grep 'python2-pip')" ]]; then
+        if [[ ! "$(grep 'python2-pip' /etc/yum.conf)" ]]; then
+          NEW_PYTHONPIP_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) python2-pip")
+          sed -i "s|^exclude=.*|$NEW_PYTHONPIP_EXCLUDES|" /etc/yum.conf
+        fi
+      fi
       if [[ "$CHECK_PIPUPDATE" = 'pip' ]]; then
         export CC='gcc'
         PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade pip
         yum -q -y versionlock python2-pip >/dev/null 2>&1
+        if [[ ! "$(grep 'python2-pip' /etc/yum.conf)" ]]; then
+          NEW_PYTHONPIP_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) python2-pip")
+          sed -i "s|^exclude=.*|$NEW_PYTHONPIP_EXCLUDES|" /etc/yum.conf
+        fi
       fi
       if [[ "$CHECK_PSUTILUPDATE" = 'psutil' ]]; then
         export CC='gcc'
         if [[ "$(rpm -qa python2-psutil | grep -o python2-psutil)" = 'python2-psutil' ]]; then
           yum -q -y remove python2-psutil >/dev/null 2>&1
+          # yum -q -y versionlock python2-psutil >/dev/null 2>&1
+          if [[ ! "$(grep 'python2-psutil' /etc/yum.conf)" ]]; then
+            NEW_PYTHONPSUTIL_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) python2-psutil")
+            sed -i "s|^exclude=.*|$NEW_PYTHONPSUTIL_EXCLUDES|" /etc/yum.conf
+          fi
         fi
         PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade psutil
       fi
       if [[ "$CHECK_GLANCESUPDATE" = 'Glances' ]]; then
         export CC='gcc'
         PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install -qqq --upgrade glances
+      fi
+    fi
+    if [[ "$CENTOS_SIX" -eq '6' && -f /usr/bin/pip2.7 && -f /usr/bin/python2.7-config ]]; then
+      CHECK_PIPALL_UPDATES=$(PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 list -o --format columns)
+      CHECK_PIPUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -o pip)
+      CHECK_PSUTILUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -o psutil)
+      CHECK_GLANCESUPDATE=$(echo "$CHECK_PIPALL_UPDATES" | grep -io glances)
+      if [[ "$(yum versionlock list | grep 'python-pip')" ]]; then
+        if [[ ! "$(grep 'python-pip' /etc/yum.conf)" ]]; then
+          NEW_PYTHONPIP_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) python-pip")
+          sed -i "s|^exclude=.*|$NEW_PYTHONPIP_EXCLUDES|" /etc/yum.conf
+        fi
+      fi
+      if [[ "$CHECK_PIPUPDATE" = 'pip' ]]; then
+        export CC='gcc'
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 install -qqq --upgrade pip
+        yum -q -y versionlock python-pip >/dev/null 2>&1
+        if [[ ! "$(grep 'python-pip' /etc/yum.conf)" ]]; then
+          NEW_PYTHONPIP_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) python-pip")
+          sed -i "s|^exclude=.*|$NEW_PYTHONPIP_EXCLUDES|" /etc/yum.conf
+        fi
+      fi
+      if [[ "$CHECK_PSUTILUPDATE" = 'psutil' ]]; then
+        export CC='gcc'
+        if [[ "$(rpm -qa python-psutil | grep -o python-psutil)" = 'python-psutil' ]]; then
+          yum -q -y remove python-psutil >/dev/null 2>&1
+          # yum -q -y versionlock python-psutil >/dev/null 2>&1
+          if [[ ! "$(grep 'python-psutil' /etc/yum.conf)" ]]; then
+            NEW_PYTHONPSUTIL_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.conf) python-psutil")
+            sed -i "s|^exclude=.*|$NEW_PYTHONPSUTIL_EXCLUDES|" /etc/yum.conf
+          fi
+        fi
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 install -qqq --upgrade psutil
+      fi
+      if [[ "$CHECK_GLANCESUPDATE" = 'Glances' ]]; then
+        export CC='gcc'
+        PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip2.7 install -qqq --upgrade glances
       fi
     fi
   fi
@@ -233,7 +422,7 @@ march_hostcheck() {
   # smarter detection of cloud vps providers who run a mix of different
   # cpu models to prevent issues when you switch host nodes with differing 
   # cpu models causing seg faults for nginx and php-fpm
-  VPS_ASNCHECK=$(curl -s https://ipinfo.io/org)
+  VPS_ASNCHECK=$(curl -4s https://ipinfo.io/org)
   if [[ "$(echo "${VPS_ASNCHECK}" | egrep -i -o 'upcloud|linode|digitalocean|vultr|choopa')" && "$MARCH_TARGETNATIVE_ALWAYS" != [yY] ]]; then
     MARCH_TARGETNATIVE='n'
     NGX_GSPLITDWARF='n'
@@ -317,17 +506,21 @@ nginxlargefile_fix() {
       # auto calculate client_max_body_size size and auto tune in nginx.conf to largest file
       # detected in /home/nginx/domains/*/public vhost public web roots and is greater than
       # the size of the existing nginx.conf set client_max_body_size directive only
-      GET_CLIENTMAXBODY=$(awk '/client_max_body_size/ {print $2}' /usr/local/nginx/conf/nginx.conf)
+      GET_CLIENTMAXBODY=$(awk '/client_max_body_size/ {print $2}' /usr/local/nginx/conf/nginx.conf | grep -v '#')
       if [[ "$(echo $GET_CLIENTMAXBODY | grep 'm')" ]]; then
-        GET_CLIENTMAXBODYSIZE=$(($(awk '/client_max_body_size/ {print $2}' /usr/local/nginx/conf/nginx.conf | sed -e 's|m;||')))
+        GET_CLIENTMAXBODYSIZE=$(($(awk '/client_max_body_size/ {print $2}' /usr/local/nginx/conf/nginx.conf | grep -v '#' | sed -e 's|m;||'| head -n1)))
         CLIENTMAXBODYSIZEMB="$GET_CLIENTMAXBODYSIZE"
         CLIENTMAXBODYSIZEKB=$(($GET_CLIENTMAXBODYSIZE * 1024))
       elif [[ "$(echo $GET_CLIENTMAXBODY | grep 'k')" ]]; then
-        GET_CLIENTMAXBODYSIZE=$(($(awk '/client_max_body_size/ {print $2}' /usr/local/nginx/conf/nginx.conf | sed -e 's|k;||')))
+        GET_CLIENTMAXBODYSIZE=$(($(awk '/client_max_body_size/ {print $2}' /usr/local/nginx/conf/nginx.conf | grep -v '#' | sed -e 's|k;||'| head -n1)))
         CLIENTMAXBODYSIZEMB=$(($GET_CLIENTMAXBODYSIZE / 1024))
         CLIENTMAXBODYSIZEKB="$GET_CLIENTMAXBODYSIZE"
       fi
-      CHECKMAXFILESIZE_VHOSTS=$(find /home/nginx/domains/*/public -maxdepth 4 -size +"${CLIENTMAXBODYSIZEMB}"M -type f -printf '%s %p\n'|sort -nr|awk 'NR == 1 {print $1}')
+      if [[ -z "$(find /home/nginx/domains/ -maxdepth 1 -type d \( ! -wholename /home/nginx/domains/ \))" || -z "$CLIENTMAXBODYSIZEMB" ]]; then
+        CHECKMAXFILESIZE_VHOSTS=0
+      else
+        CHECKMAXFILESIZE_VHOSTS=$(find /home/nginx/domains/*/public -maxdepth 4 -size +"${CLIENTMAXBODYSIZEMB}"M -type f -printf '%s %p\n'|sort -nr|awk 'NR == 1 {print $1}')
+      fi
       if [[ "$CHECKMAXFILESIZE_VHOSTS" -ge '1' ]]; then
         MAXFILESIZE_VHOSTS=$(echo $(($CHECKMAXFILESIZE_VHOSTS * 1024 / 1000 / 1024)))
         CLIENTMAXBODYSIZEKB_THRESHOLD='5242880'
@@ -539,18 +732,25 @@ update_cmdshortcuts() {
 
 update_nginxconf() {
   if [[ -f /usr/local/nginx/conf/nginx.conf && "$NGINX_ALLOWOVERRIDE" = [yY] ]]; then
-    NGX_WRKCON=$(grep -w 'worker_connections' /usr/local/nginx/conf/nginx.conf | column -t| tr -s " " | sed -e 's|;||g' | awk '{print $2}' | grep -v 'worker_connections')
-    NGX_KT=$(grep -w 'keepalive_timeout' /usr/local/nginx/conf/nginx.conf | column -t| tr -s " " | sed -e 's|;||g' | awk '{print $2}'| grep -v keep)
+    NGX_WRKCON=$(grep -w 'worker_connections' /usr/local/nginx/conf/nginx.conf | column -t| tr -s " " | sed -e 's|;||g' | awk '{print $2}' | grep -v 'worker_connections'| head -n1)
+    NGX_KEEPALIVEREQUESTS=$(grep -w 'keepalive_requests' /usr/local/nginx/conf/nginx.conf | column -t| tr -s " " | sed -e 's|;||g' | awk '{print $2}' | grep -v 'keepalive_requests'| head -n1)
+    NGX_KT=$(grep -w 'keepalive_timeout' /usr/local/nginx/conf/nginx.conf | column -t| tr -s " " | sed -e 's|;||g' | awk '{print $2}'| grep -v keep| head -n1)
     # adjust to new default higher values only if previous defaults are detected
     # do not adjust if end user has changed values from previous defaults
-    if [[ "$NGX_WRKCON" -eq '4096' || "$NGX_WRKCON" -eq '10000' ]]; then
-      sed -i 's|worker_connections .*|worker_connections  50000;|' /usr/local/nginx/conf/nginx.conf
+    if [[ "$NGX_KEEPALIVEREQUESTS" -eq '500' ]]; then
+      sed -i 's|keepalive_requests .*|keepalive_requests  5000;|' /usr/local/nginx/conf/nginx.conf
+    fi
+    if [[ "$NGX_KEEPALIVEREQUESTS" -eq '1000' ]]; then
+      sed -i 's|keepalive_requests .*|keepalive_requests  5000;|' /usr/local/nginx/conf/nginx.conf
+    fi
+    if [[ "$NGX_WRKCON" -eq '4096' || "$NGX_WRKCON" -eq '10000' || "$NGX_WRKCON" -eq '50000' || "$NGX_WRKCON" -eq '80000' ]]; then
+      sed -i 's|worker_connections .*|worker_connections  100000;|' /usr/local/nginx/conf/nginx.conf
     fi
     if [[ "$(echo $NGX_KT | grep -o 's')" = 's' ]]; then
       NGX_KT=$(echo $NGX_KT | sed -e 's|s||g')
     fi
-    if [[ "$NGX_KT" -eq '8' ]]; then
-      sed -i 's|keepalive_timeout .*|keepalive_timeout  5s;|' /usr/local/nginx/conf/nginx.conf
+    if [[ "$NGX_KT" = '8s' ]]; then
+      sed -i 's|keepalive_timeout .*|keepalive_timeout  10s;|' /usr/local/nginx/conf/nginx.conf
     fi
   fi
 }
@@ -721,6 +921,32 @@ fixlshw_rpmforge() {
     NEW_LSHWEXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.repos.d/rpmforge.repo) lshw")
     sed -i "s|^exclude=.*|$NEW_LSHWEXCLUDES|" /etc/yum.repos.d/rpmforge.repo
     # yum -y swap -- remove lshw -- install lshw --disablerepo=rpmforge
+    fi
+  fi
+}
+
+fixnoarch_percona() {
+  if [[ "$(yum-config-manager percona-release-noarch | awk '/enabled = / {print $3}')" != 'False' ]]; then
+    yum-config-manager --disable percona-release-noarch >/dev/null 2>&1
+  fi
+}
+
+fixsysbench_percona() {
+  # prevent sysbench install via percona-release yum repo
+  if [[ -f /etc/yum.repos.d/percona-release.repo && "$(grep '^exclude=' /etc/yum.repos.d/percona-release.repo | grep sysbench > /dev/null 2>&1; echo $?)" = '1' ]]; then
+    if [[ "$(grep '^exclude=' /etc/yum.repos.d/percona-release.repo > /dev/null 2>&1; echo $?)" = '0' ]]; then
+    NEW_SYSBENCH_EXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.repos.d/percona-release.repo) sysbench")
+    sed -i "s|^exclude=.*|$NEW_SYSBENCH_EXCLUDES|" /etc/yum.repos.d/percona-release.repo
+    fi
+  fi
+}
+
+fixpercona_epel() {
+  # prevent percona-xtrabackup install via epel yum repo
+  if [[ -f /etc/yum.repos.d/epel.repo && "$(grep '^exclude=' /etc/yum.repos.d/epel.repo | grep percona-xtrabackup > /dev/null 2>&1; echo $?)" = '1' ]]; then
+    if [[ "$(grep '^exclude=' /etc/yum.repos.d/epel.repo > /dev/null 2>&1; echo $?)" = '0' ]]; then
+    NEW_XTRABACKUPEXCLUDES=$(echo "$(grep '^exclude=' /etc/yum.repos.d/epel.repo) percona-xtrabackup")
+    sed -i "s|^exclude=.*|$NEW_XTRABACKUPEXCLUDES|" /etc/yum.repos.d/epel.repo
     fi
   fi
 }
@@ -920,9 +1146,9 @@ gitenv_askupdate() {
       # https://github.com/centminmod/centminmod/raw/${branchname}/giturl.txt
       # check if you can properly resolve raw.githubusercontent.com first in case of dns outpages
       # issues at github end https://community.centminmod.com/threads/centmin-mod-github-com-repo-504-timeouts.9232/
-      CURL_GITURLCHECKER=$(curl -s${ipv_forceopt} https://raw.githubusercontent.com/centminmod/centminmod/${branchname}/giturl.txt >/dev/null 2>&1; echo $?)
+      CURL_GITURLCHECKER=$(curl -sk${ipv_forceopt} https://raw.githubusercontent.com/centminmod/centminmod/${branchname}/giturl.txt >/dev/null 2>&1; echo $?)
       if [[ "$CURL_GITURLCHECKER" = '0' ]]; then
-        CURL_GITURL=$(curl -s${ipv_forceopt} https://raw.githubusercontent.com/centminmod/centminmod/${branchname}/giturl.txt)
+        CURL_GITURL=$(curl -sk${ipv_forceopt} https://raw.githubusercontent.com/centminmod/centminmod/${branchname}/giturl.txt)
       else
         # just default to https://github.com/centminmod/centminmod.git if can not resolve the
         # https://raw.githubusercontent.com/centminmod/centminmod/${branchname}/giturl.txt
@@ -974,6 +1200,9 @@ gitenv_askupdate() {
 }
 
 wgetver_check() {
+  if [[ "$CENTOS_SEVEN" -eq '7' ]]; then
+    WGET_VERSION=$WGET_VERSION_SEVEN
+  fi
   # only check if on 64bit OS
   if [[ "$(uname -m)" = 'x86_64' ]]; then
     if [[ "$(wget -V | head -n1 | awk '{print $3}' | grep -q ${WGET_VERSION} >/dev/null 2>&1; echo $?)" != '0' ]] || [[ "$(pcre-config --version | grep -q ${PCRE_VERSION} >/dev/null 2>&1; echo $?)" != '0' ]]; then
@@ -1085,8 +1314,16 @@ yumupdatechecker() {
       YENABLEREPOS=""
       YEXCLUDE='nginx* php* mysql*'
     fi
-    YYUM_PARAMETER="--disableplugin=priorities${VERSIONLOCK_REPO}"
-    YYUM_UPDATEPARAMETER="--disableplugin=priorities"
+    YYUM_PARAMETER="--disableplugin=priorities${VERSIONLOCK_REPO} --setopt=deltarpm=0"
+    YYUM_UPDATEPARAMETER="--disableplugin=priorities --setopt=deltarpm=0"
+    # if IUS Community python34u, python35u or python36u packages installed from addons installers
+    # ensure that system/EPEL versions of python34 and python36 are excluded from yum list & yum updates
+    if [[ "$(yum list installed python34u* python35u* python36u* -q --exclude=python* 2>&1 | grep -v Installed | grep -v 'No matching Packages' | tr -s ' ' | column -t)" ]]; then
+      PROMPT_FOR_BASE_PYTHON='y'
+      YUM_EXCLUDE_PYTHON=' --exclude=python34-*,python35-*,python36-*'
+    else
+      YUM_EXCLUDE_PYTHON=""
+    fi
     echo
     echo " checking for YUM updates... please wait..."
     # only check if last yum update was over 24hrs ago
@@ -1096,13 +1333,17 @@ yumupdatechecker() {
     SEC_SINCELASTUPDATE=$(echo ${TODAY_EPOCHDATE} - ${LASTYUMCHECK_EPOCHDATE} | bc)
     # SEC_SINCEHISTORYLASTUPDATE=$(echo ${TODAY_EPOCHDATE} - ${LASTYUMHISTORYCHECK_EPOCHDATE} | bc)
     if [[ -f /etc/yum.repos.d/remi.repo || -f /etc/yum.repos.d/city-fan.org.repo ]]; then
-      if [[ "${SEC_SINCELASTUPDATE}" -gt '86400' ]]; then
-        UPDATE_CHECK=$(/usr/bin/yum $YYUM_PARAMETER -e 0 -d 0 check-update --enablerepo=$YENABLEREPOS --exclude="$YEXCLUDE" 1> /dev/null 2>&1; echo $?)
+      if [[ "$MENUEXIT_ALWAYS_YUMCHECK" = [yY] ]]; then
+        UPDATE_CHECK=$(/usr/bin/yum $YYUM_PARAMETER -e 0 -d 0 check-update --enablerepo=${YENABLEREPOS}${YUM_EXCLUDE_PYTHON} --exclude="$YEXCLUDE" 1> /dev/null 2>&1; echo $?)
+      elif [[ "$MENUEXIT_ALWAYS_YUMCHECK" != [yY] && "${SEC_SINCELASTUPDATE}" -gt '86400' ]]; then
+        UPDATE_CHECK=$(/usr/bin/yum $YYUM_PARAMETER -e 0 -d 0 check-update --enablerepo=${YENABLEREPOS}${YUM_EXCLUDE_PYTHON} --exclude="$YEXCLUDE" 1> /dev/null 2>&1; echo $?)
       else
         UPDATE_CHECK=1
       fi
     else
-      if [[ "${SEC_SINCELASTUPDATE}" -gt '86400' ]]; then
+      if [[ "$MENUEXIT_ALWAYS_YUMCHECK" = [yY] ]]; then
+        UPDATE_CHECK=$(/usr/bin/yum $YYUM_PARAMETER -e 0 -d 0 check-update --enablerepo=${YENABLEREPOS}${YUM_EXCLUDE_PYTHON} --exclude="$YEXCLUDE" 1> /dev/null 2>&1; echo $?)
+      elif [[ "$MENUEXIT_ALWAYS_YUMCHECK" != [yY] && "${SEC_SINCELASTUPDATE}" -gt '86400' ]]; then
         UPDATE_CHECK=$(/usr/bin/yum $YYUM_PARAMETER -e 0 -d 0 check-update --exclude="$YEXCLUDE" 1> /dev/null 2>&1; echo $?)
       else
         UPDATE_CHECK=1
@@ -1121,21 +1362,29 @@ yumupdatechecker() {
       cecho "  To list available YUM Updates type: " $boldyellow
       cecho "-------------------------------------------------------------" $boldgreen
       if [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]] && [[ -f /usr/bin/php56 || -f /usr/bin/php70 || -f /usr/bin/php71 || -f /usr/bin/php72 || -f /usr/bin/php73 ]]; then
-        echo "  yum list updates $YYUM_PARAMETER --enablerepo=$YENABLEREPOS --disableexcludes=main,remi"
+        echo "  yum list updates $YYUM_PARAMETER --enablerepo=${YENABLEREPOS}${YUM_EXCLUDE_PYTHON} --disableexcludes=main,remi"
       elif [[ -f /etc/yum.repos.d/remi.repo || -f /etc/yum.repos.d/city-fan.org.repo ]]; then
-        echo "  yum list updates $YYUM_PARAMETER --enablerepo=$YENABLEREPOS"
+        echo "  yum list updates $YYUM_PARAMETER --enablerepo=${YENABLEREPOS}${YUM_EXCLUDE_PYTHON}"
       else
         echo "  yum list updates $YYUM_PARAMETER"
+      fi
+      if [[ -f /usr/local/bin/kernel-update && "$(uname -r | grep -o elrepo)" = 'elrepo' ]]; then
+        echo
+        cecho "-------------------------------------------------------------" $boldgreen
+        cecho "  To Check For ELRepo Kernel Updates type: " $boldyellow
+        cecho "-------------------------------------------------------------" $boldgreen
+        echo "/usr/local/bin/kernel-update"
+        echo
       fi
       cecho "-------------------------------------------------------------" $boldgreen
       cecho "  Following Updates are available: " $boldyellow
       cecho "-------------------------------------------------------------" $boldgreen
       if [[ -f /etc/yum.repos.d/remi.repo && -f /etc/yum.repos.d/city-fan.org.repo ]] && [[ -f /usr/bin/php56 || -f /usr/bin/php70 || -f /usr/bin/php71 || -f /usr/bin/php72 || -f /usr/bin/php73 ]]; then
-        yum -q list updates $YYUM_PARAMETER --enablerepo=$YENABLEREPOS --disableexcludes=main,remi | grep -v 'Updated Packages' | tee "/root/centminlogs/yumcheck-imagemagick6-$DT.txt"
+        yum -q list updates $YYUM_PARAMETER --enablerepo=${YENABLEREPOS}${YUM_EXCLUDE_PYTHON} --disableexcludes=main,remi | grep -v 'Updated Packages' | tee "/root/centminlogs/yumcheck-imagemagick6-$DT.txt"
         IMAGEMAGICK_UPDATECHECK=$(grep ImageMagick6 "/root/centminlogs/yumcheck-imagemagick6-$DT.txt" >/dev/null 2>&1; echo $?)
         rm -rf "/root/centminlogs/yumcheck-imagemagick6-$DT.txt"
       elif [[ -f /etc/yum.repos.d/remi.repo || -f /etc/yum.repos.d/city-fan.org.repo ]]; then
-        yum -q list updates $YYUM_PARAMETER --enablerepo=$YENABLEREPOS | grep -v 'Updated Packages' | tee "/root/centminlogs/yumcheck-imagemagick6-$DT.txt"
+        yum -q list updates $YYUM_PARAMETER --enablerepo=${YENABLEREPOS}${YUM_EXCLUDE_PYTHON} | grep -v 'Updated Packages' | tee "/root/centminlogs/yumcheck-imagemagick6-$DT.txt"
         IMAGEMAGICK_UPDATECHECK=$(grep ImageMagick6 "/root/centminlogs/yumcheck-imagemagick6-$DT.txt" >/dev/null 2>&1; echo $?)
         rm -rf "/root/centminlogs/yumcheck-imagemagick6-$DT.txt"
       else
@@ -1153,19 +1402,30 @@ yumupdatechecker() {
           echo "  run centmin.sh menu option 15 to update imagick PHP ext then run: "
           echo
         fi
-        echo "  yum update $YYUM_UPDATEPARAMETER --enablerepo=$YENABLEREPOS --disableexcludes=main,remi"
+        echo "  yum update $YYUM_UPDATEPARAMETER --enablerepo=${YENABLEREPOS}${YUM_EXCLUDE_PYTHON} --disableexcludes=main,remi"
       elif [[ -f /etc/yum.repos.d/remi.repo || -f /etc/yum.repos.d/city-fan.org.repo ]]; then
         if [ "$IMAGEMAGICK_UPDATECHECK" -eq '0' ]; then
           echo "  run centmin.sh menu option 15 to update imagick PHP ext then run: "
           echo
         fi
-        echo "  yum update $YYUM_UPDATEPARAMETER --enablerepo=$YENABLEREPOS"
+        echo "  yum update $YYUM_UPDATEPARAMETER --enablerepo=${YENABLEREPOS}${YUM_EXCLUDE_PYTHON}"
       else
         if [ "$IMAGEMAGICK_UPDATECHECK" -eq '0' ]; then
           echo "  run centmin.sh menu option 15 to update imagick PHP ext then run: "
           echo
         fi
         echo "  yum update $YYUM_UPDATEPARAMETER"
+      fi
+      echo
+      if [[ "$CENTOS_SEVEN" = '7' && "$PROMPT_FOR_BASE_PYTHON" = [yY] ]]; then
+        echo "detected python36u IUS Community YUM packages installed"
+        echo "For CentOS 7 they have been replaced with native CentOS 7.7+"
+        echo "python3 packages now"
+        echo
+        echo "One time task to run the addons/python36_install.sh script"
+        echo "to switch from python36u to python3 packages for Python 3.6"
+        echo "before doing YUM update command, run the script at:"
+        echo "/usr/local/src/centminmod/addons/python36_install.sh"
       fi
       echo
     else
@@ -1260,6 +1520,10 @@ reuseportchecks() {
 }
 
 rclocalchecks() {
+  if [[ "$CENTOS_SEVEN" = '7' && ! "$(grep '/var/run/php-fpm' /etc/rc.local)" ]]; then
+    echo 'if [ ! -d /var/run/php-fpm/ ]; then mkdir -p /var/run/php-fpm/; fi' >> /etc/rc.local
+  fi
+
 # https://community.centminmod.com/posts/52406/
 if [[ "$CENTOS_SEVEN" = '7' && ! -f /etc/rc.d/rc.local ]]; then
 
@@ -1429,7 +1693,12 @@ checkcmdircmd() {
     echo "alias cmdir='pushd ${SCRIPT_DIR}'" >> /root/.bashrc
 cat > "/usr/bin/centmin" << EOF
 #!/bin/bash
-pushd "$SCRIPT_DIR"; bash centmin.sh
+pushd "$SCRIPT_DIR"; . ./centmin.sh
+cleanup_msg() {
+  exit 1
+}
+
+trap cleanup_msg SIGHUP SIGINT SIGTERM SIGTSTP
 EOF
     chmod 0700 /usr/bin/centmin
   fi
@@ -1452,14 +1721,14 @@ cmupdatecheck() {
 }
 
 dmotdcheck() {
-  if [ ! -h /usr/local/bin/dmotd ]; then
-    if [ -f "${SCRIPT_DIR}/config/motd/dmotd.sh" ]; then
-      rm -rf /usr/local/bin/dmotd
-      ln -s "${SCRIPT_DIR}/config/motd/dmotd.sh" /usr/local/bin/dmotd >/dev/null 2>&1
-      if [ -f /usr/local/bin/dmotd ]; then
-        chmod +x /usr/local/bin/dmotd
-      fi
-    fi
+  # correct /etc/profile.d/dmotd.sh to only run motd and logging on interactive ssh sessions
+  # skip for non-interactive sessions like remote ssh logs that are scripted
+  if [[ -f /etc/profile.d/dmotd.sh && -z "$(grep 'tty' /etc/profile.d/dmotd.sh)" ]]; then
+    echo '#!/bin/bash' > /etc/profile.d/dmotd.sh
+    # echo "if [[ \"\$(id -u)\" = '0' && -f /usr/local/bin/dmotd ]]; then  /usr/local/bin/dmotd; fi" >> /etc/profile.d/dmotd.sh
+    echo "if tty -s; then type='interactive'; if [[ \"\$(id -u)\" = '0' && -f /usr/local/bin/dmotd ]]; then /usr/local/bin/dmotd; fi; else type='non-interactive'; fi;" >> /etc/profile.d/dmotd.sh
+    echo "if echo \$0 | grep -e ^\\- 2>&1>/dev/null; then login='login'; else login='non-login'; fi;" >> /etc/profile.d/dmotd.sh
+    # echo "$type/$login"
   fi
 }
 
@@ -1671,6 +1940,43 @@ pureftpdupdates() {
       service pure-ftpd restart >/dev/null 2>&1
     fi
   fi
+  # fix bug https://community.centminmod.com/posts/71920/
+  if [[ "$INITIALINSTALL" != [yY] && -f /etc/pure-ftpd/pure-ftpd.conf ]]; then
+    check_pureftpd_verboselog=$(awk '/VerboseLog/ {print $2}' /etc/pure-ftpd/pure-ftpd.conf)
+    check_pureftpd_tls=$(awk '/^TLS / {print $2}' /etc/pure-ftpd/pure-ftpd.conf)
+    check_pureftpd_portrange=$(awk '/PassivePortRange / {print $3}' /etc/pure-ftpd/pure-ftpd.conf)
+    # echo "check_pureftpd_tls = $check_pureftpd_tls"
+    # echo "check_pureftpd_verboselog = $check_pureftpd_verboselog"
+    # echo "check_pureftpd_portrange = $check_pureftpd_portrange"
+    
+    if [[ "$check_pureftpd_tls" != '2' || "$check_pureftpd_verboselog" != 'yes' ]] && [[ "$check_pureftpd_portrange" != '50011' ]]; then
+      echo "fix pure-ftpd updated configuration"
+      echo "https://community.centminmod.com/posts/71920/"
+      echo "backup existing config at /etc/pure-ftpd/pure-ftpd.conf.backup.$DT"
+      # backup original /etc/pure-ftpd/pure-ftpd.conf
+      cp -a /etc/pure-ftpd/pure-ftpd.conf "/etc/pure-ftpd/pure-ftpd.conf.backup.$DT"
+      # tweak /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's/# UnixAuthentication  /UnixAuthentication  /' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's/VerboseLog .*/VerboseLog yes/' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's|# PureDB user |# PureDB-user |' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's/# PureDB .*/PureDB                        \/etc\/pure-ftpd\/pureftpd.pdb/' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's/# CreateHomeDir .*/CreateHomeDir               yes/' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's/# TLS .*/TLS                      2/' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's/# PassivePortRange .*/PassivePortRange    30001 50011/' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's/^PassivePortRange    3000 3050/PassivePortRange    30001 50011/' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's|MaxClientsNumber .*|MaxClientsNumber            1000|' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's|MaxClientsPerIP .*|MaxClientsPerIP             500|' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's|NoAnonymous .*|NoAnonymous                 yes|' /etc/pure-ftpd/pure-ftpd.conf
+      # fix default file/directory permissions
+      sed -i 's/Umask .*/Umask                       137:027/' /etc/pure-ftpd/pure-ftpd.conf
+      sed -i 's|# TLSCipherSuite .*|TLSCipherSuite               HIGH|' /etc/pure-ftpd/pure-ftpd.conf
+      sdiff -s -w200 /etc/pure-ftpd/pure-ftpd.conf "/etc/pure-ftpd/pure-ftpd.conf.backup.$DT"
+      cat /etc/pure-ftpd/pure-ftpd.conf | egrep 'UnixAuthentication|VerboseLog|PureDB |CreateHomeDir|TLS|PassivePortRange|TLSCipherSuite|MaxClientsNumber|MaxClientsPerIP|NoAnonymous|Umask'
+      if [[ "$(ps aufx | grep pure-ftpd | grep -v grep | grep pure-ftpd  >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+        service pure-ftpd restart >/dev/null 2>&1
+      fi
+    fi
+  fi
 }
 
 leupdates() {
@@ -1839,6 +2145,10 @@ sshdfixes() {
   # this fixes it
   if [[ "$(grep 'UseDNS noKexAlgorithms' /etc/ssh/sshd_config)" ]]; then
     sed -i 's|UseDNS noKexAlgorithms|UseDNS no\nKexAlgorithms|' /etc/ssh/sshd_config
+  fi
+  if [[ "$CENTOS_SEVEN" -eq '7' && "$(egrep '^PrintMotd noKexAlgorithms' /etc/ssh/sshd_config)" ]]; then
+    # fix https://community.centminmod.com/posts/75607/
+    sed -i 's|^PrintMotd noKexAlgorithms|PrintMotd no\nKexAlgorithms|' /etc/ssh/sshd_config
   fi
 }
 
@@ -2042,20 +2352,21 @@ if [[ ! -f /proc/user_beancounters ]]; then
             if [[ "$(grep 'centminmod added' /etc/sysctl.d/101-sysctl.conf >/dev/null 2>&1; echo $?)" != '0' ]]; then
 cat >> "/etc/sysctl.d/101-sysctl.conf" <<EOF
 # centminmod added
+kernel.printk=4 1 1 7
 fs.nr_open=12000000
 fs.file-max=9000000
 net.core.wmem_max=16777216
 net.core.rmem_max=16777216
 net.ipv4.tcp_rmem=8192 87380 16777216                                          
 net.ipv4.tcp_wmem=8192 65536 16777216
-net.core.netdev_max_backlog=8192
-net.core.somaxconn=8151
+net.core.netdev_max_backlog=65536
+net.core.somaxconn=65535
 net.core.optmem_max=8192
 net.ipv4.tcp_fin_timeout=10
 net.ipv4.tcp_keepalive_intvl=30
 net.ipv4.tcp_keepalive_probes=3
 net.ipv4.tcp_keepalive_time=240
-net.ipv4.tcp_max_syn_backlog=8192
+net.ipv4.tcp_max_syn_backlog=65536
 net.ipv4.tcp_sack=1
 net.ipv4.tcp_syn_retries=3
 net.ipv4.tcp_synack_retries = 2
@@ -2321,7 +2632,7 @@ setup_pwdh() {
 }
 
 cpcheck() {
-  if [[ -f /usr/bin/systemd-detect-virt && "$(/usr/bin/systemd-detect-virt)" = 'lxc' ]] || [[ -f $(which virt-what) && $(virt-what | head -n1) = 'lxc' ]]; then
+  if [[ ! -f /proc/user_beancounters && -f /usr/bin/systemd-detect-virt && "$(/usr/bin/systemd-detect-virt)" = 'lxc' ]] || [[ ! -f /proc/user_beancounters && -f $(which virt-what) && $(virt-what | xargs | grep -o lxc) = 'lxc' ]]; then
     CHECK_LXD='y'
     if [[ -d /etc/profile.d && ! -f /etc/profile.d/locale.sh ]]; then
       echo "export LANG=en_US.UTF-8" >> /etc/profile.d/locale.sh
@@ -2404,6 +2715,9 @@ setup_pwdh
 cmupdatecheck
 pzcat_install
 csf_portflood
+python_centossix_sclfix
+disable_avahi
+qrencode_setup
 
 if [[ "$INITIALINSTALL" != [yY] ]]; then
   march_hostcheck
@@ -2425,7 +2739,7 @@ if [[ "$INITIALINSTALL" != [yY] ]]; then
   csf_portflood
   checkaliases
   checkcmdircmd
-  # dmotdcheck
+  dmotdcheck
   nvcheck
   cmupdatecheck
   multiphpcheck
@@ -2465,6 +2779,9 @@ if [[ "$INITIALINSTALL" != [yY] ]]; then
   fixnginx_epel
   fixsclutils_epel
   fixlshw_rpmforge
+  fixpercona_epel
+  fixnoarch_percona
+  fixsysbench_percona
   #fixclamav_epel
   nano_highlight
   checkwoff
@@ -2492,6 +2809,13 @@ if [[ "$INITIALINSTALL" != [yY] ]]; then
   pzcat_install
   redetect_tlsonethree
   dft_phpupstream
+  python_centossix_sclfix
+  disable_avahi
+  qrencode_setup
+  less_console_verbose
+  opt_sslcache
+  add_versionlocks
+  symlink_setup_emailnotify
 fi
 
 }
@@ -2539,6 +2863,8 @@ fi
 
 if [[ -z "$(crontab -l 2>&1 | grep cminfo_updater)" ]]; then
     crontab -l > cronjoblist
+    mkdir -p /etc/centminmod/cronjobs
+    cp cronjoblist /etc/centminmod/cronjobs/cronjoblist-before-setupdate-cminfo-updater-setup-${DT}.txt
     echo "0 */4 * * * /usr/bin/cminfo_updater 2>/dev/null" >> cronjoblist
     crontab cronjoblist
     rm -rf cronjoblist

@@ -198,6 +198,8 @@ if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
         CENTOS_SEVEN='7'
+    elif [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '8' ]]; then
+        CENTOS_EIGHT='8'
     fi
 fi
 
@@ -220,7 +222,7 @@ cat > "/etc/yum.repos.d/mariadb.repo" <<EOF
 [mariadb]
 name = MariaDB
 baseurl = https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/10.1/centos7-aarch64
-gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum//RPM-GPG-KEY-MariaDB
+gpgkey=https://mirrors.tuna.tsinghua.edu.cn/mariadb/yum/RPM-GPG-KEY-MariaDB
 gpgcheck=1
 EOF
 else
@@ -342,7 +344,7 @@ echo
 echo "shut down existing MariaDB server for upgrade.."
 mysql -e "set global innodb_buffer_pool_dump_at_shutdown=0;"
 sleep 10
-service mysql stop
+service mysqld stop
 echo
 # move aside existing ib_logfile* files
 cd $MYSQLDATADIR
