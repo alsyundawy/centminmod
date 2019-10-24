@@ -27,7 +27,7 @@ DT=$(date +"%d%m%y-%H%M%S")
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='285'
+SCRIPT_INCREMENTVER='292'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
 SCRIPT_DATE='31/10/2019'
@@ -787,7 +787,7 @@ MAILPARSEPHP_VER='2.1.6'       # https://pecl.php.net/package/mailparse
 MAILPARSEPHP_COMPATVER='3.0.2' # For PHP 7
 MEMCACHED_INSTALL='y'          # Install Memcached
 LIBEVENT_VERSION='2.1.8'      # Use this version of Libevent
-MEMCACHED_VERSION='1.5.16'    # Use this version of Memcached server
+MEMCACHED_VERSION='1.5.19'    # Use this version of Memcached server
 MEMCACHED_TLS='n'             # TLS support https://github.com/memcached/memcached/wiki/ReleaseNotes1513
 MEMCACHE_VERSION='3.0.8'      # Use this version of Memcache
 MEMCACHEDPHP_VER='2.2.0'      # Memcached PHP extension not server
@@ -1202,6 +1202,23 @@ if [[ "$CENTOS_SEVEN" -eq '7' ]]; then
 fi
 if [[ "$CENTOS_EIGHT" -eq '8' ]]; then
   WGET_VERSION=$WGET_VERSION_SEVEN
+
+  # enable CentOS 8 PowerTools repo for -devel packages
+  if [ ! -f /usr/bin/yum-config-manager ]; then
+    yum -q -y install dnf-utils
+    yum-config-manager --enable PowerTools
+  elif [ -f /usr/bin/yum-config-manager ]; then
+    yum-config-manager --enable PowerTools
+  fi
+
+  # disable native CentOS 8 AppStream repo based nginx, php & oracle mysql packages
+  yum -q -y module disable nginx mysql php:7.2
+
+  # install missing dependencies specific to CentOS 8
+  # for csf firewall installs
+  if [ ! -f /usr/share/perl5/vendor_perl/Math/BigInt.pm ]; then
+    yum -q -y install perl-Math-BigInt
+  fi
 fi
 
 if [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then

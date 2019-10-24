@@ -2700,6 +2700,12 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin:/root/bin:/bin
 EMAIL=$WPADMINEMAIL
 EMAILFROM=$WPADMINEMAIL_FROM
 DT=\$(date +"%d%m%y-%H%M%S")
+# set locale temporarily to english
+# due to some non-english locale issues
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+export LANGUAGE=en_US.UTF-8
+export LC_CTYPE=en_US.UTF-8
 
 {
 cd /home/nginx/domains/${vhostname}/public${WPSUBDIR}
@@ -2741,7 +2747,18 @@ if [[ -f .wpcli-status && ! "\$(grep -w 'Plugin already updated' .wpcli-status)"
 fi
 rm -rf .wpcli-status
 } 2>&1 | tee /home/nginx/domains/${vhostname}/log/wp_updater-\${DT}.log
-cat -v /home/nginx/domains/${vhostname}/log/wp_updater-\${DT}.log | /usr/bin/tr -cd '\11\12\15\40-\176' | sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" | dos2unix | mail -r \$EMAILFROM -s "Wordpress WP-CLI Auto Update \$(date)" \$EMAIL
+if [ -f /usr/sbin/sendmail ]; then
+sendmail -i \$EMAIL <<END
+From: \$EMAILFROM
+To: \$EMAIL
+Subject: Wordpress WP-CLI Auto Update \$(date)
+
+\$(cat /home/nginx/domains/\${vhostname}/log/wp_updater-\${DT}.log)
+
+END
+else
+  cat -v /home/nginx/domains/${vhostname}/log/wp_updater-\${DT}.log | /usr/bin/tr -cd '\11\12\15\40-\176' | sed -r "s/\x1B\[([0-9]{1,2}(;[0-9]{1,2})?)?[m|K]//g" | dos2unix | mail -r \$EMAILFROM -s "Wordpress WP-CLI Auto Update \$(date)" \$EMAIL
+fi
 #rm -rf /home/nginx/domains/${vhostname}/log/wp_updater-\${DT}.log
 ENDA
 
@@ -3054,7 +3071,18 @@ elif [[ "$wpscache" = 'redis' ]]; then
   cecho "------------------------------------------------------------" $boldgreen
 fi
 } 2>&1 | tee /tmp/setupwp.log
+if [ -f /usr/sbin/sendmail ]; then
+sendmail -i \$WPADMINEMAIL <<END
+From: \$WPADMINEMAIL_FROM
+To: \$WPADMINEMAIL
+Subject: ${vhostname} Wordpress Installed \$(date)
+
+\$(cat /tmp/setupwp.log)
+
+END
+else
 cat -v /tmp/setupwp.log | /usr/bin/tr -cd '\11\12\15\40-\176' | perl -pe 's/\x1b.*?[mGKH]//g' | dos2unix | mail -r $WPADMINEMAIL_FROM -s "${vhostname} Wordpress Installed `date`" $WPADMINEMAIL
+fi
 cp -a /tmp/setupwp.log "${CENTMINLOGDIR}/setupwp-$(date +"%d%m%y-%H%M%S").log"
 rm -rf /tmp/setupwp.log
 

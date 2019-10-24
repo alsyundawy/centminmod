@@ -129,6 +129,23 @@ if [[ "$CENTOS_SEVEN" -eq '7' ]]; then
 fi
 if [[ "$CENTOS_EIGHT" -eq '8' ]]; then
   WGET_VERSION=$WGET_VERSION_SEVEN
+
+  # enable CentOS 8 PowerTools repo for -devel packages
+  if [ ! -f /usr/bin/yum-config-manager ]; then
+    yum -q -y install dnf-utils
+    yum-config-manager --enable PowerTools
+  elif [ -f /usr/bin/yum-config-manager ]; then
+    yum-config-manager --enable PowerTools
+  fi
+
+  # disable native CentOS 8 AppStream repo based nginx, php & oracle mysql packages
+  yum -q -y module disable nginx mysql php:7.2
+
+  # install missing dependencies specific to CentOS 8
+  # for csf firewall installs
+  if [ ! -f /usr/share/perl5/vendor_perl/Math/BigInt.pm ]; then
+    yum -q -y install perl-Math-BigInt
+  fi
 fi
 
 if [ -f /proc/user_beancounters ]; then
@@ -1030,7 +1047,7 @@ if [[ ! -f /usr/bin/git || ! -f /usr/bin/bc || ! -f /usr/bin/wget || ! -f /bin/n
   if [[ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -ge '1018000' && "$CENTOS_SEVEN" = '7' ]]; then
     time $YUMDNFBIN -y install yum-plugin-fastestmirror yum-plugin-security
     sar_call
-  elif [[ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -ge '263000' ]]; then
+  elif [[ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -ge '263000' && "$CENTOS_SIX" = '6' ]]; then
     time $YUMDNFBIN -y install yum-plugin-fastestmirror yum-plugin-security
     sar_call
   fi
@@ -1094,7 +1111,14 @@ if [[ ! -f /usr/bin/git || ! -f /usr/bin/bc || ! -f /usr/bin/wget || ! -f /bin/n
   touch /tmp/curlinstaller-yum
   time $YUMDNFBIN -y install epel-release${DISABLEREPO_DNF}
   sar_call
-  if [[ "$CENTOS_SEVEN" = '7' ]]; then
+  if [[ "$CENTOS_EIGHT" = '8' ]]; then
+    time $YUMDNFBIN -y install qrencode jq clang clang-devel jemalloc jemalloc-devel zstd python2-pip libmcrypt libmcrypt-devel libraqm figlet moreutils nghttp2 libnghttp2 libnghttp2-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 bash-completion bash-completion-extras mlocate re2c kernel-headers kernel-devel${DISABLEREPO_DNF} --enablerepo=epel,epel-playground,epel-testing
+    libc_fix
+    if [ -f /usr/bin/pip ]; then
+      PYTHONWARNINGS=ignore:::pip._internal.cli.base_command pip install --upgrade pip
+    fi
+    sar_call
+  elif [[ "$CENTOS_SEVEN" = '7' ]]; then
     time $YUMDNFBIN -y install qrencode jq clang clang-devel jemalloc jemalloc-devel zstd python2-pip libmcrypt libmcrypt-devel libraqm figlet moreutils nghttp2 libnghttp2 libnghttp2-devel pngquant optipng jpegoptim pwgen pigz pbzip2 xz pxz lz4 bash-completion bash-completion-extras mlocate re2c kernel-headers kernel-devel${DISABLEREPO_DNF} --enablerepo=epel
     libc_fix
     if [ -f /usr/bin/pip ]; then
