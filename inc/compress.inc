@@ -1,5 +1,5 @@
-ZSTD_VER='1.4.3'
-LZFOUR_VER='1.9.1'
+ZSTD_VER='1.4.4'
+LZFOUR_VER='1.9.2'
 PIGZ_VER='2.4'
 PBZIP_VER='1.1.13'
 LBZIP_VER='2.5'
@@ -17,6 +17,43 @@ compgcc_seven() {
   else
     label=""
   fi
+  COMP_CPU_MARCH=$(gcc -c -Q -march=native --help=target | awk '/  -march/ {print $2}' | head -n1 )
+}
+
+compgcc_eight() {
+  if [[ -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+    label='gcc7 built'
+    source /opt/rh/devtoolset-8/enable
+    export CFLAGS="-Wimplicit-fallthrough=0"
+    export CXXFLAGS="${CFLAGS}"
+  else
+    label=""
+  fi
+  COMP_CPU_MARCH=$(gcc -c -Q -march=native --help=target | awk '/  -march/ {print $2}' | head -n1 )
+}
+
+pgo_export_compress() {
+  if [[ "$GCC_FALIGN_FUNCTION" = [yY] ]] && [[ "$COMP_CPU_MARCH" = 'nehalem' || "$COMP_CPU_MARCH" = 'westmere' || "$COMP_CPU_MARCH" = 'core2' || "$COMP_CPU_MARCH" = 'bonnell' || "$COMP_CPU_MARCH" = 'silvermont' ]]; then
+    COMP_FALIGN_FUCTION_OPT=''
+  elif [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1-3 | sed "s|\.|0|g")" -gt '40805' && "$GCC_FALIGN_FUNCTION" = [yY] ]]; then
+    COMP_FALIGN_FUCTION_OPT=' -falign-functions=32 -malign-data=cacheline'
+  else
+    COMP_FALIGN_FUCTION_OPT=''
+  fi
+export CFLAGS="$CFLAGS -O3${COMP_FALIGN_FUCTION_OPT} -ffat-lto-objects -flto=$(nproc) -fno-math-errno -fno-semantic-interposition -fno-trapping-math "
+export FCFLAGS="$CFLAGS -O3${COMP_FALIGN_FUCTION_OPT} -ffat-lto-objects -flto=$(nproc) -fno-math-errno -fno-semantic-interposition -fno-trapping-math "
+export FFLAGS="$CFLAGS -O3${COMP_FALIGN_FUCTION_OPT} -ffat-lto-objects -flto=$(nproc) -fno-math-errno -fno-semantic-interposition -fno-trapping-math "
+export CXXFLAGS="$CXXFLAGS -O3${COMP_FALIGN_FUCTION_OPT} -ffat-lto-objects -flto=$(nproc) -fno-math-errno -fno-semantic-interposition -fno-trapping-math "
+export CFLAGS_GENERATE="$CFLAGS -fprofile-generate -fprofile-dir=/home/pgo_compress -fprofile-update=atomic "
+export FCFLAGS_GENERATE="$FCFLAGS -fprofile-generate -fprofile-dir=/home/pgo_compress -fprofile-update=atomic "
+export FFLAGS_GENERATE="$FFLAGS -fprofile-generate -fprofile-dir=/home/pgo_compress -fprofile-update=atomic "
+export CXXFLAGS_GENERATE="$CXXFLAGS -fprofile-generate -fprofile-dir=/home/pgo_compress -fprofile-update=atomic "
+export LDFLAGS_GENERATE="$LDFLAGS -fprofile-generate -fprofile-dir=/home/pgo_compress -fprofile-update=atomic "
+export CFLAGS_USE="$CFLAGS${COMP_FALIGN_FUCTION_OPT} -fprofile-use -fprofile-dir=/home/pgo_compress -fprofile-correction "
+export FCFLAGS_USE="$FCFLAGS${COMP_FALIGN_FUCTION_OPT} -fprofile-use -fprofile-dir=/home/pgo_compress -fprofile-correction "
+export FFLAGS_USE="$FFLAGS${COMP_FALIGN_FUCTION_OPT} -fprofile-use -fprofile-dir=/home/pgo_compress -fprofile-correction "
+export CXXFLAGS_USE="$CXXFLAGS${COMP_FALIGN_FUCTION_OPT} -fprofile-use -fprofile-dir=/home/pgo_compress -fprofile-correction "
+export LDFLAGS_USE="$LDFLAGS${COMP_FALIGN_FUCTION_OPT} -fprofile-use -fprofile-dir=/home/pgo_compress -fprofile-correction " 
 }
 
 compressmenu_notice() {
@@ -27,12 +64,13 @@ compressmenu_notice() {
   echo "
   1. pigz
   2. pbzip2
-  3. lbzip2
-  4. plzip
-  5. zstd
-  6. lz4"
+  3. plzip
+  4. zstd
+  5. lz4"
   echo
   compgcc_seven
+  compgcc_eight
+  pgo_export_compress
 }
 
 zstdinstall() {
@@ -101,7 +139,17 @@ function funct_pigzinstall {
     make clean
     # rm -rf Makefile
     # wget -c${ipv_forceopt} https://raw.github.com/madler/pigz/5316bf3440025ca37d84d7580a8f616c0127668a/Makefile -O Makefile
+    # export CFLAGS="${CFLAGS_GENERATE}" 
+    # export CXXFLAGS="${CXXFLAGS_GENERATE}" 
+    # export FFLAGS="${FFLAGS_GENERATE}" 
+    # export FCFLAGS="${FCFLAGS_GENERATE}" 
+    # export LDFLAGS="${LDFLAGS_GENERATE}"
+    CFLAGS="${CFLAGS_GENERATE}" CXXFLAGS="${CXXFLAGS_GENERATE}" FFLAGS="${FFLAGS_GENERATE}" FCFLAGS="${FCFLAGS_GENERATE}" LDFLAGS="${LDFLAGS_GENERATE}"
     make -j$(nproc)
+    make tests -j$(nproc) CFLAGS="${CFLAGS_GENERATE}" CXXFLAGS="${CXXFLAGS_GENERATE}" FFLAGS="${FFLAGS_GENERATE}" FCFLAGS="${FCFLAGS_GENERATE}" LDFLAGS="${LDFLAGS_GENERATE}"
+    make clean
+    CFLAGS="${CFLAGS_USE}" CXXFLAGS="${CXXFLAGS_USE}" FFLAGS="${FFLAGS_USE}" FCFLAGS="${FCFLAGS_USE}" LDFLAGS="${LDFLAGS_USE}"
+    make -j$(nproc) CFLAGS="${CFLAGS_USE}" CXXFLAGS="${CXXFLAGS_USE}" FFLAGS="${FFLAGS_USE}" FCFLAGS="${FCFLAGS_USE}" LDFLAGS="${LDFLAGS_USE}"
     \cp -f pigz unpigz /usr/local/bin
     ls -lh /usr/local/bin | grep pigz
     if [ -f /usr/local/bin/pigz ]; then

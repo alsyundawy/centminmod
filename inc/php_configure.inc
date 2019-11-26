@@ -1,3 +1,22 @@
+php_pcrejit_stacksize() {
+  if [[ "$PHP_PCREJIT_STACKSIZE_ADJUST" = [yY] ]]; then
+    pushd ../
+    get_php_pcrejit_stacksize=$(awk '/#define PCRE_JIT_STACK_MAX_SIZE/ {print $3}' ext/pcre/php_pcre.c | sed -e 's|(||g')
+    echo "existing PHP PCRE_JIT_STACK_MAX_SIZE = $get_php_pcrejit_stacksize * 1024"
+    if [[ "$get_php_pcrejit_stacksize" -eq '64' || "$get_php_pcrejit_stacksize" -eq '192' || "$get_php_pcrejit_stacksize" -eq '256' ]] && [ -f ext/pcre/php_pcre.c ]; then
+      # only change if php 7.2 (64) or 7.3 (192) or 7.4 (256) defaults are for 
+      # PHP 7+ PCRE JIT when pcre.jit=1 enabled https://www.php.net/manual/en/pcre.configuration.php
+        grep -w 'PCRE_JIT_STACK_MAX_SIZE' ext/pcre/php_pcre.c
+        echo
+        sed -i "s|#define PCRE_JIT_STACK_MAX_SIZE .*|#define PCRE_JIT_STACK_MAX_SIZE ($PHP_PCREJIT_STACKSIZE * 1024)|" ext/pcre/php_pcre.c
+        echo
+        grep -w 'PCRE_JIT_STACK_MAX_SIZE' ext/pcre/php_pcre.c
+        echo
+    fi
+    popd
+  fi
+}
+
 pgophpbench() {
   echo
   echo "PGO phpbench setup start"
@@ -1316,7 +1335,11 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
 
   if [[ "$(uname -m)" = 'x86_64' && "$CPUVENDOR" = 'GenuineIntel' && "$SSECHECK" = '[enabled]' ]] && [[ "$CLANG_PHP" = [nN] ]]; then
     CCM=64
-    
+    if [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1-3 | sed "s|\.|0|g")" -gt '40805' && "$GCC_FALIGN_FUNCTION" = [yY] ]]; then
+      FALIGN_FUNCTION_OPT=' -falign-functions=32'
+    else
+      FALIGN_FUNCTION_OPT=''
+    fi
     if [[ "$MARCH_TARGETNATIVE" = [nN] ]]; then
       PHP_MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}${GCC_NONNATIVEFLAGS}"
     elif [[ "$CPU_MARCH" = 'silvermont' ]]; then
@@ -1332,49 +1355,49 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
       gcc -c -Q -march=bonnell${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'cascadelake' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=cascadelake"
+      PHP_MTUNEOPT="-m${CCM} -march=cascadelake${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=cascadelake${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=cascadelake${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'cannonlake' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=cannonlake"
+      PHP_MTUNEOPT="-m${CCM} -march=cannonlake${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=cannonlake${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=cannonlake${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'skylake-avx512' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=skylake-avx512"
+      PHP_MTUNEOPT="-m${CCM} -march=skylake-avx512${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=skylake-avx512${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=skylake-avx512${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'skylake' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=skylake"
+      PHP_MTUNEOPT="-m${CCM} -march=skylake${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=skylake${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=skylake${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'broadwell' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=broadwell"
+      PHP_MTUNEOPT="-m${CCM} -march=broadwell${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=broadwell${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=broadwell${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'haswell' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=haswell"
+      PHP_MTUNEOPT="-m${CCM} -march=haswell${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=haswell${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=haswell${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'ivybridge' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=ivybridge"
+      PHP_MTUNEOPT="-m${CCM} -march=ivybridge${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=ivybridge${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=ivybridge${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'sandybridge' && "$(cat /proc/cpuinfo | grep -o 'avx' | uniq)" = 'avx' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=sandybridge"
+      PHP_MTUNEOPT="-m${CCM} -march=sandybridge${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=sandybridge${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=sandybridge${PHPEXTRA_CFLAGS} --help=target
@@ -1392,25 +1415,25 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
       gcc -c -Q -march=nehalem${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'core-avx2' && "$(cat /proc/cpuinfo | grep -o 'avx' | uniq)" = 'avx' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=core-avx2"
+      PHP_MTUNEOPT="-m${CCM} -march=core-avx2${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=core-avx2${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=core-avx2${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'core-avx-i' && "$(cat /proc/cpuinfo | grep -o 'avx' | uniq)" = 'avx' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=core-avx-i"
+      PHP_MTUNEOPT="-m${CCM} -march=core-avx-i${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=core-avx-i${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=core-avx-i${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'corei7-avx' && "$(cat /proc/cpuinfo | grep -o 'avx' | uniq)" = 'avx' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=corei7-avx"
+      PHP_MTUNEOPT="-m${CCM} -march=corei7-avx${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=corei7-avx${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=corei7-avx${PHPEXTRA_CFLAGS} --help=target
       echo
     elif [[ "$CPU_MARCH" = 'corei7' ]]; then
-      PHP_MTUNEOPT="-m${CCM} -march=corei7"
+      PHP_MTUNEOPT="-m${CCM} -march=corei7${FALIGN_FUNCTION_OPT}"
       echo
       echo "gcc -c -Q -march=corei7${PHPEXTRA_CFLAGS} --help=target"
       gcc -c -Q -march=corei7${PHPEXTRA_CFLAGS} --help=target
@@ -1529,6 +1552,8 @@ else
   PHP_OPENSSLOPT='--with-openssl'
 fi
 
+php_pcrejit_stacksize
+
 if [[ "$MDB_INSTALL" == [yY] || "$MYSQL_INSTALL" == [yY] ]]; then
 
   echo "../configure --enable-fpm${OPCACHEOPT}${PHPINTLOPT}${PCNTLOPT}${MCRYPT}${RECODEOPT}${SNMPOPT}${PHPEMBEDOPT}${PHPLTOOPT} --with-mhash ${ZLIBPHP_OPT} --with-gettext --enable-exif --enable-zip${LIBZIP_OPT} --with-bz2 --enable-soap --enable-sockets --enable-sysvmsg --enable-sysvsem --enable-sysvshm --enable-shmop --with-pear --enable-mbstring $PHP_OPENSSLOPT --with-mysql=mysqlnd --with-libdir=${LIBDIR} --with-mysqli=mysqlnd --with-mysql-sock=${PHP_MYSQLSOCKPATH}/mysql.sock --with-curl --with-gd --with-xmlrpc --enable-bcmath --enable-calendar${FTPEXTOPT} --enable-gd-native-ttf --with-freetype-dir=${PLIBDIR} --with-jpeg-dir=${PLIBDIR} --with-png-dir=${PLIBDIR} --with-xpm-dir=${PLIBDIR}${LIBVPXOPT}${TLIBOPT} --enable-pdo${PDOSQLLITE_OPT} --with-pdo-mysql=mysqlnd${MSSQLOPT} --enable-inline-optimization${IMAPOPT} --with-kerberos --with-readline --with-libedit --with-gmp --with-pspell --with-tidy --with-enchant --with-fpm-user=nginx --with-fpm-group=nginx${FILEINFOOPT}${SQLLITEOPT}${LDAPOPT}${PDOPGSQL_OPT}${OPCACHEHUGEPAGES_OPT}${ARGONTWO_OPT}${LIBSODIUM_OPT} --with-config-file-scan-dir=${CONFIGSCANDIR}${PHPDEBUGOPT}${FPMSYSTEMD_INTEGRATEOPT}${FFI_OPT}${PHP_EXTRAOPTS}"
@@ -1550,7 +1575,10 @@ sar_call
     echo
     echo "php_configure.inc make${MAKETHREADS_PHP}"
     echo "PHP_PGO = $PHP_PGO"
-    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMVER" = '7.0' || "$PHPMVER" = '7.1' || "$PHPMVER" = '7.2' || "$PHPMVER" = '7.3' ]]; then
+    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMVER" = '7.0' || "$PHPMVER" = '7.1' || "$PHPMVER" = '7.2' || "$PHPMVER" = '7.3' || "$PHPMVER" = '7.4' ]]; then
+        # get cpu core to fix for PGO training for optimal cpu cache access
+        pgo_cpurange=$(echo $(($(nproc)-1)))
+        pgo_cpulist=$(seq 1 $pgo_cpurange)
         echo "make${MAKETHREADS_PHP} prof-gen"
         time make${MAKETHREADS_PHP} prof-gen
         if [ ! -d "$DIR_TMP/php_pgo_training_scripts" ]; then
@@ -1563,37 +1591,61 @@ sar_call
             ls -lah "$DIR_TMP/php_pgo_training_scripts"
             sed -i "s|define('DB_PASSWORD', 'root');|define('DB_PASSWORD', '$GET_ROOT_PASS');|" "$DIR_TMP/php_pgo_training_scripts/constants.php"
             ./sapi/cli/php "$DIR_TMP/php_pgo_training_scripts/init.php"
-            echo "time ./sapi/cgi/php-cgi -T80 ../Zend/bench.php"
-            time ./sapi/cgi/php-cgi -T80 ../Zend/bench.php
-            echo "time ./sapi/cgi/php-cgi -T40 ../Zend/micro_bench.php"
-            time ./sapi/cgi/php-cgi -T40 ../Zend/micro_bench.php
-            echo "./sapi/cgi/php-cgi -T100 "$DIR_TMP/php_pgo_training_scripts/index.php""
-            time ./sapi/cgi/php-cgi -T100 "$DIR_TMP/php_pgo_training_scripts/index.php"
+
+            if [ -f ./sapi/cgi/php ]; then
+              echo "time ./sapi/cgi/php ../Zend/bench.php"
+              time ./sapi/cgi/php ../Zend/bench.php
+              echo "time ./sapi/cgi/php ../Zend/micro_bench.php"
+              time ./sapi/cgi/php ../Zend/micro_bench.php
+            fi
+
+            echo "time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} ../Zend/bench.php"
+            time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} ../Zend/bench.php
+            echo "time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} ../Zend/micro_bench.php"
+            time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} ../Zend/micro_bench.php
+            echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$DIR_TMP/php_pgo_training_scripts/index.php""
+            time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$DIR_TMP/php_pgo_training_scripts/index.php"
             if [ -f "$PHPPGO_INDEXPATH" ]; then
-                echo "./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH""
-                time ./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH"
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH" >/dev/null
             fi
             if [ -f "$PHPPGO_INDEXPATH_TWO" ]; then
-                echo "./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_TWO""
-                time ./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_TWO"
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_TWO""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_TWO" >/dev/null
             fi
             if [ -f "$PHPPGO_INDEXPATH_THREE" ]; then
-                echo "./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_THREE""
-                time ./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_THREE"
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_THREE""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_THREE" >/dev/null
             fi
             if [ -f "$PHPPGO_INDEXPATH_FOUR" ]; then
-                echo "./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_FOUR""
-                time ./sapi/cgi/php-cgi -T100 "$PHPPGO_INDEXPATH_FOUR"
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_FOUR""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_FOUR" >/dev/null
+            fi
+            if [ -f "$PHPPGO_INDEXPATH_FIVE" ]; then
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_FIVE""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_FIVE" >/dev/null
+            fi
+            if [ -f "$PHPPGO_INDEXPATH_SIX" ]; then
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_SIX""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_SIX" >/dev/null
             fi
             echo "pgophpbench"
             pgophpbench
             if [ -f "${DIR_TMP}/phpbench/phpbench.php" ]; then
-              echo "./sapi/cgi/php-cgi -T10 ${DIR_TMP}/phpbench/phpbench.php"
-              time ./sapi/cgi/php-cgi -T10 "${DIR_TMP}/phpbench/phpbench.php"
+              echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} ${DIR_TMP}/phpbench/phpbench.php"
+              time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "${DIR_TMP}/phpbench/phpbench.php"
+              if [ -f ./sapi/cgi/php ]; then
+                echo "./sapi/cgi/php ${DIR_TMP}/phpbench/phpbench.php"
+                time ./sapi/cgi/php "${DIR_TMP}/phpbench/phpbench.php"
+              fi
             fi
             if [ -f /opt/phpbench/detailed_benchmark.php ]; then
-              echo "./sapi/cgi/php-cgi -T20 /opt/phpbench/detailed_benchmark.php"
-              time ./sapi/cgi/php-cgi -T20 /opt/phpbench/detailed_benchmark.php
+              echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} /opt/phpbench/detailed_benchmark.php"
+              time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} /opt/phpbench/detailed_benchmark.php
+              if [ -f ./sapi/cgi/php ]; then
+                echo "./sapi/cgi/php /opt/phpbench/detailed_benchmark.php"
+                time ./sapi/cgi/php /opt/phpbench/detailed_benchmark.php
+              fi
             fi
         elif [ -d "$DIR_TMP/php_pgo_training_scripts" ]; then
             pushd "$DIR_TMP/php_pgo_training_scripts"
@@ -1603,37 +1655,61 @@ sar_call
             GET_ROOT_PASS=$(awk -F "=" '/password/ {print $2}' /root/.my.cnf | sed -e "s|'||g")
             sed -i "s|define('DB_PASSWORD', 'root');|define('DB_PASSWORD', '$GET_ROOT_PASS');|" "$DIR_TMP/php_pgo_training_scripts/constants.php"
             ./sapi/cli/php "$DIR_TMP/php_pgo_training_scripts/init.php"
-            echo "time ./sapi/cgi/php-cgi -T2,${PHP_PGO_TRAINRUNS} ../Zend/bench.php"
-            time ./sapi/cgi/php-cgi -T2,${PHP_PGO_TRAINRUNS} ../Zend/bench.php
-            echo "time ./sapi/cgi/php-cgi -T2,${PHP_PGO_TRAINRUNS} ../Zend/micro_bench.php"
-            time ./sapi/cgi/php-cgi -T2,${PHP_PGO_TRAINRUNS} ../Zend/micro_bench.php
+
+            if [ -f ./sapi/cgi/php ]; then
+              echo "time ./sapi/cgi/php ../Zend/bench.php"
+              time ./sapi/cgi/php ../Zend/bench.php
+              echo "time ./sapi/cgi/php ../Zend/micro_bench.php"
+              time ./sapi/cgi/php ../Zend/micro_bench.php
+            fi
+
+            echo "time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} ../Zend/bench.php"
+            time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} ../Zend/bench.php
+            echo "time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} ../Zend/micro_bench.php"
+            time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} ../Zend/micro_bench.php
             echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$DIR_TMP/php_pgo_training_scripts/index.php""
             time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$DIR_TMP/php_pgo_training_scripts/index.php"
             if [ -f "$PHPPGO_INDEXPATH" ]; then
-                echo "./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH""
-                time ./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH"
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH" >/dev/null
             fi
             if [ -f "$PHPPGO_INDEXPATH_TWO" ]; then
-                echo "./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_TWO""
-                time ./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_TWO"
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_TWO""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_TWO" >/dev/null
             fi
             if [ -f "$PHPPGO_INDEXPATH_THREE" ]; then
-                echo "./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_THREE""
-                time ./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_THREE"
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_THREE""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_THREE" >/dev/null
             fi
             if [ -f "$PHPPGO_INDEXPATH_FOUR" ]; then
-                echo "./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_FOUR""
-                time ./sapi/cgi/php-cgi -T80 "$PHPPGO_INDEXPATH_FOUR"
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_FOUR""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_FOUR" >/dev/null
+            fi
+            if [ -f "$PHPPGO_INDEXPATH_FIVE" ]; then
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_FIVE""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_FIVE" >/dev/null
+            fi
+            if [ -f "$PHPPGO_INDEXPATH_SIX" ]; then
+                echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_SIX""
+                time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "$PHPPGO_INDEXPATH_SIX" >/dev/null
             fi
             echo "pgophpbench"
             pgophpbench
             if [ -f "${DIR_TMP}/phpbench/phpbench.php" ]; then
-              echo "./sapi/cgi/php-cgi -T10 ${DIR_TMP}/phpbench/phpbench.php"
-              time ./sapi/cgi/php-cgi -T10 "${DIR_TMP}/phpbench/phpbench.php"
+              echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} ${DIR_TMP}/phpbench/phpbench.php"
+              time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} "${DIR_TMP}/phpbench/phpbench.php"
+              if [ -f ./sapi/cgi/php ]; then
+                echo "./sapi/cgi/php ${DIR_TMP}/phpbench/phpbench.php"
+                time ./sapi/cgi/php "${DIR_TMP}/phpbench/phpbench.php"
+              fi
             fi
             if [ -f /opt/phpbench/detailed_benchmark.php ]; then
-              echo "./sapi/cgi/php-cgi -T20 /opt/phpbench/detailed_benchmark.php"
-              time ./sapi/cgi/php-cgi -T20 /opt/phpbench/detailed_benchmark.php
+              echo "./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} /opt/phpbench/detailed_benchmark.php"
+              time ./sapi/cgi/php-cgi -T${PHP_PGO_TRAINRUNS} /opt/phpbench/detailed_benchmark.php
+              if [ -f ./sapi/cgi/php ]; then
+                echo "./sapi/cgi/php /opt/phpbench/detailed_benchmark.php"
+                time ./sapi/cgi/php /opt/phpbench/detailed_benchmark.php
+              fi
             fi
         fi
         echo "make prof-clean"

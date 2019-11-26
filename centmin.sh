@@ -27,10 +27,10 @@ DT=$(date +"%d%m%y-%H%M%S")
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='292'
+SCRIPT_INCREMENTVER='329'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
-SCRIPT_DATE='31/10/2019'
+SCRIPT_DATE='31/12/2019'
 SCRIPT_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_MODIFICATION_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_URL='https://centminmod.com'
@@ -431,7 +431,7 @@ CLANG_MEMCACHED='n'           # Memcached menu option 10 routine
 GCCINTEL_PHP='y'              # enable PHP-FPM GCC compiler with Intel cpu optimizations
 PHP_PGO='n'                   # Profile Guided Optimization https://software.intel.com/en-us/blogs/2015/10/09/pgo-let-it-go-php
 PHP_PGO_ALWAYS='n'            # override for PHP_PGO enable for 1 cpu thread servers too
-PHP_PGO_TRAINRUNS='80'        # number of runs done during PGO PHP 7 training runs
+PHP_PGO_TRAINRUNS='10'        # number of runs done during PGO PHP 7 training runs
 PHP_PGO_CENTOSSIX='n'         # CentOS 6 may need GCC >4.4.7 fpr PGO so use devtoolset-4 GCC 5.3
 DEVTOOLSET_PHP='n'            # use devtoolset GCC for GCCINTEL_PHP='y'
 DEVTOOLSETSIX='n'             # Enable or disable devtoolset-6 GCC 6.2 support instead of devtoolset-4 GCC 5.3 support
@@ -632,6 +632,8 @@ PHP_HUGEPAGES='n'            # Enable explicit huge pages support for PHP 7 on C
 PHP_CUSTOMSSL='n'            # compile php-fpm against openssl 1.0.2+ or libressl 2.3+ whichever nginx uses
 PHPMAKETEST=n                # set to y to enable make test after PHP make for diagnostic purposes
 AUTODETECPHP_OVERRIDE='n'    # when enabled, php updates will always reinstall all php extensions even if minor php version
+PHP_PCREJIT_STACKSIZE_ADJUST='n' # when enabled, allows you to raise PHP's default PCRE JIT stack size https://github.com/php/php-src/pull/2910
+PHP_PCREJIT_STACKSIZE='512'  # value to raise PHP PCRE JIT stack size when PHP_PCREJIT_STACKSIZE_ADJUST='y' set on centmin.sh menu option 5 runs
 
 PHPGEOIP_ALWAYS='y'          # GeoIP php extension is always reinstalled on php recompiles
 PHPIMAGICK_ALWAYS='y'        # imagick php extension is always reinstalled on php recompiles
@@ -647,6 +649,8 @@ PHPIMAGICK='y'               # Disable or Enable PHP ImagicK extension
 PHPMAILPARSE='y'             # Disable or Enable PHP mailparse extension
 PHPIONCUBE='n'               # Disable or Enable Ioncube Loader via addons/ioncube.sh
 PHPMSSQL='n'                 # Disable or Enable MSSQL server PHP extension
+PHPTIMEZONEDB='y'            # timezonedb PHP extension updated https://pecl.php.net/package/timezonedb
+PHPTIMEZONEDB_VER='2019.3'   # timezonedb PHP extension version
 PHPMSSQL_ALWAYS='n'          # mssql php extension always install on php recompiles
 PHPEMBED='y'                 # built php with php embed SAPI library support --enable-embed=shared
 
@@ -658,7 +662,7 @@ SUHOSINVER='0.9.38'
 
 PHPREDIS='y'                # redis PHP extension install
 REDISPHP_VER='4.3.0'        # redis PHP version for PHP <7.x
-REDISPHPSEVEN_VER='5.0.2'   # redis PHP version for PHP =>7.x
+REDISPHPSEVEN_VER='5.1.1'   # redis PHP version for PHP =>7.x
 REDISPHP_GIT='n'            # pull php 7 redis extension from git or pecl downloads
 PHPMONGODB='n'              # MongoDB PHP extension install
 MONGODBPHP_VER='1.5.4'      # MongoDB PHP version
@@ -717,7 +721,7 @@ MYSQL_INSTALL='n'            # Install official Oracle MySQL Server (MariaDB alt
 SENDMAIL_INSTALL='n'         # Install Sendmail (and mailx) set to y and POSTFIX_INSTALL=n for sendmail
 POSTFIX_INSTALL=y            # Install Postfix (and mailx) set to n and SENDMAIL_INSTALL=y for sendmail
 # Nginx
-NGINX_VERSION='1.17.4'       # Use this version of Nginx
+NGINX_VERSION='1.17.6'       # Use this version of Nginx
 NGINX_VHOSTSSL='y'            # enable centmin.sh menu 2 prompt to create self signed SSL vhost 2nd vhost conf
 NGINXBACKUP='y'
 NGINXCPU_AUTOTUNE_NEW='y'    # revised nginx worker_proccess auto tuned settings for >12 cpu thread based servers
@@ -761,7 +765,7 @@ PRIORITIZE_CHACHA_OPENSSL='n' # https://community.centminmod.com/threads/15708/
 
 # LibreSSL
 LIBRESSL_SWITCH='n'        # if set to 'y' it overrides OpenSSL as the default static compiled option for Nginx server
-LIBRESSL_VERSION='2.9.1'   # Use this version of LibreSSL http://www.libressl.org/
+LIBRESSL_VERSION='3.0.2'   # Use this version of LibreSSL http://www.libressl.org/
 
 # BoringSSL
 # not working yet just prep work
@@ -822,6 +826,9 @@ USEAXEL='y'                  # whether to use axel download accelerator or wget
 INTELOPT='n'
 # GCC optimization level choices: -O2 or -O3 or -Ofast (only for GCC via CLANG=n)
 GCC_OPTLEVEL='-O3'
+# https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
+# enabled will set -falign-functions=32 for GCC compiles of Nginx and PHP-FPM and pigz
+GCC_FALIGN_FUNCTION='n'
 
 # experimental custom RPM compiled packages to replace source 
 # compiled versions for 64bit systems only
@@ -1039,6 +1046,7 @@ source "inc/igbinary.inc"
 source "inc/apcprotect.inc"
 source "inc/apcinstall.inc"
 source "inc/apcreinstall.inc"
+source "inc/timezonedb.inc"
 source "inc/zendopcache_55ini.inc"
 source "inc/zendopcache_install.inc"
 source "inc/zendopcache_upgrade.inc"
@@ -2226,6 +2234,11 @@ if [[ "$PHP_ZSTD" = [yY] ]]; then
   php_ext_zstd
 fi
 
+if [[ "$PHPTIMEZONEDB" = [yY] ]]; then
+  echo "phptimezonedb_install"
+  phptimezonedb_install
+fi
+
 if [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMVER" = '7.4' ]]; then
   if [ -f /usr/local/src/centminmod/addons/php74-mcrypt.sh ]; then
     /usr/local/src/centminmod/addons/php74-mcrypt.sh menu
@@ -2276,26 +2289,34 @@ cecho "**********************************************************************" $
 cecho "* Starting Services..." $boldgreen
 cecho "**********************************************************************" $boldgreen
 if [[ "$NSD_INSTALL" = [yY] && -f /etc/init.d/nsd ]]; then
-    /etc/init.d/nsd start
+  /etc/init.d/nsd start
 fi
 
 if [ -f /etc/init.d/ntpd ]; then
-    /etc/init.d/ntpd start
+  /etc/init.d/ntpd start
 fi
 
 if [[ "$NGINX_INSTALL" = [yY] && -f /etc/init.d/nginx ]]; then
-    /etc/init.d/nginx start
+  /etc/init.d/nginx start
 fi
 
 if [[ "$MDB_INSTALL" = [yY] || "$MDB_YUMREPOINSTALL" = [yY] ]] && [ -f /etc/init.d/mysql ]; then
-    /etc/init.d/mysql start
+  /etc/init.d/mysql start
 fi
 
 if [[ "$MYSQL_INSTALL" = [yY] && -f /etc/init.d/mysqld ]]; then
-    /etc/init.d/mysqld start
+  /etc/init.d/mysqld start
 fi
-echo " "
-echo " "
+
+if [[ "$(service csf status >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
+  service csf start
+fi
+
+if [[ "$(service lfd status >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
+  service lfd start
+fi
+
+echo
 
 cd
 
@@ -2648,7 +2669,7 @@ else
             cecho "18). Suhosin PHP Extension install" $boldgreen
             cecho "19). Install FFMPEG and FFMPEG PHP Extension" $boldgreen
             cecho "20). NSD Install/Re-Install" $boldgreen
-            cecho "21). Update - Nginx + PHP-FPM + Siege" $boldgreen
+            cecho "21). Data Transfer (TBA)" $boldgreen
             cecho "22). Add Wordpress Nginx vhost + Cache Plugin" $boldgreen
             cecho "23). Update Centmin Mod Code Base" $boldgreen
             cecho "24). Exit" $boldgreen
@@ -3115,7 +3136,7 @@ EOF
         compressmenu_notice
         funct_pigzinstall
         funct_pbzip2install
-        funct_lbzip2install
+        # funct_lbzip2install
         funct_lzipinstall
         funct_plzipinstall
         zstdinstall
@@ -3195,56 +3216,15 @@ EOF
         starttime=$(TZ=UTC date +%s.%N)
         centminlog
         {
-        
-        if [ "$CCACHEINSTALL" == 'y' ]; then
-        ccacheinstall
-        fi
-        
-        cecho "Updating Nginx, PHP-FPM & Siege versions" $boldyellow
+        cecho "Place holder for future feature allowing Centmin Mod To Centmin Mod server data migration" $boldyellow
         echo
-        yumskipinstall
-
-        if [[ "$yuminstallrun" == [yY] ]]; then
-            yuminstall
-        fi
-
-        funct_nginxupgrade
-        funct_phpupgrade
-        checksiege
-        siegeinstall
-
-        echo ""
-            cecho "--------------------------------------------------------" $boldyellow
-            cecho "Check Nginx Version:" $boldyellow
-            cecho "--------------------------------------------------------" $boldyellow
-            nginx -V
-        echo ""
-            cecho "--------------------------------------------------------" $boldyellow
-            cecho "Check PHP-FPM Version:" $boldyellow
-            cecho "--------------------------------------------------------" $boldyellow
-            php -v
-        echo ""
-            cecho "--------------------------------------------------------" $boldyellow
-            cecho "Check Siege Benchmark Version:" $boldyellow
-            cecho "--------------------------------------------------------" $boldyellow
-        siege -V
-
-        } 2>&1 | tee "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_update_all.log"
+        } 2>&1 | tee "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_data_transfer.log"
         
-        if [ "$CCACHEINSTALL" == 'y' ]; then
-        
-            # check if ccache installed first
-            if [ -f /usr/bin/ccache ]; then
-        { echo ""; source ~/.bashrc; echo "ccache stats:"; ccache -s; echo ""; } 2>&1 | tee -a  "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_update_all.log"
-            fi
-        fi
-
         endtime=$(TZ=UTC date +%s.%N)
         INSTALLTIME=$(echo "scale=2;$endtime - $starttime"|bc )
-        echo "" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_update_all.log"
-        echo "Total Update Time: $INSTALLTIME seconds" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_update_all.log"
-        tail -1 "${CENTMINLOGDIR}/$(ls -Art ${CENTMINLOGDIR}/ | grep 'update_all.log' | tail -1)"
-
+        echo "" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_data_transfer.log"
+        echo "Total Data Transfer Time: $INSTALLTIME seconds" >> "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_data_transfer.log"
+        tail -1 "${CENTMINLOGDIR}/$(ls -Art ${CENTMINLOGDIR}/ | grep '_data_transfer.log' | tail -1)"
         ;;
         22|addwpvhost)
         if [ -f "${CENTMINLOGDIR}/centminmod_${SCRIPT_VERSION}_${DT}_wordpress_addvhost.log" ]; then
@@ -3395,7 +3375,7 @@ EOF
         compressmenu_notice
         funct_pigzinstall
         funct_pbzip2install
-        funct_lbzip2install
+        # funct_lbzip2install
         funct_lzipinstall
         funct_plzipinstall
         #funct_p7zipinstall

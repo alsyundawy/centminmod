@@ -248,6 +248,8 @@ fi
 if [[ "$NGINX_ZLIBNG" = [yY] && "$(uname -m)" = 'x86_64' ]]; then
   zlibng_install
   ZLIBNG_OPT=' --with-zlib=../zlib-ng'
+  CLOUDFLARE_ZLIB='n'
+  NGINX_ZLIBCUSTOM='n'
 else
   ZLIBNG_OPT=""
 fi
@@ -290,7 +292,7 @@ if [[ "$CENTOS_SEVEN" = '7' || "$CENTOS_SIX" = '6' ]]; then
     NGX_HPACK_OPT=' --with-http_v2_hpack_enc'
   elif [[ "$NGINX_HPACK" = [yY] && "$DETECT_NGXVER" -ge '1015000' && "$DETECT_NGXVER" -le '1015007' ]]; then
     NGX_HPACK_OPT=' --with-http_v2_hpack_enc'
-  elif [[ "$NGINX_HPACK" = [yY] && "$DETECT_NGXVER" -ge '1015008' && "$DETECT_NGXVER" -le '1017004' ]]; then
+  elif [[ "$NGINX_HPACK" = [yY] && "$DETECT_NGXVER" -ge '1015008' && "$DETECT_NGXVER" -le '1017006' ]]; then
     NGX_HPACK_OPT=' --with-http_v2_hpack_enc'
   else
     NGX_HPACK_OPT=""
@@ -1220,16 +1222,26 @@ if [[ "$CENTOS_SEVEN" = '7' || "$CENTOS_SIX" = '6' ]]; then
       echo "ls -lahR /usr/local/lib/lua/${BUILDLUA_VER}/resty/"
       ls -lahR /usr/local/lib/lua/${BUILDLUA_VER}/resty/
       echo
+      echo "setup lua_package_path include file"
+      echo "lua_package_path '/usr/local/lib/lua/?.lua;/usr/local/lib/lua/5.1/?.lua;/usr/local/lib/lua/ngx/?.lua;/usr/local/lib/lua/resty/?.lua;;';" > /usr/local/nginx/conf/lua-package-path-include.conf
+
+      LUAPACKAGEPATH_INCLUDECHECK=$(grep '\/usr\/local\/nginx\/conf\/lua-package-path-include.conf' /usr/local/nginx/conf/nginx.conf)
+      if [[ -z "$LUAPACKAGEPATH_INCLUDECHECK" ]]; then
+        sed -i 's|\/usr\/local\/nginx\/conf\/fastcgi_param_https_map.conf;|\/usr\/local\/nginx\/conf\/fastcgi_param_https_map.conf;\ninclude \/usr\/local\/nginx\/conf\/lua-package-path-include.conf;|g' /usr/local/nginx/conf/nginx.conf
+        #service nginx restart >/dev/null 2>&1
+      fi
+      echo
       cd "${DIR_TMP}"
   else
     LUAOPT=""
     LUALD_OPT="-Wl,-rpath,${ZLIBCF_RPATH}${BORINGSSL_RPATH}/usr/local/lib"
-      if [[ -f /usr/local/nginx/modules/ngx_http_lua_module.so && "$NGXDYNAMIC_MANUALOVERRIDE" != [yY] ]]; then
-        rm -rf /usr/local/nginx/modules/ngx_http_lua_module.so
-      fi
-      if [ -f /usr/local/nginx/modules/ngx_http_lua_module.so.old ]; then
-        rm -rf /usr/local/nginx/modules/ngx_http_lua_module.so.old
-      fi
+    if [[ -f /usr/local/nginx/modules/ngx_http_lua_module.so && "$NGXDYNAMIC_MANUALOVERRIDE" != [yY] ]]; then
+      rm -rf /usr/local/nginx/modules/ngx_http_lua_module.so
+    fi
+    if [ -f /usr/local/nginx/modules/ngx_http_lua_module.so.old ]; then
+      rm -rf /usr/local/nginx/modules/ngx_http_lua_module.so.old
+    fi
+    echo > /usr/local/nginx/conf/lua-package-path-include.conf
   fi
 
   if [[ "$NGINX_SPDY" = [yY] ]]; then
@@ -3216,9 +3228,18 @@ egrep '\-march=|\-mtune|\-mavx|\-msse4|\-mpclmul' ${CENTMINLOGDIR}/gcc_diff_nati
   echo "GCC_NONNATIVEFLAGS=$GCC_NONNATIVEFLAGS"
   echo
 
+NGINX_CPU_MARCH=$(gcc -c -Q -march=native --help=target | awk '/  -march/ {print $2}' | head -n1 )
+if [[ "$GCC_FALIGN_FUNCTION" = [yY] ]] && [[ "$NGINX_CPU_MARCH" = 'nehalem' || "$NGINX_CPU_MARCH" = 'westmere' || "$NGINX_CPU_MARCH" = 'core2' || "$NGINX_CPU_MARCH" = 'bonnell' || "$NGINX_CPU_MARCH" = 'silvermont' ]]; then
+  NGINX_FALIGN_FUCTION_OPT=''
+elif [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1-3 | sed "s|\.|0|g")" -gt '40805' && "$GCC_FALIGN_FUNCTION" = [yY] ]]; then
+  NGINX_FALIGN_FUCTION_OPT=' -falign-functions=32'
+else
+  NGINX_FALIGN_FUCTION_OPT=''
+fi
+
 if [[ "$CLANG" = [nN] ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1-3 | sed "s|\.|0|g")" -ge '40805' ]] && [[ "$(uname -m)" = 'x86_64' && "$CPUVENDOR" = 'GenuineIntel' ]]; then
   CCM=64
-  MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}${GCC_NONNATIVEFLAGS}${NGX_FOPENOPT} "
+  MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}${GCC_NONNATIVEFLAGS}${NGX_FOPENOPT}${NGINX_FALIGN_FUCTION_OPT} "
 elif [[ -f "${CLANG_NEWBIN}" && "$CLANG" = [yY] ]] && [[ "$(gcc --version | head -n1 | awk '{print $3}' | cut -d . -f1-3 | sed "s|\.|0|g")" -ge '40805' ]] && [[ "$(uname -m)" = 'x86_64' && "$CPUVENDOR" = 'GenuineIntel' ]]; then
   CCM=64
   MTUNEOPT="-m${CCM} -march=${MARCH_TARGET}${NGX_FOPENOPT} "
@@ -3234,10 +3255,6 @@ elif [[ "$(uname -m)" != 'x86_64' && "$CPUVENDOR" = 'GenuineIntel' ]]; then
 else
   MTUNEOPT=""
 fi
-
-# fix no longer needed with libressl 2.3.3
-# https://community.centminmod.com/threads/libressl-2-3-3-released.6788/
-# libresslcompile_fix
 
 if [[ "$CLANG" = [yY] ]]; then
   if [[ "$NGINX_PASSENGER" = [yY] ]]; then

@@ -1,3 +1,29 @@
+mytop_setup() {
+  if [[ $(rpm -q mytop >/dev/null 2>&1; echo $?) != '0' ]]; then
+      yum -y install mytop
+      echo -e "host=localhost\ndb=mysql\ndelay=2\nidle=0" > /root/.mytop
+      if [ ! -f /usr/local/bin/mytop ]; then
+          wget -q -4 https://gist.github.com/centminmod/14419caaba4f33ffdb240b526f46e8b5/raw/mytop.pl -O /usr/local/bin/mytop
+          chmod +x /usr/local/bin/mytop
+          echo -e "host=localhost\ndb=mysql\ndelay=2\nidle=0\nfullqueries=1" > /root/.mytop
+      fi
+  fi
+}
+
+pureftpd_symlink_fix() {
+  # workaround for too many levels of symbolic links
+  # messages on openvz vpses
+  if [[ "$CENTOS_SEVEN" = '7' && -f /proc/user_beancounters && ! -f /etc/systemd/system/pure-ftpd.service.d/pidfile.conf ]]; then
+    echo
+    # echo "create /etc/systemd/system/pure-ftpd.service.d/pidfile.conf"
+    mkdir -p /etc/systemd/system/pure-ftpd.service.d
+    echo '[Service]' > /etc/systemd/system/pure-ftpd.service.d/pidfile.conf
+    echo 'PIDFile=/run/pure-ftpd.pid' >> /etc/systemd/system/pure-ftpd.service.d/pidfile.conf
+    systemctl daemon-reload
+    #cat /etc/systemd/system/pure-ftpd.service.d/pidfile.conf
+  fi
+}
+
 symlink_setup_emailnotify() {
   if [[ -f "${SCRIPT_DIR}/tools/emailnotify.sh" && ! -h /usr/local/bin/emailnotify ]]; then
     ln -s "${SCRIPT_DIR}/tools/emailnotify.sh" /usr/local/bin/emailnotify >/dev/null 2>&1
@@ -54,10 +80,10 @@ opt_sslcache() {
 
 less_console_verbose() {
   if [ ! -f /proc/user_beancounters ]; then
-    if [[ ! "$(grep 'kernel.printk' /etc/sysctl.d/101-sysctl.conf)" && -f /etc/sysctl.d/101-sysctl.conf ]]; then
+    if [[ -f /etc/sysctl.d/101-sysctl.conf && ! "$(grep 'kernel.printk' /etc/sysctl.d/101-sysctl.conf)" ]]; then
       echo 'kernel.printk=4 1 1 7' >> /etc/sysctl.d/101-sysctl.conf
       sysctl --system >/dev/null 2>&1
-    elif [[ ! "$(grep 'kernel.printk' /etc/sysctl.conf)" && -f /etc/sysctl.conf && ! -f /etc/sysctl.d/101-sysctl.conf ]]; then
+    elif [[ -f /etc/sysctl.conf && ! -f /etc/sysctl.d/101-sysctl.conf && ! "$(grep 'kernel.printk' /etc/sysctl.conf)" ]]; then
       echo 'kernel.printk=4 1 1 7' >> /etc/sysctl.conf
       sysctl -p >/dev/null 2>&1
     fi
@@ -1891,6 +1917,11 @@ csf_distftp() {
 
 pureftpdupdates() {
   if [ -f /etc/pure-ftpd/pure-ftpd.conf ]; then
+    if [ "$SECOND_IP" ]; then
+      CNIP="$SECOND_IP"
+    else
+      CNIP=$(curl -4s https://ipinfo.io/ip)
+    fi
     # disable anonymous logins by default
     CHECKPFTPD_ANON=$(grep 'NoAnonymous                 no' /etc/pure-ftpd/pure-ftpd.conf)
     if [ "$CHECKPFTPD_ANON" ]; then
@@ -1936,6 +1967,21 @@ pureftpdupdates() {
     echo "may take a while to create..."
     openssl dhparam -out /etc/ssl/private/pure-ftpd-dhparams.pem 2048 >/dev/null 2>&1
     echo "pure-ftpd: /etc/ssl/private/pure-ftpd-dhparams.pem created"
+    if [[ "$(ps aufx | grep pure-ftpd | grep -v grep | grep pure-ftpd  >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+      service pure-ftpd restart >/dev/null 2>&1
+    fi
+  fi
+  if [[ "$INITIALINSTALL" != [yY] && -f /etc/pki/pure-ftpd/pure-ftpd.pem && "$(openssl x509 -in /etc/pki/pure-ftpd/pure-ftpd.pem -text -noout | grep '1024 bit')" ]]; then
+    echo "pure-ftpd: update & re-create 2048bit /etc/pki/pure-ftpd/pure-ftpd.pem file for $CNIP"
+    openssl req -x509 -days 7300 -sha256 -nodes -subj "/C=US/ST=California/L=Los Angeles/O=Default Company Ltd/CN=$CNIP" -newkey rsa:2048 -keyout /etc/pki/pure-ftpd/pure-ftpd.pem -out /etc/pki/pure-ftpd/pure-ftpd.pem >/dev/null 2>&1
+    echo "pure-ftpd: /etc/pki/pure-ftpd/pure-ftpd.pem created"
+    if [[ "$(ps aufx | grep pure-ftpd | grep -v grep | grep pure-ftpd  >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+      service pure-ftpd restart >/dev/null 2>&1
+    fi
+  elif [[ "$INITIALINSTALL" != [yY] && ! -f /etc/pki/pure-ftpd/pure-ftpd.pem ]]; then
+    echo "pure-ftpd: create 2048bit /etc/pki/pure-ftpd/pure-ftpd.pem file for $CNIP"
+    openssl req -x509 -days 7300 -sha256 -nodes -subj "/C=US/ST=California/L=Los Angeles/O=Default Company Ltd/CN=$CNIP" -newkey rsa:2048 -keyout /etc/pki/pure-ftpd/pure-ftpd.pem -out /etc/pki/pure-ftpd/pure-ftpd.pem >/dev/null 2>&1
+    echo "pure-ftpd: /etc/pki/pure-ftpd/pure-ftpd.pem created"
     if [[ "$(ps aufx | grep pure-ftpd | grep -v grep | grep pure-ftpd  >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
       service pure-ftpd restart >/dev/null 2>&1
     fi
@@ -2816,6 +2862,7 @@ if [[ "$INITIALINSTALL" != [yY] ]]; then
   opt_sslcache
   add_versionlocks
   symlink_setup_emailnotify
+  pureftpd_symlink_fix
 fi
 
 }

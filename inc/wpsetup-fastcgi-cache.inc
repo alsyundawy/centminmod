@@ -224,7 +224,7 @@ if [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module
   HTTPTWO_MAXHEADERSIZE='http2_max_header_size 32k;'  
 elif [[ "$(nginx -V 2>&1 | grep -Eo 'with-http_v2_module')" = 'with-http_v2_module' ]]; then
   HTTPTWO=y
-  if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep reuseport | awk -F ':  ' '{print $2}' | grep -o reuseport)" != 'reuseport' ]]; then
+  if [[ "$(grep -rn listen /usr/local/nginx/conf/conf.d/ | grep -v '#' | grep 443 | grep ' ssl' | grep ' http2' | grep -o reuseport )" != 'reuseport' ]]; then
     # check if reuseport is supported for listen 443 port - only needs to be added once globally for all nginx vhosts
     NGXVHOST_CHECKREUSEPORT=$(grep --color -Ro SO_REUSEPORT /usr/src/kernels/* | head -n1 | awk -F ":" '{print $2}')
     if [[ "$NGXVHOST_CHECKREUSEPORT" = 'SO_REUSEPORT' ]]; then
@@ -2958,6 +2958,23 @@ if [[ "$wpscache" = 'redis' ]]; then
   touch "/home/nginx/domains/${vhostname}/public/wp-content/uploads/nginx-helper/nginx.log"
   chmod 0660 "/home/nginx/domains/${vhostname}/public/wp-content/uploads/nginx-helper/nginx.log"
   chown nginx:nginx "/home/nginx/domains/${vhostname}/public/wp-content/uploads/nginx-helper/nginx.log"
+  cecho "------------------------------------------------------------" $boldgreen
+  \wp plugin install autoptimize --activate --allow-root
+  configure_autoptimize
+  if [[ "$WP_AUTOPTIMIZE_GZIP" = [yY] ]]; then
+    # https://community.centminmod.com/threads/15314/
+    # https://github.com/centminmod/autoptimize-gzip
+    echo
+    echo "configure autoptimize-gzip https://community.centminmod.com/threads/15314/"
+    mkdir -p "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip"
+    wget -4 -cnv -O "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip/autoptimize-gzip.php" https://github.com/centminmod/autoptimize-gzip/raw/master/autoptimize-gzip.php
+    wget -4 -cnv -O "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip/index.html" https://github.com/centminmod/autoptimize-gzip/raw/master/index.html
+    wget -4 -cnv -O "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip/readme.md" https://github.com/centminmod/autoptimize-gzip/blob/master/readme.md
+    wget -4 -cnv -O "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip/LICENSE" https://github.com/centminmod/autoptimize-gzip/raw/master/LICENSE
+    chown -R nginx:nginx "/home/nginx/domains/${vhostname}/public${WPSUBDIR}/wp-content/plugins/autoptimize-gzip"
+    \wp plugin activate autoptimize-gzip --allow-root
+    \wp plugin status autoptimize-gzip --allow-root
+  fi
 fi
 
 cecho "------------------------------------------------------------" $boldgreen
@@ -3302,7 +3319,7 @@ fi
 rm -rf .wpcli-status
 } 2>&1 | tee /home/nginx/domains/${vhostname}/log/wp_updater-\${DT}.log
 if [ -f /usr/sbin/sendmail ]; then
-sendmail -i \$EMAIL <<END
+sendmail -i $EMAIL <<END
 From: \$EMAILFROM
 To: \$EMAIL
 Subject: Wordpress WP-CLI Auto Update \$(date)
@@ -3649,7 +3666,7 @@ elif [[ "$wpscache" = 'redis' ]]; then
 fi
 } 2>&1 | tee /tmp/setupwp.log
 if [ -f /usr/sbin/sendmail ]; then
-sendmail -i \$WPADMINEMAIL <<END
+sendmail -i $WPADMINEMAIL <<END
 From: \$WPADMINEMAIL_FROM
 To: \$WPADMINEMAIL
 Subject: ${vhostname} Wordpress Installed \$(date)

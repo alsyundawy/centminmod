@@ -48,7 +48,7 @@ CLANG_MEMCACHED='n'           # Memcached menu option 10 routine
 GCCINTEL_PHP='y'              # enable PHP-FPM GCC compiler with Intel cpu optimizations
 PHP_PGO='n'                   # Profile Guided Optimization https://software.intel.com/en-us/blogs/2015/10/09/pgo-let-it-go-php
 PHP_PGO_ALWAYS='n'            # override for PHP_PGO enable for 1 cpu thread servers too
-PHP_PGO_TRAINRUNS='80'        # number of runs done during PGO PHP 7 training runs
+PHP_PGO_TRAINRUNS='10'        # number of runs done during PGO PHP 7 training runs
 PHP_PGO_CENTOSSIX='n'         # CentOS 6 may need GCC >4.4.7 fpr PGO so use devtoolset-4 GCC 5.3
 DEVTOOLSET_PHP='n'            # use devtoolset GCC for GCCINTEL_PHP='y'
 DEVTOOLSETSIX='n'             # Enable or disable devtoolset-6 GCC 6.2 support instead of devtoolset-4 GCC 5.3 support
@@ -103,7 +103,7 @@ MARIADB_UPDATEMAINTENANCE='n'
 
 # Nginx
 NGINXCOMPILE_PIE='n'         # build nginx with Position-independent code (PIC) / Position-indendendent executables (PIEs)
-NGINX_VERSION='1.17.4'      # Use this version of Nginx
+NGINX_VERSION='1.17.6'      # Use this version of Nginx
 NGINX_VHOSTSSL='y'           # enable centmin.sh menu 2 prompt to create self signed SSL vhost 2nd vhost conf
 NGINXBACKUP='y'
 NGINXCPU_AUTOTUNE_NEW='y'    # revised nginx worker_proccess auto tuned settings for >12 cpu thread based servers
@@ -246,6 +246,8 @@ PHP_HUGEPAGES='n'            # Enable explicit huge pages support for PHP 7 on C
 PHP_CUSTOMSSL='n'            # compile php-fpm against openssl 1.0.2+ or libressl 2.3+ whichever nginx uses
 PHPMAKETEST='n'              # set to y to enable make test after PHP make for diagnostic purposes
 AUTODETECPHP_OVERRIDE='n'    # when enabled, php updates will always reinstall all php extensions even if minor php version
+PHP_PCREJIT_STACKSIZE_ADJUST='n' # when enabled, allows you to raise PHP's default PCRE JIT stack size https://github.com/php/php-src/pull/2910
+PHP_PCREJIT_STACKSIZE='512'  # value to raise PHP PCRE JIT stack size when PHP_PCREJIT_STACKSIZE_ADJUST='y' set on centmin.sh menu option 5 runs
 
 PHPGEOIP_ALWAYS='y'          # GeoIP php extension is always reinstalled on php recompiles
 PHPIMAGICK_ALWAYS='y'        # imagick php extension is always reinstalled on php recompiles
@@ -261,6 +263,8 @@ PHPIMAGICK='y'               # Disable or Enable PHP ImagicK extension
 PHPMAILPARSE='y'             # Disable or Enable PHP mailparse extension
 PHPIONCUBE='n'               # Disable or Enable Ioncube Loader via addons/ioncube.sh
 PHPMSSQL='n'                 # Disable or Enable MSSQL server PHP extension
+PHPTIMEZONEDB='y'            # timezonedb PHP extension updated https://pecl.php.net/package/timezonedb
+PHPTIMEZONEDB_VER='2019.3'   # timezonedb PHP extension version
 PHPMSSQL_ALWAYS='n'          # mssql php extension always install on php recompiles
 PHPEMBED='y'                 # built php with php embed SAPI library support --enable-embed=shared
 SHORTCUTS='y'                # shortcuts
@@ -301,7 +305,7 @@ PRIORITIZE_CHACHA_OPENSSL='n' # https://community.centminmod.com/threads/15708/
 
 # LibreSSL
 LIBRESSL_SWITCH='y'        # if set to 'y' it overrides OpenSSL as the default static compiled option for Nginx server
-LIBRESSL_VERSION='2.9.1'   # Use this version of LibreSSL http://www.libressl.org/
+LIBRESSL_VERSION='3.0.2'   # Use this version of LibreSSL http://www.libressl.org/
 
 # BoringSSL
 BORINGSSL_SWITCH='n'       # if set to 'y' it overrides OpenSSL as the default static compiled option for Nginx server
@@ -336,7 +340,7 @@ LIBMEMCACHED_VER='1.0.18'     # libmemcached version for source compile
 TWEMPERF_VER='0.1.1'
 PHPREDIS='y'                # redis PHP extension install
 REDISPHP_VER='4.3.0'        # redis PHP version for PHP <7.x
-REDISPHPSEVEN_VER='5.0.2'   # redis PHP version for PHP =>7.x
+REDISPHPSEVEN_VER='5.1.1'   # redis PHP version for PHP =>7.x
 REDISPHP_GIT='n'            # pull php 7 redis extension from git or pecl downloads
 PHPMONGODB='n'              # MongoDB PHP extension install
 MONGODBPHP_VER='1.5.4'      # MongoDB PHP version

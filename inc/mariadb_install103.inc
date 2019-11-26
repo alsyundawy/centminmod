@@ -519,9 +519,7 @@ fi
 if [[ $(rpm -q net-snmp >/dev/null 2>&1; echo $?) != '0' ]]; then
     time $YUMDNFBIN -y install net-snmp${DISABLEOTHERREPO} 
 fi
-if [[ $(rpm -q mytop >/dev/null 2>&1; echo $?) != '0' ]]; then
-    yum -y install mytop
-fi
+mytop_setup
 
 if [[ "$CENTALTREPO_DISABLE" = [nN] ]]; then
 # make sure MariaDB 5.5 is updated from only one repo
@@ -751,6 +749,7 @@ fi
     
     cmservice mysql stop
     cmservice mysql start
+    chkconfig mysql on
 fi
 
 }
