@@ -27,7 +27,7 @@ DT=$(date +"%d%m%y-%H%M%S")
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='329'
+SCRIPT_INCREMENTVER='362'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
 SCRIPT_DATE='31/12/2019'
@@ -665,13 +665,13 @@ REDISPHP_VER='4.3.0'        # redis PHP version for PHP <7.x
 REDISPHPSEVEN_VER='5.1.1'   # redis PHP version for PHP =>7.x
 REDISPHP_GIT='n'            # pull php 7 redis extension from git or pecl downloads
 PHPMONGODB='n'              # MongoDB PHP extension install
-MONGODBPHP_VER='1.5.4'      # MongoDB PHP version
+MONGODBPHP_VER='1.6.1'      # MongoDB PHP version
 MONGODB_SASL='n'            # SASL not working yet leave = n
 PDOPGSQL_PHPVER='11'        # pdo-pgsql PHP extension version for postgresql
 PHP_LIBZIP='n'              # use newer libzip instead of PHP embedded zip
 PHP_ARGON='n'               # alias for PHP_LIBZIP, when PHP_ARGON='y' then PHP_LIBZIP='y'
 LIBZIP_VER='1.5.2'          # required for PHP 7.2 + with libsodium & argon2
-LIBSODIUM_VER='1.0.17'      # https://github.com/jedisct1/libsodium/releases
+LIBSODIUM_VER='1.0.18'      # https://github.com/jedisct1/libsodium/releases
 LIBSODIUM_NATIVE='n'        # optimise for specific cpu not portable between different cpu modules
 LIBARGON_VER='20171227'     # https://github.com/P-H-C/phc-winner-argon2
 PHP_MCRYPTPECL='y'          # PHP 7.2 deprecated mcrypt support so this adds it back as PECL extension
@@ -791,11 +791,11 @@ MAILPARSEPHP_VER='2.1.6'       # https://pecl.php.net/package/mailparse
 MAILPARSEPHP_COMPATVER='3.0.2' # For PHP 7
 MEMCACHED_INSTALL='y'          # Install Memcached
 LIBEVENT_VERSION='2.1.8'      # Use this version of Libevent
-MEMCACHED_VERSION='1.5.19'    # Use this version of Memcached server
+MEMCACHED_VERSION='1.5.20'    # Use this version of Memcached server
 MEMCACHED_TLS='n'             # TLS support https://github.com/memcached/memcached/wiki/ReleaseNotes1513
 MEMCACHE_VERSION='3.0.8'      # Use this version of Memcache
 MEMCACHEDPHP_VER='2.2.0'      # Memcached PHP extension not server
-MEMCACHEDPHP_SEVENVER='3.1.3' # Memcached PHP 7 only extension version
+MEMCACHEDPHP_SEVENVER='3.1.5' # Memcached PHP 7 only extension version
 LIBMEMCACHED_YUM='y'          # switch to YUM install instead of source compile
 LIBMEMCACHED_VER='1.0.18'     # libmemcached version for source compile
 TWEMPERF_VER='0.1.1'
@@ -2258,7 +2258,7 @@ if [[ "$NSD_INSTALL" = [yY] ]]; then
     nsdinstall
 fi
 
-php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2|7.3|7.4'
+php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2|7.3|7.4|8.0'
 PHPSEVEN_CHECKVER=$?
 echo "$PHPSEVEN_CHECKVER"
 if [[ "$PHPSEVEN_CHECKVER" = '0' ]]; then
@@ -2297,22 +2297,40 @@ if [ -f /etc/init.d/ntpd ]; then
 fi
 
 if [[ "$NGINX_INSTALL" = [yY] && -f /etc/init.d/nginx ]]; then
+  sleep 2
   /etc/init.d/nginx start
 fi
 
-if [[ "$MDB_INSTALL" = [yY] || "$MDB_YUMREPOINSTALL" = [yY] ]] && [ -f /etc/init.d/mysql ]; then
-  /etc/init.d/mysql start
+if [[ "$CENTOS_SEVEN" = '7' || "$CENTOS_EIGHT" = '8' ]] && [[ "$MDB_INSTALL" = [yY] || "$MDB_YUMREPOINSTALL" = [yY] ]]; then
+  sleep 2
+  systemctl daemon-reload -q
+  systemctl restart mariadb
+  if [[ "$(systemctl is-active mariadb -q; echo $?)" -ne '0' ]]; then
+    sleep 4
+    systemctl daemon-reload -q
+    systemctl restart mariadb
+  fi
+elif [[ "$MDB_INSTALL" = [yY] || "$MDB_YUMREPOINSTALL" = [yY] ]] && [ -f /etc/init.d/mysql ]; then
+  sleep 3
+  /etc/init.d/mysql restart
 fi
 
 if [[ "$MYSQL_INSTALL" = [yY] && -f /etc/init.d/mysqld ]]; then
   /etc/init.d/mysqld start
 fi
 
+if [[ "$(service postfix status >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
+  sleep 2
+  service postfix restart
+fi
+
 if [[ "$(service csf status >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
+  sleep 2
   service csf start
 fi
 
 if [[ "$(service lfd status >/dev/null 2>&1; echo $?)" -ne '0' ]]; then
+  sleep 2
   service lfd start
 fi
 
@@ -2618,6 +2636,13 @@ cleanup_msg() {
 
 trap cleanup_msg SIGHUP SIGINT SIGTERM SIGTSTP
 EOF
+    if [[ "$(id -u)" -ne '0' ]]; then
+      sed -i '/cmdir=/d' $HOME/.bashrc
+      sed -i '/centmin=/d' $HOME/.bashrc
+      rm -rf /usr/bin/cmdir
+      alias cmdir="pushd ${SCRIPT_DIR}"
+      echo "alias cmdir='pushd ${SCRIPT_DIR}'" >> $HOME/.bashrc
+    fi
     chmod 0700 /usr/bin/centmin
 
     unsetramdisk
@@ -2735,6 +2760,15 @@ else
     echo "alias fpm-phperrlog='tail -10 /var/log/php-fpm/www-php.error.log'" >> /root/.bashrc
     echo "alias fpm-slowlog='tail -10 /var/log/php-fpm/www-slow.log'" >> /root/.bashrc
     echo "alias cmdir='pushd ${SCRIPT_DIR}'" >> /root/.bashrc
+    if [[ "$(id -u)" -ne '0' ]]; then
+      sed -i '/cmdir=/d' $HOME/.bashrc
+      sed -i '/centmin=/d' $HOME/.bashrc
+      rm -rf /usr/bin/cmdir
+      echo "alias fpm-errlog='tail -10 /var/log/php-fpm/www-error.log'" >> $HOME/.bashrc
+      echo "alias fpm-phperrlog='tail -10 /var/log/php-fpm/www-php.error.log'" >> $HOME/.bashrc
+      echo "alias fpm-slowlog='tail -10 /var/log/php-fpm/www-slow.log'" >> $HOME/.bashrc
+      echo "alias cmdir='pushd ${SCRIPT_DIR}'" >> $HOME/.bashrc
+    fi
 cat > "/usr/bin/centmin" << EOF
 #!/bin/bash
 pushd "$SCRIPT_DIR"; . ./centmin.sh

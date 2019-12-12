@@ -19,8 +19,15 @@ pureftpd_symlink_fix() {
     mkdir -p /etc/systemd/system/pure-ftpd.service.d
     echo '[Service]' > /etc/systemd/system/pure-ftpd.service.d/pidfile.conf
     echo 'PIDFile=/run/pure-ftpd.pid' >> /etc/systemd/system/pure-ftpd.service.d/pidfile.conf
-    systemctl daemon-reload
+    systemctl daemon-reload >/dev/null 2>&1
     #cat /etc/systemd/system/pure-ftpd.service.d/pidfile.conf
+  fi
+}
+
+symlink_setup_mariadb() {
+  if [[ "$CENTOS_SEVEN" = '7' && "$MYSQLSERVICE_DISABLED" = [nN] && ! -h /etc/systemd/system/multi-user.target.wants/mariadb.service ]]; then
+    # ensure MariaDB service startup symlink is setup
+    systemctl enable mariadb >/dev/null 2>&1
   fi
 }
 
@@ -790,9 +797,9 @@ checkipvsix() {
   # disable system IPv6 support
   # https://wiki.centos.org/FAQ/CentOS7#head-8984faf811faccca74c7bcdd74de7467f2fcd8ee
   if [[ "$DISABLE_IPVSIX" = [yY] ]]; then
-    if [[ -d /etc/postfix && "$(postconf -n inet_protocols | grep -w 'all')" ]]; then
+    if [[ -d /etc/postfix && "$(grep -w 'inet_protocols' /etc/postfix/main.cf | grep -w 'all')" ]]; then
       postconf -e 'inet_protocols = ipv4'
-      service postfix restart >/dev/null 2>&1
+      restartpostfix='y'
     fi
     if [[ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6)" -eq '0' ]]; then
       DETECH_CHANGES='y'
@@ -811,6 +818,9 @@ checkipvsix() {
       sed -i 's|net.ipv6.conf.default.disable_ipv6 = .*|net.ipv6.conf.default.disable_ipv6 = 1|' /etc/sysctl.conf
       sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
     fi
+    if [[ "$restartpostfix" = [yY] ]]; then
+      service postfix restart >/dev/null 2>&1
+    fi
     # address centos 7.4+ rpcbind failure to start if IPv6 is disabled
     # https://community.centminmod.com/threads/13353/
     if [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/lib/systemd/system/rpcbind.socket && "$(systemctl is-active rpcbind.socket -q; echo $?)" -eq '0' ]]; then
@@ -823,8 +833,8 @@ ListenStream=0.0.0.0:111
 ListenStream=/var/run/rpcbind.sock
 ROF
       systemctl daemon-reload -q
-      systemctl stop rpcbind.socket -q
-      systemctl start rpcbind.socket -q
+      systemctl stop rpcbind.socket rpcbind.service -q
+      systemctl start rpcbind.socket rpcbind.service -q
     elif [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/lib/systemd/system/rpcbind.socket && "$(systemctl is-active rpcbind.socket -q; echo $?)" -ne '0' ]]; then
       # rpcbind.socket is not active so does not needs restart
       mkdir -p /etc/systemd/system/rpcbind.socket.d
@@ -834,11 +844,14 @@ ListenStream=
 ListenStream=0.0.0.0:111
 ListenStream=/var/run/rpcbind.sock
 ROF
+      systemctl daemon-reload -q
+      systemctl stop rpcbind.socket rpcbind.service -q
+      systemctl start rpcbind.socket rpcbind.service -q
     fi
   elif [[ "$DISABLE_IPVSIX" != [yY] ]]; then
-    if [[ -d /etc/postfix && "$(postconf -n inet_protocols | grep -w 'ipv4')" ]]; then
+    if [[ -d /etc/postfix && "$(grep -w 'inet_protocols' /etc/postfix/main.cf | grep -w 'ipv4')" ]]; then
       postconf -e 'inet_protocols = all'
-      service postfix restart >/dev/null 2>&1
+      restartpostfix='y'
     fi
     if [[ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6)" -eq '1' ]]; then
       DETECH_CHANGES='y'
@@ -849,15 +862,37 @@ ROF
       echo 'net.ipv6.conf.all.disable_ipv6 = 0' >> /etc/sysctl.conf
       sysctl -w net.ipv6.conf.all.disable_ipv6=0 >/dev/null 2>&1
     elif [[ "$DETECH_CHANGES" = [yY] && "$(grep -w 'net.ipv6.conf.all.disable_ipv6' /etc/sysctl.conf)" ]]; then
-      sed -i 's|net.ipv6.conf.all.disable_ipv6 = .*|net.ipv6.conf.all.disable_ipv6 = 1|' /etc/sysctl.conf
-      sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1
+      sed -i 's|net.ipv6.conf.all.disable_ipv6 = .*|net.ipv6.conf.all.disable_ipv6 = 0|' /etc/sysctl.conf
+      sysctl -w net.ipv6.conf.all.disable_ipv6=0 >/dev/null 2>&1
     fi
     if [[ "$DETECH_CHANGES" = [nN] && ! "$(grep -w 'net.ipv6.conf.default.disable_ipv6' /etc/sysctl.conf)" ]]; then
       echo 'net.ipv6.conf.default.disable_ipv6 = 0' >> /etc/sysctl.conf
       sysctl -w net.ipv6.conf.default.disable_ipv6=0 >/dev/null 2>&1
     elif [[ "$DETECH_CHANGES" = [yY] && "$(grep -w 'net.ipv6.conf.default.disable_ipv6' /etc/sysctl.conf)" ]]; then
-      sed -i 's|net.ipv6.conf.default.disable_ipv6 = .*|net.ipv6.conf.default.disable_ipv6 = 1|' /etc/sysctl.conf
-      sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
+      sed -i 's|net.ipv6.conf.default.disable_ipv6 = .*|net.ipv6.conf.default.disable_ipv6 = 0|' /etc/sysctl.conf
+      sysctl -w net.ipv6.conf.default.disable_ipv6=0 >/dev/null 2>&1
+    fi
+    if [[ "$restartpostfix" = [yY] ]]; then
+      service postfix restart >/dev/null 2>&1
+    fi
+    # address centos 7.4+ rpcbind failure to start if IPv6 is disabled
+    # https://community.centminmod.com/threads/13353/
+    if [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/lib/systemd/system/rpcbind.socket && "$(systemctl is-active rpcbind.socket -q; echo $?)" -eq '0' ]]; then
+      # rpcbind.socket is active so needs restart
+      if [ -f /etc/systemd/system/rpcbind.socket.d/no-ipv6.conf ]; then
+        rm -rf /etc/systemd/system/rpcbind.socket.d/no-ipv6.conf
+      fi
+      systemctl daemon-reload -q
+      systemctl stop rpcbind.socket rpcbind.service -q
+      systemctl start rpcbind.socket rpcbind.service -q
+    elif [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/lib/systemd/system/rpcbind.socket && "$(systemctl is-active rpcbind.socket -q; echo $?)" -ne '0' ]]; then
+      # rpcbind.socket is not active so does not needs restart
+      if [ -f /etc/systemd/system/rpcbind.socket.d/no-ipv6.conf ]; then
+        rm -rf /etc/systemd/system/rpcbind.socket.d/no-ipv6.conf
+      fi
+      systemctl daemon-reload -q
+      systemctl stop rpcbind.socket rpcbind.service -q
+      systemctl start rpcbind.socket rpcbind.service -q
     fi
   fi
   if [[ -f /etc/csf/csf.conf && -f /etc/sysconfig/network && "$(awk -F "=" '/NETWORKING_IPV6/ {print $2}' /etc/sysconfig/network | grep 'yes' >/dev/null 2>&1; echo $?)" = '0' ]] && [[ "$(cat /proc/sys/net/ipv6/conf/all/disable_ipv6)" -eq '0' && "$(cat /proc/sys/net/ipv6/conf/default/disable_ipv6)" -eq '0' ]]; then
@@ -877,22 +912,6 @@ ROF
     sed -i "s|^IPV6 = .*|IPV6 = \"0\"|" /etc/csf/csf.conf
     csf -ra >/dev/null 2>&1
   fi
-    # address centos 7.4+ rpcbind failure to start if IPv6 is disabled
-    # https://community.centminmod.com/threads/13353/
-    if [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/lib/systemd/system/rpcbind.socket && "$(systemctl is-active rpcbind.socket -q; echo $?)" -eq '0' ]]; then
-      # rpcbind.socket is active so needs restart
-      if [ -f /etc/systemd/system/rpcbind.socket.d/no-ipv6.conf ]; then
-        rm -rf /etc/systemd/system/rpcbind.socket.d/no-ipv6.conf
-      fi
-      systemctl daemon-reload -q
-      systemctl stop rpcbind.socket -q
-      systemctl start rpcbind.socket -q
-    elif [[ "$CENTOS_SEVEN" -eq '7' && -f /usr/lib/systemd/system/rpcbind.socket && "$(systemctl is-active rpcbind.socket -q; echo $?)" -ne '0' ]]; then
-      # rpcbind.socket is not active so does not needs restart
-      if [ -f /etc/systemd/system/rpcbind.socket.d/no-ipv6.conf ]; then
-        rm -rf /etc/systemd/system/rpcbind.socket.d/no-ipv6.conf
-      fi
-    fi
   if [[ "$DETECH_CHANGES" = [yY] ]]; then
     service network restart >/dev/null 2>&1
   fi
@@ -1728,6 +1747,25 @@ trap cleanup_msg SIGHUP SIGINT SIGTERM SIGTSTP
 EOF
     chmod 0700 /usr/bin/centmin
   fi
+  if [[ "$(id -u)" -ne '0' ]]; then
+    if [[ "$(grep 'cmdir=' $HOME/.bashrc)" || "$(grep 'centmin=' $HOME/.bashrc)" ]]; then
+      sed -i '/cmdir=/d' $HOME/.bashrc
+      sed -i '/centmin=/d' $HOME/.bashrc
+      rm -rf /usr/bin/cmdir
+      alias cmdir="pushd ${SCRIPT_DIR}"
+      echo "alias cmdir='pushd ${SCRIPT_DIR}'" >> $HOME/.bashrc
+cat > "/usr/bin/centmin" << EOF
+#!/bin/bash
+pushd "$SCRIPT_DIR"; . ./centmin.sh
+cleanup_msg() {
+  exit 1
+}
+
+trap cleanup_msg SIGHUP SIGINT SIGTERM SIGTSTP
+EOF
+      chmod 0700 /usr/bin/centmin
+    fi
+  fi
 }
 
 nvcheck() {
@@ -1753,6 +1791,7 @@ dmotdcheck() {
     echo '#!/bin/bash' > /etc/profile.d/dmotd.sh
     # echo "if [[ \"\$(id -u)\" = '0' && -f /usr/local/bin/dmotd ]]; then  /usr/local/bin/dmotd; fi" >> /etc/profile.d/dmotd.sh
     echo "if tty -s; then type='interactive'; if [[ \"\$(id -u)\" = '0' && -f /usr/local/bin/dmotd ]]; then /usr/local/bin/dmotd; fi; else type='non-interactive'; fi;" >> /etc/profile.d/dmotd.sh
+    echo "if tty -s; then type='interactive'; if [[ \"\$(id -u)\" != '0' && \"\$(id -Gn | grep -wo 'wheel')\" = 'wheel' && -f /usr/local/bin/dmotd ]]; then sudo /usr/local/bin/dmotd; fi; else type='non-interactive'; fi;" >> /etc/profile.d/dmotd.sh
     echo "if echo \$0 | grep -e ^\\- 2>&1>/dev/null; then login='login'; else login='non-login'; fi;" >> /etc/profile.d/dmotd.sh
     # echo "$type/$login"
   fi
@@ -2137,6 +2176,12 @@ crontabdisable_r() {
     # disable crontab -r commmand https://community.centminmod.com/threads/strange-cancellation-of-the-cron.14059/#post-59929
     echo 'crontab () { [[ $@ =~ -[iel]*r ]] && echo '"r" not allowed' || command crontab "$@" ;}' >> /root/.bashrc
   fi
+  if [[ "$(id -u)" -ne '0' ]]; then
+    if [[ ! "$(grep -w 'crontab \(\)' $HOME/.bashrc)" ]]; then
+      # disable crontab -r commmand https://community.centminmod.com/threads/strange-cancellation-of-the-cron.14059/#post-59929
+      echo 'crontab () { [[ $@ =~ -[iel]*r ]] && echo '"r" not allowed' || command crontab "$@" ;}' >> $HOME/.bashrc
+    fi
+  fi
 }
 
 xpowerby() {
@@ -2161,6 +2206,12 @@ pathfixes() {
   if [[ -z "$(grep '\$PATH:' /root/.bashrc)" ]]; then
     # sed -i "s|export PATH=\"\/usr\/lib64\/ccache|export PATH=\"\$PATH:\/usr\/lib64\/ccache|" /root/.bashrc
     sed -i 's|export PATH=.*|export PATH="\$PATH:\/usr\/lib64\/ccache:\/usr\/local\/sbin:\/usr\/local\/bin:\/sbin:\/bin:\/usr\/sbin:\/usr\/bin:\/root\/bin"|' /root/.bashrc
+  fi
+  if [[ "$(id -u)" -ne '0' ]]; then
+    if [[ -z "$(grep '\$PATH:' $HOME/.bashrc)" ]]; then
+      # sed -i "s|export PATH=\"\/usr\/lib64\/ccache|export PATH=\"\$PATH:\/usr\/lib64\/ccache|" $HOME/.bashrc
+      sed -i 's|export PATH=.*|export PATH="\$PATH:\/usr\/lib64\/ccache:\/usr\/local\/sbin:\/usr\/local\/bin:\/sbin:\/bin:\/usr\/sbin:\/usr\/bin:\/root\/bin"|' $HOME/.bashrc
+    fi
   fi
   # for sudo
   if [ -d /etc/sudoers.d ]; then
@@ -2398,6 +2449,7 @@ if [[ ! -f /proc/user_beancounters ]]; then
             if [[ "$(grep 'centminmod added' /etc/sysctl.d/101-sysctl.conf >/dev/null 2>&1; echo $?)" != '0' ]]; then
 cat >> "/etc/sysctl.d/101-sysctl.conf" <<EOF
 # centminmod added
+kernel.pid_max=65536
 kernel.printk=4 1 1 7
 fs.nr_open=12000000
 fs.file-max=9000000
@@ -2668,12 +2720,32 @@ expand_cmdprompt() {
       echo 'export PS1="[\A][\u@\H \W]\\$ "' >> /root/.bashrc
       export PS1="[\A][\u@\H \W]\\$ "
     fi
-  fi  
+  fi
+  if [[ "$(id -u)" -ne '0' ]]; then
+    if [[ -z "$(grep 'PS1' $HOME/.bashrc)" ]]; then
+      if [ "$(id -u)" -eq 0 ]; then 
+        # you are root
+        ORIG=$PS1
+        # PS1="\e[40;1;37m[\A][\u@\H \w]\\$ \e[m " 
+        echo 'export PS1="[\A][\u@\H \W]\\$ "' >> $HOME/.bashrc
+        export PS1="[\A][\u@\H \W]\\$ "
+      else
+        ORIG=$PS1
+        echo 'export PS1="[\A][\u@\H \W]\\$ "' >> $HOME/.bashrc
+        export PS1="[\A][\u@\H \W]\\$ "
+      fi
+    fi
+  fi
 }
 
 setup_pwdh() {
   if [[ -z "$(grep -w 'pwdh' /root/.bashrc)" ]]; then
     echo "alias pwdh='echo -n \"\$HOSTNAME\"; echo \" \$PWD\"'" >> /root/.bashrc
+  fi
+  if [[ "$(id -u)" -ne '0' ]]; then
+    if [[ -z "$(grep -w 'pwdh' $HOME/.bashrc)" ]]; then
+      echo "alias pwdh='echo -n \"\$HOSTNAME\"; echo \" \$PWD\"'" >> $HOME/.bashrc
+    fi
   fi
 }
 
@@ -2862,6 +2934,7 @@ if [[ "$INITIALINSTALL" != [yY] ]]; then
   opt_sslcache
   add_versionlocks
   symlink_setup_emailnotify
+  symlink_setup_mariadb
   pureftpd_symlink_fix
 fi
 
@@ -2872,7 +2945,14 @@ histformat() {
     echo "HISTTIMEFORMAT=\"[%d.%m.%y] %T   \"" >> /root/.bashrc
     echo "export HISTSIZE=10000" >> /root/.bashrc
     echo "export HISTTIMEFORMAT" >> /root/.bashrc
-  fi  
+  fi
+  if [[ "$(id -u)" -ne '0' ]]; then
+    if [[ -z "$(grep HISTTIMEFORMAT $HOME/.bashrc)" ]]; then
+      echo "HISTTIMEFORMAT=\"[%d.%m.%y] %T   \"" >> $HOME/.bashrc
+      echo "export HISTSIZE=10000" >> $HOME/.bashrc
+      echo "export HISTTIMEFORMAT" >> $HOME/.bashrc
+    fi
+  fi
 }
 
 setupdate() {

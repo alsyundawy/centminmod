@@ -306,7 +306,7 @@ else
     echo "----------------------------------------------------------------"
     echo "Install which version of PHP? (version i.e. ${PHP_VERSION}, 7.0.33, NGDEBUG)"
     echo "PHP 7.x/7.1.x/7.2.x/7.3.x is GA Stable but still may have broken PHP extensions."
-    echo "NGDEBUG is PHP 7.4.0 dev builds minus incompatible PHP extensions"
+    echo "NGDEBUG is PHP 8.0 dev builds minus incompatible PHP extensions"
     echo "----------------------------------------------------------------"
     echo
     echo "Current PHP Version: $(php -v 2>&1 | head -n1 | cut -d "(" -f1 | awk '{print $2}')"
@@ -319,7 +319,7 @@ else
         echo
         echo "error: invalid php version format entered you entered: $phpver"
         echo
-        echo "correct exact format example is 7.3.7 not 7.3"
+        echo "correct exact format example is 7.3.12 not 7.3"
         echo "latest php versions are listed at https://php.net/"
         echo
         read -ep "Enter PHP Version number you want to upgrade/downgrade to: " phpver
@@ -612,7 +612,7 @@ fi
     fi
     echo "PHPMUVER = $PHPMUVER"
     echo "PHP_PGO = $PHP_PGO"
-    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' || "$PHPMUVER" = '7.4' ]]; then
+    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' || "$PHPMUVER" = '7.4' || "$PHPMUVER" = '8.0' ]]; then
         echo "make${MAKETHREADS_PHP} prof-gen"
         time make${MAKETHREADS_PHP} prof-gen
         if [ ! -d "$DIR_TMP/php_pgo_training_scripts" ]; then
@@ -1019,7 +1019,14 @@ fi
 
 addmysql_legacyinstall
 
-if [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMUVER" = '7.4' ]]; then
+if [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMUVER" = '8.0' ]]; then
+    echo "PHP_MCRYPTPECL=$PHP_MCRYPTPECL"
+    echo "PHPMVER=$PHPMVER"
+    echo "PHPMUVER=$PHPMUVER"
+    if [ -f /usr/local/src/centminmod/addons/php74-mcrypt.sh ]; then
+        /usr/local/src/centminmod/addons/php74-mcrypt.sh menu
+    fi
+elif [[ "$PHP_MCRYPTPECL" = [yY] ]] && [[ "$PHPMUVER" = '7.4' ]]; then
     echo "PHP_MCRYPTPECL=$PHP_MCRYPTPECL"
     echo "PHPMVER=$PHPMVER"
     echo "PHPMUVER=$PHPMUVER"
@@ -1078,6 +1085,17 @@ if [[ ! "$(grep fpm-errlog /root/.bashrc)" || ! "$(grep fpm-slowlog /root/.bashr
   echo "alias fpm-phperrlog='tail -10 /var/log/php-fpm/www-php.error.log'" >> /root/.bashrc
   echo "alias fpm-slowlog='tail -10 /var/log/php-fpm/www-slow.log'" >> /root/.bashrc
 fi
+if [[ "$(id -u)" -ne '0' ]]; then
+    # set php-fpm alias log inspection shotcuts
+    if [[ ! "$(grep fpm-errlog $HOME/.bashrc)" || ! "$(grep fpm-slowlog $HOME/.bashrc)" || ! "$(grep fpm-phperrlog $HOME/.bashrc)" ]]; then
+        alias fpm-errlog='tail -10 /var/log/php-fpm/www-error.log'
+        alias fpm-phperrlog='tail -10 /var/log/php-fpm/www-php.error.log'
+        alias fpm-slowlog='tail -10 /var/log/php-fpm/www-slow.log'
+        echo "alias fpm-errlog='tail -10 /var/log/php-fpm/www-error.log'" >> $HOME/.bashrc
+        echo "alias fpm-phperrlog='tail -10 /var/log/php-fpm/www-php.error.log'" >> $HOME/.bashrc
+        echo "alias fpm-slowlog='tail -10 /var/log/php-fpm/www-slow.log'" >> $HOME/.bashrc
+    fi
+fi
 
 echo
 php --ini
@@ -1115,7 +1133,7 @@ if [[ "$zendopcacheon" = [yY] && "$OLD_OPCACHEPHP" != [yY] ]]; then
 fi
 
 # notes for users if PHP 7.0 detected
-php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2|7.3|7.4'
+php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.0||7.1|7.2|7.3|7.4|8.0'
 PHPSEVEN_CHECKVER=$?
 echo "$PHPSEVEN_CHECKVER"
 
@@ -1156,6 +1174,21 @@ if [[ "$PHPSEVEN_CHECKVER" = '0' ]]; then
     #     cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcached.ini" $boldyellow
     #     cecho "rm -rf ${CONFIGSCANDIR}/memcached.ini" $boldyellow
     # fi
+    if [[ "$PHPMUVER" = '8.0' && -f "${CONFIGSCANDIR}/mcrypt.ini" ]]; then
+        cecho "PHP 8.0 detected removing incompatible ${CONFIGSCANDIR}/mcrypt.ini" $boldyellow
+        cecho "rm -rf ${CONFIGSCANDIR}/mcrypt.ini" $boldyellow
+        echo
+    fi
+    if [[ "$PHPMUVER" = '8.0' && -f "${CONFIGSCANDIR}/geoip.ini" ]]; then
+        cecho "PHP 8.0 detected removing incompatible ${CONFIGSCANDIR}/geoip.ini" $boldyellow
+        cecho "rm -rf ${CONFIGSCANDIR}/geoip.ini" $boldyellow
+        echo
+    fi
+    if [[ "$PHPMUVER" = '8.0' && -f "${CONFIGSCANDIR}/imagick.ini" ]]; then
+        cecho "PHP 8.0 detected removing incompatible ${CONFIGSCANDIR}/imagick.ini" $boldyellow
+        cecho "rm -rf ${CONFIGSCANDIR}/imagick.ini" $boldyellow
+        echo
+    fi
     echo
     cecho "then restart PHP-FPM again..." $boldyellow
     echo
@@ -1167,7 +1200,7 @@ fi
         cecho "* PHP compiled with CPU_MARCH=$CPU_MARCH" $boldgreen
     fi
     cecho "* PHP upgraded and auto reinstalled PHP extensions" $boldgreen
-    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' || "$PHPMUVER" = '7.4' ]]; then
+    if [[ "$PHP_PGO" = [yY] ]] && [[ "$PHPMUVER" = '7.0' || "$PHPMUVER" = '7.1' || "$PHPMUVER" = '7.2' || "$PHPMUVER" = '7.3' || "$PHPMUVER" = '7.4' || "$PHPMUVER" = '8.0' ]]; then
         cecho "* PHP_PGO='y' detected. PHP compiled with Profile Guided Optimizations" $boldgreen
         cecho "* https://software.intel.com/en-us/blogs/2015/10/09/pgo-let-it-go-php" $boldgreen
     fi

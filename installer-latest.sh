@@ -98,6 +98,26 @@ if [ ! -d "$CENTMINLOGDIR" ]; then
   mkdir -p $CENTMINLOGDIR
 fi
 
+# sudo adjustment
+  if [ -d /etc/sudoers.d ]; then
+    if [ ! -f /etc/sudoers.d/addpaths ]; then
+      touch /etc/sudoers.d/addpaths
+      if [[ "$(uname -m)" = 'x86_64' ]]; then
+        if [[ "$(grep '\/usr\/local\/sbin:\/usr\/local\/bin:\/sbin:\/bin:\/usr\/sbin:\/usr\/bin:\/root\/bin' /etc/sudoers.d/addpaths >/dev/null; echo $?)" != '0' ]]; then
+          echo "Defaults secure_path = /usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin" > /etc/sudoers.d/addpaths
+        fi
+      else
+        if [[ "$(grep '\/usr\/local\/sbin:\/usr\/local\/bin:\/sbin:\/bin:\/usr\/sbin:\/usr\/bin:\/root\/bin' /etc/sudoers.d/addpaths >/dev/null; echo $?)" != '0' ]]; then
+          echo "Defaults secure_path = /usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin" > /etc/sudoers.d/addpaths
+        fi
+      fi
+    fi
+    if [ -f /etc/sudoers.d/addpaths ]; then
+      chmod 0440 /etc/sudoers.d/addpaths
+      # visudo -c -q
+    fi
+  fi
+
 if [ "$CENTOSVER" == 'release' ]; then
     CENTOSVER=$(awk '{ print $4 }' /etc/redhat-release | cut -d . -f1,2)
     if [[ "$(cat /etc/redhat-release | awk '{ print $4 }' | cut -d . -f1)" = '7' ]]; then
@@ -743,6 +763,12 @@ source_wgetinstall() {
     echo "alias wget='/usr/local/bin/wget'" >> /root/.bashrc
   fi
   . /root/.bashrc
+  if [[ "$(id -u)" -ne '0' ]]; then
+    if [[ ! "$(grep '^alias wget' $HOME/.bashrc)" ]]; then
+      echo "alias wget='/usr/local/bin/wget'" >> $HOME/.bashrc
+    fi
+    . $HOME/.bashrc
+  fi
 
   echo
   cecho "--------------------------------------------------------" $boldgreen
@@ -913,6 +939,7 @@ if [[ ! -f /proc/user_beancounters ]]; then
             fi
 cat >> "/etc/sysctl.d/101-sysctl.conf" <<EOF
 # centminmod added
+kernel.pid_max=65536
 kernel.printk=4 1 1 7
 fs.nr_open=12000000
 fs.file-max=9000000
@@ -979,6 +1006,7 @@ EOF
             fi
 cat >> "/etc/sysctl.conf" <<EOF
 # centminmod added
+kernel.pid_max=65536
 kernel.printk=4 1 1 7
 fs.nr_open=12000000
 fs.file-max=9000000
@@ -1279,8 +1307,8 @@ cd $INSTALLDIR
 #sed -i "s|PHPREDIS='y'|PHPREDIS='n'|" centmin.sh
 
 # switch from PHP 5.4.41 to 5.6.9 default with Zend Opcache
-PHPVERLATEST=$(curl -${ipv_forceopt}sL https://www.php.net/downloads.php| egrep -o "php\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "php-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | uniq | grep '7.2' | head -n1)
-PHPVERLATEST=${PHPVERLATEST:-"7.2.22"}
+PHPVERLATEST=$(curl -${ipv_forceopt}sL https://www.php.net/downloads.php| egrep -o "php\-[0-9.]+\.tar[.a-z]*" | grep -v '.asc' | awk -F "php-" '/.tar.gz$/ {print $2}' | sed -e 's|.tar.gz||g' | uniq | grep '7.3' | head -n1)
+PHPVERLATEST=${PHPVERLATEST:-"7.3.12"}
 sed -i "s|^PHP_VERSION='.*'|PHP_VERSION='$PHPVERLATEST'|" centmin.sh
 sed -i "s|ZOPCACHEDFT='n'|ZOPCACHEDFT='y'|" centmin.sh
 
@@ -1342,6 +1370,14 @@ rm -rf /etc/centminmod/email-secondary.ini
     alias cmdir="pushd /usr/local/src/centminmod"
     echo "alias cmdir='pushd /usr/local/src/centminmod'" >> /root/.bashrc
     echo -e "pushd /usr/local/src/centminmod; bash centmin.sh" > /usr/bin/centmin
+    if [[ "$(id -u)" -ne '0' ]]; then
+      sed -i '/cmdir=/d' $HOME/.bashrc
+      sed -i '/centmin=/d' $HOME/.bashrc
+      rm -rf /usr/bin/cmdir
+      alias cmdir="pushd /usr/local/src/centminmod"
+      echo "alias cmdir='pushd /usr/local/src/centminmod'" >> $HOME/.bashrc
+      echo -e "pushd /usr/local/src/centminmod; bash centmin.sh" > /usr/bin/centmin
+    fi
     chmod 0700 /usr/bin/centmin
   echo
   echo "Created command shortcuts:"
