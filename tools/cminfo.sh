@@ -17,6 +17,8 @@ USER='root'
 PASS=''
 MYSQLHOST='localhost'
 #####################################################
+CMINFO_SAR_MEM='y'
+CMINFO_SAR_DAYS='7'
 FORCE_IPVFOUR='y' # curl/wget commands through script force IPv4
 CURL_TIMEOUTS=' --max-time 5 --connect-timeout 5'
 CURRENTIP=$(echo $SSH_CLIENT | awk '{print $1}')
@@ -65,6 +67,10 @@ fi
 
 if [ ! -f /usr/bin/smem ]; then
     yum -y -q install smem
+fi
+
+if [[ ! -f /usr/bin/datamash && -f /usr/bin/systemctl ]]; then
+    yum -y -q install datamash
 fi
 
 if [ -z $PASS ]; then
@@ -132,6 +138,150 @@ cmservice() {
       fi
     fi
   fi
+}
+
+phpfpm_mem_stats() {
+    if [[ -f /usr/bin/systemctl && -f /usr/bin/smem && "$(smem -P 'php-fpm: pool' | egrep -v 'python|Command')" ]]; then
+        echo
+        f=$(free -wk | awk '/Mem:/ {print $8}')
+        cpu_c=$(nproc)
+        count_php_masters=$(ps xao pid,ppid,command | grep 'php-fpm[:] master' | wc -l)
+        if [[ ! "$count_php_masters" ]]; then
+            count_php_masters=0
+            list_php_masters==
+        else
+            get_phppool_names=$(ps aux | grep "php-fpm" | grep -v ^root | grep -v grep | grep pool| awk '{print $13}' | sort -u)
+            map_pid_poolname=$(ps aux | grep "php-fpm" | grep -v ^root | grep -v grep | grep pool| awk '{print $2, $13}' | sort -n)
+            display_phppool_names="$(echo -e "PHP-FPM Pool Names:\n$get_phppool_names")"
+            count_php_masters=$count_php_masters
+            list_php_masters=$(ps xao pid,command | grep 'php-fpm[:] master' | sed -e 's|(||g' -e 's|)||g' -e 's|process ||g')
+        fi
+        echo "------------------------------------------------------------------"
+        echo "Total PHP-FPM Master Processes: $count_php_masters"
+        echo "$display_phppool_names"
+        echo "------------------------------------------------------------------"
+        echo "$list_php_masters"
+        echo "------------------------------------------------------------------"
+        smem -P 'php-fpm: pool' | egrep -v 'python|Command' | awk -v f=$f -v c=$cpu_c -v m=$count_php_masters '{swap+=$6; uss+=$7; pss+=$8; rss+=$9} END {print "Current Free Memory (KB): "f"\n""PHP-FPM Available Memory (KB): "f+rss"\n""Estimated Max PHP Children: "(f+rss)/(rss/NR)"\n""Estimated Max PHP Children To CPU Thread Ratio: "((f+rss)/(rss/NR)/c)"\nPHP-FPM Total Children: " NR " from "m" PHP-FPM master(s)" "\nPHP-FPM Total Used Memory (KB): ""swap:"swap, "uss:"uss, "pss:"pss, "rss:"rss"\n""PHP-FPM Average Per Child (KB): ""swap:"swap/NR, "uss:"uss/NR, "pss:"pss/NR, "rss:"rss/NR}'
+        echo "uss = user set size"
+        echo "pss = process set size"
+        echo "rss = resident set size"
+    elif [ ! "$(smem -P 'php-fpm: pool' | egrep -v 'python|Command')" ]; then
+        getpm_value=$(awk -F '= ' '/^pm =/ {print $2}' /usr/local/etc/php-fpm.conf)
+        echo "PHP-FPM pm = $getpm_value in /usr/local/etc/php-fpm.conf"
+        echo "PHP-FPM memory usage only viewable when pm = static"
+    fi
+}
+
+sar_cpu_pc() {
+    # cummulative period metrics
+    if [ -f /usr/bin/datamash ]; then
+        echo
+        echo "------------------------------------------------------------------"
+        echo " CPU Utilisation % Last $CMINFO_SAR_DAYS days ($(nproc) CPU Threads):"
+        echo "------------------------------------------------------------------"
+        for t in $(seq 1 $CMINFO_SAR_DAYS); do
+            if [ -f "/var/log/sa/sa$(date +%d -d "$t day ago")" ]; then
+                sar -u -f /var/log/sa/sa$(date +%d -d "$t day ago") >> "${CENTMINLOGDIR}/cminfo-top-sar-cpu-period-${CMINFO_SAR_DAYS}-${DT}.log"
+            fi
+        done
+            sar_cpu_metrics_period=$(cat "${CENTMINLOGDIR}/cminfo-top-sar-cpu-period-${CMINFO_SAR_DAYS}-${DT}.log" | egrep -iv 'Linux|runq|user|mem|DEV|Average' | sed -e '1d' -e '/^ *$/d' | awk '{print $4,$5,$6,$7,$8,$9}' | datamash -W -R 2 --no-strict --filler 0 min 1-6 mean 1-6 max 1-6 perc:50 1-6 perc:75 1-6 perc:90 1-6 perc:95 1-6 perc:99 1-6 | column -t | xargs -n6 | awk '{print "%user:",$1, "%nice:",$2, "%system:",$3, "%iowait:",$4, "%steal:",$5, "%idle:",$6}')
+            sar_cpu_umin_period=$(echo "$sar_cpu_metrics_period" | sed -n 1p)
+            sar_cpu_uavg_period=$(echo "$sar_cpu_metrics_period" | sed -n 2p)
+            sar_cpu_umax_period=$(echo "$sar_cpu_metrics_period" | sed -n 3p)
+            sar_cpu_upc_period_50=$(echo "$sar_cpu_metrics_period" | sed -n 4p)
+            sar_cpu_upc_period_75=$(echo "$sar_cpu_metrics_period" | sed -n 5p)
+            sar_cpu_upc_period_90=$(echo "$sar_cpu_metrics_period" | sed -n 6p)
+            sar_cpu_upc_period_95=$(echo "$sar_cpu_metrics_period" | sed -n 7p)
+            sar_cpu_upc_period_99=$(echo "$sar_cpu_metrics_period" | sed -n 8p)
+            echo -e "%CPU min: $sar_cpu_umin_period\n%CPU avg: $sar_cpu_uavg_period\n%CPU max: $sar_cpu_umax_period\n%CPU 50%: $sar_cpu_upc_period_50\n%CPU 75%: $sar_cpu_upc_period_75\n%CPU 90%: $sar_cpu_upc_period_90\n%CPU 95%: $sar_cpu_upc_period_95\n%CPU 99%: $sar_cpu_upc_period_99" | column -t
+        rm -f "${CENTMINLOGDIR}/cminfo-top-sar-cpu-period-${CMINFO_SAR_DAYS}-${DT}.log"
+    fi
+    echo
+    echo "------------------------------------------------------------------"
+    echo " CPU Utilisation % Daily Last $CMINFO_SAR_DAYS days ($(nproc) CPU Threads):"
+    echo "------------------------------------------------------------------"
+    # daily metrics
+    for t in $(seq 1 $CMINFO_SAR_DAYS); do
+        if [ -f "/var/log/sa/sa$(date +%d -d "$t day ago")" ]; then
+            sar_cpu_stats=$(sar -u -f /var/log/sa/sa$(date +%d -d "$t day ago"))
+            sar_u=$(echo "$sar_cpu_stats" | grep 'Average:' | tail -1);
+            if [ -f /usr/bin/datamash ]; then
+                # display each day's cpu utilisation min, avg, max, 95% percentile numbers
+                # instead report datamash calculated ones
+                echo "$(date '+%b %d %Y' -d "$t day ago") %CPU";
+                sar_cpu_metrics=$(echo "$sar_cpu_stats" | egrep -iv 'Linux|runq|user|mem|DEV|Average' | sed -e '1d' -e '/^ *$/d' | awk '{print $4,$5,$6,$7,$8,$9}' | datamash -W -R 2 --no-strict --filler 0 min 1-6 mean 1-6 max 1-6 perc:95 1-6 | column -t | xargs -n6 | awk '{print "%user:",$1, "%nice:",$2, "%system:",$3, "%iowait:",$4, "%steal:",$5, "%idle:",$6}')
+                sar_cpu_umin=$(echo "$sar_cpu_metrics" | sed -n 1p)
+                sar_cpu_uavg=$(echo "$sar_cpu_metrics" | sed -n 2p)
+                sar_cpu_umax=$(echo "$sar_cpu_metrics" | sed -n 3p)
+                sar_cpu_upc=$(echo "$sar_cpu_metrics" | sed -n 4p)
+                # echo "%CPU min: $sar_cpu_umin"
+                # echo "%CPU avg: $sar_cpu_uavg"
+                # echo "%CPU max: $sar_cpu_umax"
+                # echo "%CPU 95%: $sar_cpu_upc"
+                echo -e "%CPU min: $sar_cpu_umin\n%CPU avg: $sar_cpu_uavg\n%CPU max: $sar_cpu_umax\n%CPU 95%: $sar_cpu_upc" | column -t
+            else
+                # sar reported averages
+                echo -n "$(date '+%b %d %Y' -d "$t day ago") %CPU ";
+                echo "$sar_u" | awk '{print $1, "%user:",$3, "%nice:",$4, "%system:",$5, "%iowait:",$6, "%steal:",$7, "%idle:",$8}';
+            fi
+        fi
+    done
+}
+
+sar_mem_pc() {
+    # only display on centos 7 systems
+    if [[ "$CMINFO_SAR_MEM" = [yY] ]]; then
+        echo
+        echo "------------------------------------------------------------------"
+        echo " Memory Usage Daily Last $CMINFO_SAR_DAYS days ($(nproc) CPU Threads):"
+        echo "------------------------------------------------------------------"
+        for t in $(seq 1 $CMINFO_SAR_DAYS); do
+            if [ -f "/var/log/sa/sa$(date +%d -d "$t day ago")" ]; then
+                sar_mem_stats=$(sar -r -f /var/log/sa/sa$(date +%d -d "$t day ago"))
+                sar_mem=$(echo "$sar_mem_stats" | grep 'Average:' | tail -1);
+                if [ -f /usr/bin/datamash ]; then
+                    # display each day's cpu utilisation min, avg, max, 95% percentile numbers
+                    # instead report datamash calculated ones
+                    if [ -f /usr/bin/systemctl ]; then
+                        echo
+                        echo "$(date '+%b %d %Y' -d "$t day ago") Memory";
+                    else
+                        echo "$(date '+%b %d %Y' -d "$t day ago") Memory";
+                    fi
+                    if [ -f /usr/bin/systemctl ]; then
+                        sar_mem_metrics=$(echo "$sar_mem_stats" | egrep -iv 'Linux|runq|user|mem|DEV|Average' | sed -e '1d' -e '/^ *$/d' | awk '{print $3,$4,$5,$6,$7,$8,$9,$10,$11,$12}' | datamash -W -R 1 --no-strict --filler 0 min 1-10 mean 1-10 max 1-10 perc:95 1-10 | column -t | xargs -n10 | awk '{print "kbmemfree:",$1, "kbmemused:",$2, "%memused:",$3, "kbbuffers:",$4, "kbcached:",$5, "kbcommit:",$6, "%commit:",$7, "kbactive:",$8, "kbinact:",$9, "kbdirty:",$10}')
+                    else
+                        sar_mem_metrics=$(echo "$sar_mem_stats" | egrep -iv 'Linux|runq|user|mem|DEV|Average' | sed -e '1d' -e '/^ *$/d' | awk '{print $3,$4,$5,$6,$7,$8,$9}' | datamash -W -R 1 --no-strict --filler 0 min 1-7 mean 1-7 max 1-7 perc:95 1-7 | column -t | xargs -n7 | awk '{print "kbmemfree:",$1, "kbmemused:",$2, "%memused:",$3, "kbbuffers:",$4, "kbcached:",$5, "kbcommit:",$6, "%commit:",$7')
+                    fi
+                    if [ -f /usr/bin/systemctl ]; then
+                        sar_mem_umin=$(echo "$sar_mem_metrics" | sed -n 1p | xargs -n10)
+                        sar_mem_uavg=$(echo "$sar_mem_metrics" | sed -n 2p | xargs -n10)
+                        sar_mem_umax=$(echo "$sar_mem_metrics" | sed -n 3p | xargs -n10)
+                        sar_mem_upc=$(echo "$sar_mem_metrics" | sed -n 4p | xargs -n10)
+                    else
+                        sar_mem_umin=$(echo "$sar_mem_metrics" | sed -n 1p)
+                        sar_mem_uavg=$(echo "$sar_mem_metrics" | sed -n 2p)
+                        sar_mem_umax=$(echo "$sar_mem_metrics" | sed -n 3p)
+                        sar_mem_upc=$(echo "$sar_mem_metrics" | sed -n 4p)
+                    fi
+                    if [ -f /usr/bin/systemctl ]; then
+                        echo -e "Memory min:\n$sar_mem_umin\nMemory avg:\n$sar_mem_uavg\nMemory max:\n$sar_mem_umax\nMemory 95%:\n$sar_mem_upc" | column -t
+                    else
+                        echo -e "Memory min: $sar_mem_umin\nMemory avg: $sar_mem_uavg\nMemory max: $sar_mem_umax\nMemory 95%: $sar_mem_upc" | column -t
+                    fi
+                else
+                    # sar reported averages
+                    echo -n "$(date '+%b %d %Y' -d "$t day ago") Memory ";
+                    if [ -f /usr/bin/systemctl ]; then
+                        echo "$sar_mem" | awk '{print $1, "kbmemfree:",$2, "kbmemused:",$3, "%memused:",$4, "kbbuffers:",$5, "kbcached:",$6, "kbcommit:",$7, "%commit:",$8, "kbactive:",$9, "kbinact:",$10, "kbdirty:",$11}'
+                    else
+                        echo "$sar_mem" | awk '{print $1, "kbmemfree:",$2, "kbmemused:",$3, "%memused:",$4, "kbbuffers:",$5, "kbcached:",$6, "kbcommit:",$7, "%commit:",$8}'
+                    fi
+                fi
+            fi
+        done
+    fi
 }
 
 #####################################################
@@ -287,12 +437,14 @@ top_info() {
         echo
         echo "------------------------------------------------------------------"
         echo "php-fpm stats"
+        phpfpm_mem_stats
         echo
         fpmstats
     elif [[ -f /usr/local/nginx/conf/conf.d/virtual.conf && "$(grep '^include /usr/local/nginx/conf/phpstatus.conf' /usr/local/nginx/conf/conf.d/virtual.conf)" && ! -f /usr/bin/fpmstats ]]; then
         echo
         echo "------------------------------------------------------------------"
         echo "php-fpm stats"
+        phpfpm_mem_stats
         echo
         curl -s "localhost/phpstatus"
     fi
@@ -369,7 +521,7 @@ top_info() {
         mysqladmin var | tr -s ' ' | egrep -v '+-' 2>/dev/null
         echo
         echo "mysqladmin ext"
-        mysqladmin ext 2>/dev/null
+        mysqladmin ext  | tr -s ' ' | egrep -v '+-' 2>/dev/null
         echo
     fi
     if [[ "$CMINFO_MYSQL_PROCLIST" = [Yy] && "$(mysqladmin ping -s >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
@@ -415,6 +567,9 @@ top_info() {
     echo "pidstat -durh 1 ${pidstat_sec} | sed -e \"s|\$(hostname)|hostname|g\""
     echo "..."
     pidstat -durh 1 ${pidstat_sec} | sed -e "s|$(hostname)|hostname|g"
+
+    sar_cpu_pc
+    sar_mem_pc
     echo "------------------------------------------------------------------"
     echo "Stats saved at: ${CENTMINLOGDIR}/cminfo-top-${DT}.log"
     echo "------------------------------------------------------------------"
@@ -852,6 +1007,30 @@ case "$1" in
     top_info cron
     } 2>&1 | tee "${CENTMINLOGDIR}/cminfo-top-cron-${DT}.log"
         ;;
+    sar-cpu)
+    {
+    sar_cpu_pc
+    } 2>&1 | tee "${CENTMINLOGDIR}/cminfo-top-sar-cpu-${DT}.log"
+        ;;
+    sar-mem)
+    {
+    sar_mem_pc
+    } 2>&1 | tee "${CENTMINLOGDIR}/cminfo-top-sar-mem-${DT}.log"
+        ;;
+    phpmem)
+    {
+    phpfpm_mem_stats
+    } 2>&1 | tee "${CENTMINLOGDIR}/cminfo-top-php-memory-${DT}.log"
+        ;;
+    phpstats)
+    {
+    phpfpm_mem_stats
+    echo
+    if [ -f /usr/bin/fpmstats ]; then
+        fpmstats
+    fi
+    } 2>&1 | tee "${CENTMINLOGDIR}/cminfo-top-php-stats-${DT}.log"
+        ;;
     listlogs)
     list_logs
         ;;
@@ -865,6 +1044,6 @@ case "$1" in
     check_version
     ;;
     *)
-    echo "$0 {info|update|netstat|top|top-cron|listlogs|debug-menuexit|versions|checkver}"
+    echo "$0 {info|update|netstat|top|top-cron|sar-cpu||sar-mem|phpmem|phpstats|listlogs|debug-menuexit|versions|checkver}"
         ;;
 esac

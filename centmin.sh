@@ -27,7 +27,7 @@ DT=$(date +"%d%m%y-%H%M%S")
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='375'
+SCRIPT_INCREMENTVER='403'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
 SCRIPT_DATE='31/12/2019'
@@ -404,6 +404,14 @@ CCACHE_VER="3.7.4"
 CCACHESIZE='2.5G'
 
 #####################################################
+# Maxmind GeoLite2 database API Key
+# https://community.centminmod.com/posts/80656/
+# You can override this API key with your own Maxmind
+# account API key by setting MM_LICENSE_KEY variable 
+# in persistent config file /etc/centminmod/custom_config.inc
+MM_LICENSE_KEY='k0sP8JPgZm6i0sOF'
+
+#####################################################
 # Networking
 # do not edit below variables but instead set them in
 # /etc/centminmod/custom_config.inc as outlined on 
@@ -432,14 +440,14 @@ GCCINTEL_PHP='y'              # enable PHP-FPM GCC compiler with Intel cpu optim
 PHP_PGO='n'                   # Profile Guided Optimization https://software.intel.com/en-us/blogs/2015/10/09/pgo-let-it-go-php
 PHP_PGO_ALWAYS='n'            # override for PHP_PGO enable for 1 cpu thread servers too
 PHP_PGO_TRAINRUNS='10'        # number of runs done during PGO PHP 7 training runs
-PHP_PGO_CENTOSSIX='n'         # CentOS 6 may need GCC >4.4.7 fpr PGO so use devtoolset-4 GCC 5.3
+PHP_PGO_CENTOSSIX='n'         # CentOS 6 may need GCC >4.4.7 fpr PGO so use lastest devtoolset
 DEVTOOLSET_PHP='n'            # use devtoolset GCC for GCCINTEL_PHP='y'
-DEVTOOLSETSIX='n'             # Enable or disable devtoolset-6 GCC 6.2 support instead of devtoolset-4 GCC 5.3 support
+DEVTOOLSETSIX='n'             # Enable or disable devtoolset-6 GCC 6.2 support instead of lastest devtoolset support
 DEVTOOLSETSEVEN='n'           # Enable or disable devtoolset-7 GCC 7.1 support instead of devtoolset-6 GCC 6.2 support
 DEVTOOLSETEIGHT='y'           # source compiled GCC 8 from latest snapshot builds
-NGINX_DEVTOOLSETGCC='y'       # Use devtoolset-4 GCC 5.3 even for CentOS 7 nginx compiles
-GENERAL_DEVTOOLSETGCC='n'     # Use devtoolset-4 GCC 5.3 whereever possible/coded
-CRYPTO_DEVTOOLSETGCC='n'      # Use devtoolset-4 GCC 5.3 for libressl or openssl compiles
+NGINX_DEVTOOLSETGCC='y'       # Use lastest devtoolset even for CentOS 7 nginx compiles
+GENERAL_DEVTOOLSETGCC='n'     # Use lastest devtoolset whereever possible/coded
+CRYPTO_DEVTOOLSETGCC='n'      # Use lastest devtoolset for libressl or openssl compiles
 NGX_GSPLITDWARF='y'           # for Nginx compile https://community.centminmod.com/posts/44072/
 PHP_GSPLITDWARF='y'           # for PHP compile https://community.centminmod.com/posts/44072/
 PHP_LTO='n'                   # enable -flto compiler for GCC 4.8.5+ PHP-FPM compiles currently not working with PHP 7.x
@@ -721,7 +729,7 @@ MYSQL_INSTALL='n'            # Install official Oracle MySQL Server (MariaDB alt
 SENDMAIL_INSTALL='n'         # Install Sendmail (and mailx) set to y and POSTFIX_INSTALL=n for sendmail
 POSTFIX_INSTALL=y            # Install Postfix (and mailx) set to n and SENDMAIL_INSTALL=y for sendmail
 # Nginx
-NGINX_VERSION='1.17.6'       # Use this version of Nginx
+NGINX_VERSION='1.17.7'       # Use this version of Nginx
 NGINX_VHOSTSSL='y'            # enable centmin.sh menu 2 prompt to create self signed SSL vhost 2nd vhost conf
 NGINXBACKUP='y'
 NGINXCPU_AUTOTUNE_NEW='y'    # revised nginx worker_proccess auto tuned settings for >12 cpu thread based servers
@@ -1237,8 +1245,8 @@ elif [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVE
   DEVTOOLSETEIGHT='y'
   DEVTOOLSETSEVEN='n'
 elif [[ "$CENTOS_SIX" -eq '6' && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
-  DEVTOOLSETEIGHT='n'
-  DEVTOOLSETSEVEN='y'
+  DEVTOOLSETEIGHT='y'
+  DEVTOOLSETSEVEN='n'
 elif [[ "$CENTOS_SIX" -eq '6' && "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
   DEVTOOLSETEIGHT='n'
   DEVTOOLSETSEVEN='y'
@@ -1246,8 +1254,9 @@ fi
 
 if [[ "$CENTOS_SIX" -eq '6' && "$BORINGSSL_SWITCH" = [yY] ]]; then
   # centos 6 gcc 4.4.7 too low for boringssl compiles so need
-  # devtoolset-7 gcc 7.3.1+ compiler
-  DEVTOOLSETSEVEN='y'
+  # devtoolset-8 gcc 8.3.1+ compiler
+  DEVTOOLSETEIGHT='y'
+  DEVTOOLSETSEVEN='n'
   CRYPTO_DEVTOOLSETGCC='y'
 fi
 
@@ -2093,9 +2102,9 @@ fi
 
     #chown -R root:nginx /var/lib/php/session/
     chkconfig --levels 235 php-fpm on
-    #/etc/init.d/php-fpm restart 2>/dev/null
+    #service php-fpm restart 2>/dev/null
     # /etc/init.d/php-fpm force-quit
-    /etc/init.d/php-fpm start
+    service php-fpm start
     fileinfo_standalone
 
     if [[ "$CENTOS_SEVEN" -eq '7' && "$SWITCH_PHPFPM_SYSTEMD" = [yY] && -f "$CUR_DIR/tools/php-systemd.sh" ]]; then
@@ -2266,7 +2275,7 @@ if [[ "$PHPSEVEN_CHECKVER" = '0' ]]; then
   if [[ "$PHPMVER" = '7.3' && -f "${CONFIGSCANDIR}/memcache.ini" ]]; then
       # cecho "PHP 7.3 detected removing incompatible ${CONFIGSCANDIR}/memcache.ini" $boldyellow
       # cecho "rm -rf ${CONFIGSCANDIR}/memcache.ini" $boldyellow
-      # /etc/init.d/php-fpm restart >/dev/null 2>&1
+      # service php-fpm restart >/dev/null 2>&1
       echo
   fi
 fi
@@ -2299,7 +2308,7 @@ fi
 
 if [[ "$NGINX_INSTALL" = [yY] && -f /etc/init.d/nginx ]]; then
   sleep 2
-  /etc/init.d/nginx start
+  service nginx start
 fi
 
 if [[ "$CENTOS_SEVEN" = '7' || "$CENTOS_EIGHT" = '8' ]] && [[ "$MDB_INSTALL" = [yY] || "$MDB_YUMREPOINSTALL" = [yY] ]]; then

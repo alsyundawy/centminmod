@@ -4,6 +4,13 @@
 ######################################################
 branchname='123.09beta01'
 FORCE_IPVFOUR='y' # curl/wget commands through script force IPv4
+
+# Maxmind GeoLite2 database API Key
+# https://community.centminmod.com/posts/80656/
+# You can override this API key with your own Maxmind
+# account API key by setting MM_LICENSE_KEY variable 
+# in persistent config file /etc/centminmod/custom_config.inc
+MM_LICENSE_KEY='k0sP8JPgZm6i0sOF'
 ######################################################
 # Setup Colours
 black='\E[30;40m'
@@ -89,27 +96,45 @@ cecho "Updating GeoIP databases..." $boldyellow
   cp -a /usr/share/GeoIP/GeoLiteCity.dat /usr/share/GeoIP/GeoIPCity.dat
 
 if [[ -f /usr/share/GeoIP/GeoLite2-City.mmdb || -f /usr/share/GeoIP/GeoLite2-Country.mmdb ]]; then
+
+  if [ ! -f /etc/centminmod/custom_config.inc ]; then
+    CHECK_CMM_MM_LICENSE_KEY=''
+  else
+    CHECK_CMM_MM_LICENSE_KEY=$(awk -F '=' '/MM_LICENSE_KEY/ {print $2}' /etc/centminmod/custom_config.inc | sed -e 's| ||g' | sed -e 's|"||g' -e "s|'||g")
+  fi
+  if [[ "$MM_LICENSE_KEY" ]]; then
+    echo
+    maxmind_city_url="https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-City&license_key=$MM_LICENSE_KEY&suffix=tar.gz"
+    maxmind_country_url="https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key=$MM_LICENSE_KEY&suffix=tar.gz"
+    maxmind_asn_url="https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-ASN&license_key=$MM_LICENSE_KEY&suffix=tar.gz"
+  else
+    echo
+    maxmind_city_url='https://centminmod.com/centminmodparts/geoip2-lite/GeoLite2-City.tar.gz'
+    maxmind_country_url='https://centminmod.com/centminmodparts/geoip2-lite/GeoLite2-Country.tar.gz'
+    maxmind_asn_url='https://centminmod.com/centminmodparts/geoip2-lite/GeoLite2-ASN.tar.gz'
+  fi
+
   mkdir -p /usr/share/GeoIP
   pushd /usr/share/GeoIP
   cecho "GeoLite2 City database download ..." $boldyellow
-  curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 https://geolite.maxmind.com/download/geoip/database/GeoLite2-City.tar.gz | grep 'HTTP\/' | grep '200'
+  curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "$maxmind_city_url" | grep 'HTTP\/' | grep '200'
   GEOIPTWOCITYDATA_CURLCHECK=$?
   # only overwrite existing downloaded file if the download url is working
   # if download doesn't work, do not overwrite existing downloaded file
   if [[ "$GEOIPTWOCITYDATA_CURLCHECK" = '0' ]]; then
-    wget -${ipv_forceopt}cnv https://geolite.maxmind.com/download/geoip/database/GeoLite2-City.tar.gz -O /usr/share/GeoIP/GeoLite2-City.tar.gz
+    wget -${ipv_forceopt}cnv "$maxmind_city_url" -O /usr/share/GeoIP/GeoLite2-City.tar.gz
   fi
   tar xvzf /usr/share/GeoIP/GeoLite2-City.tar.gz -C /usr/share/GeoIP
   cp -a GeoLite2-City_*/GeoLite2-City.mmdb /usr/share/GeoIP/GeoLite2-City.mmdb
   rm -rf GeoLite2-City_*
 
   cecho "GeoLite2 Country database download ..." $boldyellow
-  curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz | grep 'HTTP\/' | grep '200'
+  curl -${ipv_forceopt}Is --connect-timeout 5 --max-time 5 "$maxmind_country_url" | grep 'HTTP\/' | grep '200'
   GEOIPTWOCOUNTRYDATA_CURLCHECK=$?
   # only overwrite existing downloaded file if the download url is working
   # if download doesn't work, do not overwrite existing downloaded file
   if [[ "$GEOIPTWOCOUNTRYDATA_CURLCHECK" = '0' ]]; then
-    wget -${ipv_forceopt}cnv https://geolite.maxmind.com/download/geoip/database/GeoLite2-Country.tar.gz -O /usr/share/GeoIP/GeoLite2-Country.tar.gz
+    wget -${ipv_forceopt}cnv "$maxmind_country_url" -O /usr/share/GeoIP/GeoLite2-Country.tar.gz
   fi
   tar xvzf /usr/share/GeoIP/GeoLite2-Country.tar.gz -C /usr/share/GeoIP
   cp -a GeoLite2-Country_*/GeoLite2-Country.mmdb /usr/share/GeoIP/GeoLite2-Country.mmdb

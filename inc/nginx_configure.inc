@@ -292,7 +292,7 @@ if [[ "$CENTOS_SEVEN" = '7' || "$CENTOS_SIX" = '6' ]]; then
     NGX_HPACK_OPT=' --with-http_v2_hpack_enc'
   elif [[ "$NGINX_HPACK" = [yY] && "$DETECT_NGXVER" -ge '1015000' && "$DETECT_NGXVER" -le '1015007' ]]; then
     NGX_HPACK_OPT=' --with-http_v2_hpack_enc'
-  elif [[ "$NGINX_HPACK" = [yY] && "$DETECT_NGXVER" -ge '1015008' && "$DETECT_NGXVER" -le '1017006' ]]; then
+  elif [[ "$NGINX_HPACK" = [yY] && "$DETECT_NGXVER" -ge '1015008' && "$DETECT_NGXVER" -le '1017007' ]]; then
     NGX_HPACK_OPT=' --with-http_v2_hpack_enc'
   else
     NGX_HPACK_OPT=""
@@ -863,10 +863,12 @@ if [[ "$CENTOS_SEVEN" = '7' || "$CENTOS_SIX" = '6' ]]; then
       fi
     elif [[ "$CLANG" = [yY] && "$CENTOS_SIX" -eq '6' ]]; then
       CLANG='n'
-      DEVTOOLSETSEVEN='y'
+      DEVTOOLSETEIGHT='y'
+      DEVTOOLSETSEVEN='n'
     elif [[ "$CLANG" = [nN] && "$CENTOS_SIX" -eq '6' ]]; then
       CLANG='n'
-      DEVTOOLSETSEVEN='y'
+      DEVTOOLSETEIGHT='y'
+      DEVTOOLSETSEVEN='n'
     fi
   fi
 
@@ -2819,6 +2821,35 @@ if [[ "$CENTOS_SIX" = '6' && "$CLANG" = [nN] && "$(uname -m)" = 'x86_64' ]]; the
       else
        source /opt/rh/devtoolset-6/enable
       fi
+      which gcc
+      which g++
+      unset CC
+      unset CXX
+      export CC="gcc"
+      export CXX="g++"
+    fi
+  elif [[ "$DEVTOOLSETEIGHT" = [yY] && -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+    # update devtoolset-8 repo
+    # place holder if need to update devtoolset-8 in future
+    export PS_NGX_EXTRA_FLAGS="--with-cc=/opt/rh/devtoolset-8/root/usr/bin/gcc"
+    DEVTOOLSETEIGHT_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+    DEVTOOLSETEIGHT_EXTRAFLAGS=' -fcode-hoisting -Wno-format-extra-args'
+    DEVTOOLSETNINE_FALLTHROUGH=""
+    DEVTOOLSETNINE_EXTRAFLAGS=""
+    DEVTOOLSETSEVEN_FALLTHROUGH=""
+    DEVTOOLSETSEVEN_EXTRAFLAGS=""
+    # PS_FLAGS=$(echo " $PS_NGX_EXTRA_FLAGS")
+    PS_FLAGS=""
+    if [[ "$INITIALINSTALL" != [yY] ]]; then
+      source /opt/rh/devtoolset-8/enable
+      which gcc
+      which g++
+      unset CC
+      unset CXX
+      export CC="ccache gcc"
+      export CXX="ccache g++"
+    else
+      source /opt/rh/devtoolset-8/enable
       which gcc
       which g++
       unset CC

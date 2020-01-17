@@ -88,6 +88,7 @@ funct_memcachedreinstall() {
    if [[ "$CLANG_MEMCACHED" = [yY] ]]; then
       enable_clang
    else
+      check_devtoolset_php
       enable_devtoolset
    fi
 
@@ -715,7 +716,7 @@ service memcached start
 
 # fi # memcache.so check
 
-# /etc/init.d/php-fpm restart
+# service php-fpm restart
 #     fi # PHP_INSTALL=y
 
     echo "*************************************************"

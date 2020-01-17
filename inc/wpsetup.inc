@@ -886,7 +886,7 @@ location ~ [^/]\.php(/|\$) {
 fastcgi_connect_timeout 60s;
 fastcgi_send_timeout 180s;
 fastcgi_read_timeout 300s;
-fastcgi_buffer_size 512k;
+fastcgi_buffer_size 16k;
 fastcgi_buffers 512 16k;
 fastcgi_busy_buffers_size 1m;
 fastcgi_temp_file_write_size 4m;
@@ -989,7 +989,7 @@ location ~ [^/]\.php(/|\$) {
 fastcgi_connect_timeout 60s;
 fastcgi_send_timeout 180s;
 fastcgi_read_timeout 300s;
-fastcgi_buffer_size 512k;
+fastcgi_buffer_size 16k;
 fastcgi_buffers 512 16k;
 fastcgi_busy_buffers_size 1m;
 fastcgi_temp_file_write_size 4m;
@@ -1197,6 +1197,7 @@ server {
   add_header X-Xss-Protection "1; mode=block" always;
   add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
+  #add_header Feature-Policy "accelerometer 'none'; camera 'none'; geolocation 'none'; gyroscope 'none'; magnetometer 'none'; microphone 'none'; payment 'none'; usb 'none'";
 
   # limit_conn limit_per_ip 16;
   # ssi  on;
@@ -1324,6 +1325,7 @@ server {
   add_header X-Xss-Protection "1; mode=block" always;
   add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
+  #add_header Feature-Policy "accelerometer 'none'; camera 'none'; geolocation 'none'; gyroscope 'none'; magnetometer 'none'; microphone 'none'; payment 'none'; usb 'none'";
   $COMP_HEADER;
   ssl_buffer_size 1369;
   ssl_session_tickets on;
@@ -1459,6 +1461,7 @@ server {
   add_header X-Xss-Protection "1; mode=block" always;
   add_header X-Content-Type-Options "nosniff" always;
   #add_header Referrer-Policy "strict-origin-when-cross-origin";
+  #add_header Feature-Policy "accelerometer 'none'; camera 'none'; geolocation 'none'; gyroscope 'none'; magnetometer 'none'; microphone 'none'; payment 'none'; usb 'none'";
 
   # limit_conn limit_per_ip 16;
   # ssi  on;

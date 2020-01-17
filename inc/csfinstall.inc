@@ -1,3 +1,102 @@
+csf_maxmind_geolite_two_download() {
+    csf_maxmind_silent=$1
+    if [[ -f /etc/csf/csf.conf && -d /var/lib/csf/ ]] && [[ ! -f /var/lib/csf/Geo/GeoLite2-Country-Blocks-IPv4.csv || ! -f /var/lib/csf/Geo/GeoLite2-Country-Blocks-IPv6.csv || ! -f GeoLite2-Country-Locations-en.csv ]]; then
+        if [[ "$csf_maxmind_silent" = 'silent' ]]; then
+            wget -q -4 https://centminmod.com/centminmodparts/geoip2-lite/csf-geolite2.tar.gz -O /svr-setup/csf-geolite2.tar.gz
+            tar xf /svr-setup/csf-geolite2.tar.gz -C /var/lib/csf/
+            csf --profile backup cmm-before-maxmind-csf-database-download >/dev/null 2>&1
+            sed -i 's|CC_INTERVAL = .*|CC_INTERVAL = "365"|' /etc/csf/csf.conf
+            csf --profile backup cmm-after-maxmind-csf-database-download >/dev/null 2>&1
+        else
+            wget -4 https://centminmod.com/centminmodparts/geoip2-lite/csf-geolite2.tar.gz -O /svr-setup/csf-geolite2.tar.gz
+            tar xvf /svr-setup/csf-geolite2.tar.gz -C /var/lib/csf/
+            csf --profile backup cmm-before-maxmind-csf-database-download >/dev/null 2>&1
+            sed -i 's|CC_INTERVAL = .*|CC_INTERVAL = "365"|' /etc/csf/csf.conf
+            csf --profile backup cmm-after-maxmind-csf-database-download >/dev/null 2>&1
+            csf --profile list
+            grep '^CC_INTERVAL' /etc/csf/csf.conf
+            # csf -ra
+            tail -20 /var/log/lfd.log
+            ls -lAh /var/lib/csf/Geo
+        fi
+        if [[ "$(csf -l >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+            csf -ra >/dev/null 2>&1
+        fi
+    fi
+}
+
+csf_maxmind_rego() {
+    if [ -f /etc/csf/csf.conf ]; then
+        # https://blog.maxmind.com/2019/12/18/significant-changes-to-accessing-and-using-geolite2-databases/
+        # https://dev.maxmind.com/geoip/geoipupdate/#Direct_Downloads
+        # check if MM_LICENSE_KEY variable is empty in /etc/csf/csf.conf
+        if [ ! -f /etc/centminmod/custom_config.inc ]; then
+            CHECK_CMM_MM_LICENSE_KEY=''
+        else
+            CHECK_CMM_MM_LICENSE_KEY=$(awk -F '=' '/MM_LICENSE_KEY/ {print $2}' /etc/centminmod/custom_config.inc | sed -e 's| ||g' | sed -e 's|"||g' -e "s|'||g")
+        fi
+        CHECK_CSF_MM_LICENSE_KEY=$(awk -F '=' '/MM_LICENSE_KEY/ {print $2}' /etc/csf/csf.conf | sed -e 's| ||g' | sed -e 's|"||g' -e "s|'||g")
+        CHECK_CSF_MM_LICENSE_KEY_VARCHECK=$(awk -F '=' '/MM_LICENSE_KEY/ {print $1}' /etc/csf/csf.conf | sed -e 's| ||g' | sed -e 's|"||g' -e "s|'||g")
+        if [[ "$MM_LICENSE_KEY" && "$CHECK_CMM_MM_LICENSE_KEY" ]] && [ ! "$CHECK_CSF_MM_LICENSE_KEY" ]; then
+            # if MM_LICENSE_KEY variable is set in Centmin Mod's persistent config file
+            # at /etc/centminmod/custom_config.inc via CHECK_CMM_MM_LICENSE_KEY
+            # variable check and not set in CSF config file
+            # at /etc/csf/csf.conf, then ensure CSF Firewall's MM_LICENSE_KEY
+            # variable is populated as well using CHECK_CMM_MM_LICENSE_KEY
+            csf --profile backup cmm-before-maxmind-rego >/dev/null 2>&1
+            sed -i "s|MM_LICENSE_KEY = .*|MM_LICENSE_KEY = \"${MM_LICENSE_KEY}\"|" /etc/csf/csf.conf
+            csf --profile backup cmm-after-maxmind-rego >/dev/null 2>&1
+
+            # if MM_LICENSE_KEY is set, we can change CC_INTERVAL back to default 14 days for
+            # lfd geolite2 database download updates
+            csf --profile backup cmm-before-maxmind-csf-cc-interval-reset >/dev/null 2>&1
+            sed -i 's|CC_INTERVAL = .*|CC_INTERVAL = "14"|' /etc/csf/csf.conf
+            csf --profile backup cmm-after-maxmind-csf-cc-interval-reset >/dev/null 2>&1
+            if [[ "$(csf -l >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+                csf -ra >/dev/null 2>&1
+            fi
+        elif [[ "$MM_LICENSE_KEY" && "$CHECK_CMM_MM_LICENSE_KEY" ]] && [[ "$CHECK_CSF_MM_LICENSE_KEY" = 'k0sP8JPgZm6i0sOF' ]]; then
+            # if MM_LICENSE_KEY variable is set in Centmin Mod's persistent config file
+            # at /etc/centminmod/custom_config.inc via CHECK_CMM_MM_LICENSE_KEY
+            # variable check and shared Maxmind API key is already set in CSF config file
+            # at /etc/csf/csf.conf, then ensure CSF Firewall's MM_LICENSE_KEY
+            # variable is populated with /etc/centminmod/custom_config.inc version
+            csf --profile backup cmm-before-maxmind-rego-override >/dev/null 2>&1
+            sed -i "s|MM_LICENSE_KEY = .*|MM_LICENSE_KEY = \"${MM_LICENSE_KEY}\"|" /etc/csf/csf.conf
+            csf --profile backup cmm-after-maxmind-rego-override >/dev/null 2>&1
+
+            # if MM_LICENSE_KEY is set, we can change CC_INTERVAL back to default 14 days for
+            # lfd geolite2 database download updates
+            csf --profile backup cmm-before-maxmind-csf-cc-interval-reset-override >/dev/null 2>&1
+            sed -i 's|CC_INTERVAL = .*|CC_INTERVAL = "14"|' /etc/csf/csf.conf
+            csf --profile backup cmm-after-maxmind-csf-cc-interval-reset-override >/dev/null 2>&1
+            if [[ "$(csf -l >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+                csf -ra >/dev/null 2>&1
+            fi
+        elif [[ "$MM_LICENSE_KEY" && ! "$CHECK_CMM_MM_LICENSE_KEY" ]] && [ ! "$CHECK_CSF_MM_LICENSE_KEY" ]; then
+            # if MM_LICENSE_KEY variable is set in centmin.sh for shared Maxmind API key
+            csf --profile backup cmm-before-maxmind-rego-sharedkey >/dev/null 2>&1
+            sed -i "s|MM_LICENSE_KEY = .*|MM_LICENSE_KEY = \"${MM_LICENSE_KEY}\"|" /etc/csf/csf.conf
+            csf --profile backup cmm-after-maxmind-rego-sharedkey >/dev/null 2>&1
+
+            # if MM_LICENSE_KEY is set, we can change CC_INTERVAL back to default 14 days for
+            # lfd geolite2 database download updates
+            csf --profile backup cmm-before-maxmind-csf-cc-interval-reset-sharedkey >/dev/null 2>&1
+            sed -i 's|CC_INTERVAL = .*|CC_INTERVAL = "14"|' /etc/csf/csf.conf
+            csf --profile backup cmm-after-maxmind-csf-cc-interval-reset-sharedkey >/dev/null 2>&1
+            if [[ "$(csf -l >/dev/null 2>&1; echo $?)" -eq '0' ]]; then
+                csf -ra >/dev/null 2>&1
+            fi
+        elif [[ ! "$CHECK_CMM_MM_LICENSE_KEY" && ! "$CHECK_CSF_MM_LICENSE_KEY" ]]; then
+            # if MM_LICENSE_KEY isn't set in /etc/centminmod/custom_config.inc & /etc/csf/csf.conf
+            # download last publicly available geolite2 databases for CSF Firewall
+            # as at Dec 23, 2019 & extend CC_INTERVAL to 365 days before next geolite2 database update to give
+            # time to develop alternative arrangements
+            csf_maxmind_geolite_two_download silent
+        fi
+    fi
+}
+
 csfinstalls() {
 
     # centos 6.6 minimal bug
@@ -63,6 +162,8 @@ sed -i "s/DROP_NOLOG = \"67,68,/DROP_NOLOG = \"/g" /etc/csf/csf.conf
     echo "Disabling CSF Testing mode (activates firewall)..."
     sed -i 's/TESTING = "1"/TESTING = "0"/g' /etc/csf/csf.conf
 
+csf_maxmind_rego
+csf_maxmind_geolite_two_download
 csftweaks
 
 #######################################################

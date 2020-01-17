@@ -1,3 +1,15 @@
+check_devtoolset_php() {
+  # php 7.3+ require devtoolset provided GCC 7+ to build
+  # but standalone php extensions routines aren't aware
+  # and don't enable GENERAL_DEVTOOLSETGCC='y'
+    php -v | awk -F " " '{print $2}' | head -n1 | cut -d . -f1,2 | egrep -w '7.3|7.4|8.0'
+    PHPSEVENTHREE_CHECKVER=$?
+    echo "$PHPSEVENTHREE_CHECKVER"
+    if [[ "$PHPSEVENTHREE_CHECKVER" -eq '0' ]]; then
+        GENERAL_DEVTOOLSETGCC='y'
+    fi
+}
+
 highergcc_cflags() {
   # if DEVTOOLSETSEVEN or DEVTOOLSETEIGHT enabled, some PHP extensions have issues with implicit-fallthrough
   if [[ "$GCCINTEL_PHP" = [yY] && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
@@ -54,6 +66,13 @@ enable_devtoolset() {
             GENERALDEVTOOLSET_FALLTHROUGH=' -Wimplicit-fallthrough=0'
             GENERALDEVTOOLSET_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch -Wno-deprecated-declarations'
          elif [[ "$CENTOS_SEVEN" = 7 && "$DEVTOOLSETEIGHT" = [yY] ]]; then
+            if [[ ! -f /opt/rh/devtoolset-8/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
+               scl_install
+            fi       
+            source /opt/rh/devtoolset-8/enable
+            GENERALDEVTOOLSET_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+            GENERALDEVTOOLSET_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch -Wno-deprecated-declarations'
+         elif [[ "$CENTOS_SIX" = 6 && "$DEVTOOLSETEIGHT" = [yY] ]]; then
             if [[ ! -f /opt/rh/devtoolset-8/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
                scl_install
             fi       
