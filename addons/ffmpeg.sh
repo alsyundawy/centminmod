@@ -25,6 +25,7 @@ FORCE_IPVFOUR='y' # curl/wget commands through script force IPv4
 # GCC options
 GCC_SEVEN='n'
 GCC_EIGHT='n'
+GCC_NINE='n'
 OPT_LEVEL='-O3'
 MARCH_TARGETNATIVE='n' # for intel 64bit only set march=native, if no set to x86-64
 ###############################################################################
@@ -39,7 +40,7 @@ ENABLE_LIBASS='y'
 ENABLE_ZIMG='y'
 ENABLE_OPENCV='n'
 # http://downloads.xiph.org/releases/ogg/
-LIBOGG_VER='1.3.3'
+LIBOGG_VER='1.3.4'
 # http://downloads.xiph.org/releases/vorbis/
 LIBVORBIS_VER='1.3.6'
 GD_ENABLE='n'
@@ -48,7 +49,7 @@ NASM_VER='2.14'
 YASM_VER='1.3.0'
 FDKAAC_VER='0.1.6'
 FONTCONFIG_VER='2.13.1'
-FREETYPE_VER='2.10.0'
+FREETYPE_VER='2.10.1'
 ###############################################################################
 
 shopt -s expand_aliases
@@ -212,6 +213,12 @@ if [[ "$GCC_EIGHT" = [yY] && "$(uname -m)" = 'x86_64' && -f /opt/rh/devtoolset-8
   export CXXFLAGS="${CFLAGS}"
 fi
 
+if [[ "$GCC_NINE" = [yY] && "$(uname -m)" = 'x86_64' && -f /opt/rh/devtoolset-9/root/usr/bin/gcc && -f /opt/rh/devtoolset-9/root/usr/bin/g++ ]]; then
+  source /opt/rh/devtoolset-9/enable
+  export CFLAGS="${OPT_LEVEL} -march=${MARCH_TARGET} -Wimplicit-fallthrough=0"
+  export CXXFLAGS="${CFLAGS}"
+fi
+
 do_continue() {
 	# echo
 	# echo "-------------------------------------------------------------------------"
@@ -361,7 +368,7 @@ fi
 
 cd ${OPT}/ffmpeg_sources
 rm -rf x264
-git clone --depth 1 git://git.videolan.org/x264
+git clone --depth 1 https://code.videolan.org/videolan/x264.git
 cd x264
 PKG_CONFIG_PATH="${OPT}/ffmpeg/lib/pkgconfig" ./configure --prefix="${OPT}/ffmpeg" --bindir="${OPT}/bin" --enable-static  --enable-shared
 make${MAKETHREADS}
@@ -389,9 +396,9 @@ make install
 make distclean
 
 cd ${OPT}/ffmpeg_sources
-curl -L -O https://downloads.sourceforge.net/project/lame/lame/3.99/lame-3.99.5.tar.gz
-tar xzvf lame-3.99.5.tar.gz
-cd lame-3.99.5
+curl -L -O https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
+tar xzvf lame-3.100.tar.gz
+cd lame-3.100
 ./configure --prefix="${OPT}/ffmpeg" --bindir="${OPT}/bin" --enable-shared --enable-nasm
 make${MAKETHREADS}
 make install

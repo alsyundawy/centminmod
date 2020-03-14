@@ -27,10 +27,10 @@ DT=$(date +"%d%m%y-%H%M%S")
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='403'
+SCRIPT_INCREMENTVER='451'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
-SCRIPT_DATE='31/12/2019'
+SCRIPT_DATE='29/02/2020'
 SCRIPT_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_MODIFICATION_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_URL='https://centminmod.com'
@@ -410,6 +410,7 @@ CCACHESIZE='2.5G'
 # account API key by setting MM_LICENSE_KEY variable 
 # in persistent config file /etc/centminmod/custom_config.inc
 MM_LICENSE_KEY='k0sP8JPgZm6i0sOF'
+MM_CSF_SRC='y'
 
 #####################################################
 # Networking
@@ -447,7 +448,7 @@ DEVTOOLSETSEVEN='n'           # Enable or disable devtoolset-7 GCC 7.1 support i
 DEVTOOLSETEIGHT='y'           # source compiled GCC 8 from latest snapshot builds
 NGINX_DEVTOOLSETGCC='y'       # Use lastest devtoolset even for CentOS 7 nginx compiles
 GENERAL_DEVTOOLSETGCC='n'     # Use lastest devtoolset whereever possible/coded
-CRYPTO_DEVTOOLSETGCC='n'      # Use lastest devtoolset for libressl or openssl compiles
+CRYPTO_DEVTOOLSETGCC='y'      # Use lastest devtoolset for libressl or openssl compiles
 NGX_GSPLITDWARF='y'           # for Nginx compile https://community.centminmod.com/posts/44072/
 PHP_GSPLITDWARF='y'           # for PHP compile https://community.centminmod.com/posts/44072/
 PHP_LTO='n'                   # enable -flto compiler for GCC 4.8.5+ PHP-FPM compiles currently not working with PHP 7.x
@@ -527,7 +528,7 @@ NGINX_HTTPPUSH='n'           # Nginx http/2 push patch https://community.centmin
 NGINX_ZLIBNG='n'             # 64bit OS only for Nginx compiled against zlib-ng https://github.com/Dead2/zlib-ng
 NGINX_MODSECURITY='n'        # modsecurity module support https://github.com/SpiderLabs/ModSecurity/wiki/Reference-Manual#Installation_for_NGINX
 NGINX_MODSECURITY_MAXMIND='y' # modsecurity built with libmaxminddb is failing to compile so disable it in favour of GeoIP legacy
-MODSECURITY_OWASPVER='3.1.1' # owasp modsecurity ruleset https://github.com/SpiderLabs/owasp-modsecurity-crs/releases
+MODSECURITY_OWASPVER='3.2.0' # owasp modsecurity ruleset https://github.com/SpiderLabs/owasp-modsecurity-crs/releases
 NGINX_REALIP='y'             # http://nginx.org/en/docs/http/ngx_http_realip_module.html
 NGINX_RDNS='n'               # https://github.com/flant/nginx-http-rdns
 NGINX_NJS='n'                # nginScript https://www.nginx.com/blog/launching-nginscript-and-looking-ahead/
@@ -578,7 +579,7 @@ NGINX_HTTPREDIS='y'          # Nginx redis http://wiki.nginx.org/HttpRedisModule
 NGINX_HTTPREDISVER='0.3.7'   # Nginx redis version
 NGINX_PCREJIT='y'            # Nginx configured with pcre & pcre-jit support
 NGINX_PCRE_DYNAMIC='y'       # compile nginx pcre as dynamic instead of static library
-NGINX_PCREVER='8.43'         # Version of PCRE used for pcre-jit support in Nginx
+NGINX_PCREVER='8.44'         # Version of PCRE used for pcre-jit support in Nginx
 NGINX_ZLIBCUSTOM='y'         # Use custom zlib instead of system version
 NGINX_ZLIBVER='1.2.11'       # http://www.zlib.net/
 NGINX_VIDEO='n'              # control variable when 'y' set for NGINX_SLICE='y', NGINX_RTMP='y', NGINX_FLV='y', NGINX_MP4='y'
@@ -683,7 +684,7 @@ LIBSODIUM_VER='1.0.18'      # https://github.com/jedisct1/libsodium/releases
 LIBSODIUM_NATIVE='n'        # optimise for specific cpu not portable between different cpu modules
 LIBARGON_VER='20171227'     # https://github.com/P-H-C/phc-winner-argon2
 PHP_MCRYPTPECL='y'          # PHP 7.2 deprecated mcrypt support so this adds it back as PECL extension
-PHP_MCRYPTPECLVER='1.0.1'   # https://pecl.php.net/package/mcrypt
+PHP_MCRYPTPECLVER='1.0.3'   # https://pecl.php.net/package/mcrypt
 PHPZOPFLI='n'               # enable zopfli php extension https://github.com/kjdev/php-ext-zopfli
 PHPZOPFLI_ALWAYS='n'        # zopfli php extension always install on php recompiles
 PHP_BROTLI='n'              # brotli php extension https://github.com/kjdev/php-ext-brotli
@@ -729,7 +730,7 @@ MYSQL_INSTALL='n'            # Install official Oracle MySQL Server (MariaDB alt
 SENDMAIL_INSTALL='n'         # Install Sendmail (and mailx) set to y and POSTFIX_INSTALL=n for sendmail
 POSTFIX_INSTALL=y            # Install Postfix (and mailx) set to n and SENDMAIL_INSTALL=y for sendmail
 # Nginx
-NGINX_VERSION='1.17.7'       # Use this version of Nginx
+NGINX_VERSION='1.17.9'       # Use this version of Nginx
 NGINX_VHOSTSSL='y'            # enable centmin.sh menu 2 prompt to create self signed SSL vhost 2nd vhost conf
 NGINXBACKUP='y'
 NGINXCPU_AUTOTUNE_NEW='y'    # revised nginx worker_proccess auto tuned settings for >12 cpu thread based servers
@@ -791,7 +792,7 @@ GPERFTOOLS_VERSION='2.6.3'        # Use this version of google-perftools
 
 # Choose whether to compile PCRE from source. Note PHP 5.3.8 already includes PCRE
 PCRE_SOURCEINSTALL='n'     
-PCRE_VERSION='8.43'          # PCRE version
+PCRE_VERSION='8.44'          # PCRE version
 
 # PHP and Cache/Acceleration
 IMAGICKPHP_VER='3.4.4'   # PHP extension for imagick
@@ -799,7 +800,7 @@ MAILPARSEPHP_VER='2.1.6'       # https://pecl.php.net/package/mailparse
 MAILPARSEPHP_COMPATVER='3.0.4' # For PHP 7
 MEMCACHED_INSTALL='y'          # Install Memcached
 LIBEVENT_VERSION='2.1.8'      # Use this version of Libevent
-MEMCACHED_VERSION='1.5.20'    # Use this version of Memcached server
+MEMCACHED_VERSION='1.6.0'    # Use this version of Memcached server
 MEMCACHED_TLS='n'             # TLS support https://github.com/memcached/memcached/wiki/ReleaseNotes1513
 MEMCACHE_VERSION='3.0.8'      # Use this version of Memcache
 MEMCACHE_COMPATVER='4.0.5.1'  # For PHP 7
@@ -1238,16 +1239,32 @@ if [[ "$CENTOS_EIGHT" -eq '8' ]]; then
   fi
 fi
 
-if [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+if [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETNINE" = [yY] && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+  DEVTOOLSETNINE='y'
+  DEVTOOLSETEIGHT='n'
+  DEVTOOLSETSEVEN='n'
+elif [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETNINE" = [yY] && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [nN] ]]; then
+  DEVTOOLSETNINE='y'
+  DEVTOOLSETEIGHT='n'
+  DEVTOOLSETSEVEN='n'
+elif [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETNINE" = [yY] && "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+  DEVTOOLSETNINE='y'
+  DEVTOOLSETEIGHT='n'
+  DEVTOOLSETSEVEN='n'
+elif [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETNINE" = [nN] && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+  DEVTOOLSETNINE='n'
   DEVTOOLSETEIGHT='y'
   DEVTOOLSETSEVEN='n'
-elif [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
-  DEVTOOLSETEIGHT='y'
-  DEVTOOLSETSEVEN='n'
+elif [[ "$CENTOS_SEVEN" -eq '7' && "$DEVTOOLSETNINE" = [nN] && "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+  DEVTOOLSETNINE='n'
+  DEVTOOLSETEIGHT='n'
+  DEVTOOLSETSEVEN='y'
 elif [[ "$CENTOS_SIX" -eq '6' && "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+  DEVTOOLSETNINE='n'
   DEVTOOLSETEIGHT='y'
   DEVTOOLSETSEVEN='n'
 elif [[ "$CENTOS_SIX" -eq '6' && "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+  DEVTOOLSETNINE='n'
   DEVTOOLSETEIGHT='n'
   DEVTOOLSETSEVEN='y'
 fi
@@ -1255,6 +1272,7 @@ fi
 if [[ "$CENTOS_SIX" -eq '6' && "$BORINGSSL_SWITCH" = [yY] ]]; then
   # centos 6 gcc 4.4.7 too low for boringssl compiles so need
   # devtoolset-8 gcc 8.3.1+ compiler
+  DEVTOOLSETNINE='n'
   DEVTOOLSETEIGHT='y'
   DEVTOOLSETSEVEN='n'
   CRYPTO_DEVTOOLSETGCC='y'
@@ -1996,6 +2014,13 @@ fi
     PHPVER_ID=$(awk '/PHP_VERSION_ID/ {print $3}' ${DIR_TMP}/php-${PHP_VERSION}/main/php_version.h)
     echo "PHP VERSION ID: $PHPVER_ID"
 
+    # if ZOPCACHEDFT override enabled = yY and PHP_VERSION is not 5.5, 5.6 or 5.7
+    # install Zend OpCache PECL extesnion otherwise if PHP_VERSION = 5.5
+    # then php_configure.inc routine will pick up PHP_VERSION 5.5 and install
+    # native Zend OpCache when ZOPCACHEDFT=yY
+    PHPMVER=$(echo "$PHP_VERSION" | cut -d . -f1,2)
+    echo "Initial Install PHPMVER: $PHPMVER"
+
     php_patches
 
     if [[ "$CENTOS_SIX" -eq '6' ]]; then
@@ -2160,12 +2185,6 @@ if [[ "$APCINSTALL" = [yY] && "$ZOPCACHEDFT" = [nN] ]]; then
   funct_apcsourceinstall
 fi
 
-# if ZOPCACHEDFT override enabled = yY and PHP_VERSION is not 5.5, 5.6 or 5.7
-# install Zend OpCache PECL extesnion otherwise if PHP_VERSION = 5.5
-# then php_configure.inc routine will pick up PHP_VERSION 5.5 and install
-# native Zend OpCache when ZOPCACHEDFT=yY
-PHPMVER=$(echo "$PHP_VERSION" | cut -d . -f1,2)
-
 # ZOPCACHE_OVERRIDE=y allows you to override PHP 5.5-7.0's inbuilt included
 # Zend Opcache version with one available from pecl site
 if [[ "$ZOPCACHEDFT" = [yY] ]] && [[ "$PHPMVER" = 5.[234] || "$ZOPCACHE_OVERRIDE" = [yY] ]]; then
@@ -2192,6 +2211,9 @@ incmemcachedinstall
 
 echo "csfinstalls"
 csfinstalls
+
+echo "csfcron_setup"
+csfcron_setup
 
 echo "siegeinstall"
 siegeinstall
@@ -2314,11 +2336,18 @@ fi
 if [[ "$CENTOS_SEVEN" = '7' || "$CENTOS_EIGHT" = '8' ]] && [[ "$MDB_INSTALL" = [yY] || "$MDB_YUMREPOINSTALL" = [yY] ]]; then
   sleep 2
   systemctl daemon-reload -q
-  systemctl restart mariadb
+  service php-fpm stop >/dev/null 2>&1
+  systemctl restart mariadb -q
+  service php-fpm start >/dev/null 2>&1
   if [[ "$(systemctl is-active mariadb -q; echo $?)" -ne '0' ]]; then
     sleep 4
     systemctl daemon-reload -q
-    systemctl restart mariadb
+    systemctl restart mariadb -q
+    if [[ "$(systemctl is-active mariadb -q; echo $?)" -eq '0' ]]; then
+      echo "Starting mariadb (via systemctl): [ OK ]"
+    else
+      echo "Starting mariadb (via systemctl): [ Failed ]"
+    fi
   fi
 elif [[ "$MDB_INSTALL" = [yY] || "$MDB_YUMREPOINSTALL" = [yY] ]] && [ -f /etc/init.d/mysql ]; then
   sleep 3

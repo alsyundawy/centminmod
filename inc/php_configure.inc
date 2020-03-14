@@ -99,6 +99,7 @@ CHECKLOWMEMPHP=`expr $TOTALMEM \< $ISLOWMEMPHP`
 #############################################################
 PLIBDIR='/usr'
 PHPMVER=$(echo "$PHP_VERSION" | cut -d . -f1,2)
+echo "php_configure.inc PHPMVER: $PHPMVER"
 
 # compiling PHP with LTO support takes 2-4x times the memory
 # and cpu resources to do and takes 2-4x times longer to compile
@@ -121,14 +122,30 @@ else
   FFI_OPT=""
 fi
 
-if [[ "$PHPMVER" = '7.4' || "$PHPMUVER" = '7.4' || "$PHPMVER" = '8.0' || "$PHPMUVER" = '8.0' ]]; then
+if [[ "$INITIALINSTALL" = [yY] ]] && [[ "$PHPMVER" = '7.4' || "$PHPMVER" = '8.0' ]]; then
   # https://raw.githubusercontent.com/php/php-src/PHP-7.4/UPGRADING
   ZIPOPT='--with-zip'
   PHPGDOPT='--enable-gd'
   PHPFREETYPEOPT='--with-freetype'
   PHPJPEGOPT='--with-jpeg'
   PHPXPMOPT='--with-xpm'
-else
+elif [[ "$INITIALINSTALL" = [yY] ]]; then
+  #statements
+  ZIPOPT='--enable-zip'
+  PHPGDOPT='--with-gd'
+  PHPFREETYPEOPT="--with-freetype-dir=${PLIBDIR}"
+  PHPJPEGOPT="--with-jpeg-dir=${PLIBDIR}"
+  PHPXPMOPT="--with-xpm-dir=${PLIBDIR}"
+fi
+
+if [[ "$INITIALINSTALL" != [yY] ]] && [[ "$PHPMUVER" = '7.4' || "$PHPMUVER" = '8.0' ]]; then
+  # https://raw.githubusercontent.com/php/php-src/PHP-7.4/UPGRADING
+  ZIPOPT='--with-zip'
+  PHPGDOPT='--enable-gd'
+  PHPFREETYPEOPT='--with-freetype'
+  PHPJPEGOPT='--with-jpeg'
+  PHPXPMOPT='--with-xpm'
+elif [[ "$INITIALINSTALL" != [yY] ]]; then
   ZIPOPT='--enable-zip'
   PHPGDOPT='--with-gd'
   PHPFREETYPEOPT="--with-freetype-dir=${PLIBDIR}"
@@ -355,6 +372,7 @@ oniguruma_check
 # whether to switch from system used zlib to cloudflare zlib performance
 # fork for php conmpilations for cpus supporting SSE4.2 at least
 CHECK_PCLMUL=$(gcc -c -Q -march=native --help=target | egrep '\[enabled\]|mtune|march' | grep 'mpclmul' | grep -o enabled)
+CLOUDFLARE_ZLIBPHP='n'
 if [[ "$CLOUDFLARE_ZLIBPHP" = [yY] && "$(cat /proc/cpuinfo | grep -o 'sse4_2' | uniq)" = 'sse4_2' && "$CHECK_PCLMUL" = 'enabled' ]]; then
   # check if static libz.a installed usually as result of compiling nginx with
   # CLOUDFLARE_ZLIB='y' set but if not installed run install function from inc/zlib.inc
@@ -1056,7 +1074,10 @@ fi
 
 if [[ "$GCCINTEL_PHP" = [yY] ]]; then
 
-  # ensure devtoolset-7 and devtoolset-8 are installed
+  # ensure devtoolset-7 and devtoolset-8 and devtoolset-9 are installed
+  if [[ "$DEVTOOLSETNINE" = [yY] && ! -f /opt/rh/devtoolset-9/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-9/root/usr/bin/g++ ]]; then
+      scl_install
+  fi
   if [[ "$DEVTOOLSETEIGHT" = [yY] && ! -f /opt/rh/devtoolset-8/root/usr/bin/gcc || ! -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
       scl_install
   fi
@@ -1233,6 +1254,20 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
       unset CXX
       export CC="ccache gcc"
       export CXX="ccache g++"
+    elif [[ "$DEVTOOLSETNINE" = [yY] && -f /opt/rh/devtoolset-9/root/usr/bin/gcc && -f /opt/rh/devtoolset-9/root/usr/bin/g++ ]]; then
+        GENERAL_DEVTOOLSETGCC='y'
+        DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+        source /opt/rh/devtoolset-9/enable
+        which gcc
+        which g++
+        unset CC
+        unset CXX
+        export CC="ccache /opt/rh/devtoolset-9/root/usr/bin/gcc"
+        export CXX="ccache /opt/rh/devtoolset-9/root/usr/bin/g++"
+        echo "centos 7 set devtoolset-9"
+        echo $CC
+        echo $CXX
     elif [[ "$DEVTOOLSETEIGHT" = [yY] && -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
         GENERAL_DEVTOOLSETGCC='y'
         DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
@@ -1310,6 +1345,20 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
       unset CXX
       export CC="ccache gcc"
       export CXX="ccache g++"
+    elif [[ "$DEVTOOLSETNINE" = [yY] && -f /opt/rh/devtoolset-9/root/usr/bin/gcc && -f /opt/rh/devtoolset-9/root/usr/bin/g++ ]]; then
+        GENERAL_DEVTOOLSETGCC='y'
+        DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+        DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting -Wno-cast-function-type -Wno-error=cast-align -Wno-implicit-function-declaration -Wno-builtin-declaration-mismatch'
+        source /opt/rh/devtoolset-9/enable
+        which gcc
+        which g++
+        unset CC
+        unset CXX
+        export CC="ccache /opt/rh/devtoolset-9/root/usr/bin/gcc"
+        export CXX="ccache /opt/rh/devtoolset-9/root/usr/bin/g++"
+        echo "centos 7 set devtoolset-9"
+        echo $CC
+        echo $CXX
     elif [[ "$DEVTOOLSETEIGHT" = [yY] && -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
         GENERAL_DEVTOOLSETGCC='y'
         DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
@@ -1372,6 +1421,14 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
       DEVTOOLSETNINE='n'
       DEVTOOLSETEIGHT='y'
       DEVTOOLSETSEVEN='n'
+    elif [[ -f /opt/rh/devtoolset-9/enable && "$DEVTOOLSETNINE" = [yY] ]] && [[ "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+      DEVTOOLSETNINE='y'
+      DEVTOOLSETEIGHT='n'
+      DEVTOOLSETSEVEN='n'
+    elif [[ ! -f /opt/rh/devtoolset-9/enable || "$DEVTOOLSETNINE" != [yY] ]] && [[ "$DEVTOOLSETEIGHT" = [yY] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
+      DEVTOOLSETNINE='n'
+      DEVTOOLSETEIGHT='y'
+      DEVTOOLSETSEVEN='n'
     elif [[ "$DEVTOOLSETEIGHT" = [nN] && "$DEVTOOLSETSEVEN" = [yY] ]]; then
       DEVTOOLSETEIGHT='y'
       DEVTOOLSETSEVEN='n'
@@ -1401,6 +1458,17 @@ if [[ "$GCCINTEL_PHP" = [yY] ]]; then
       unset CXX
       export CC="ccache gcc"
       export CXX="ccache g++"
+    elif [[ "$DEVTOOLSETNINE" = [yY] && -f /opt/rh/devtoolset-9/root/usr/bin/gcc && -f /opt/rh/devtoolset-9/root/usr/bin/g++ ]]; then
+      GENERAL_DEVTOOLSETGCC='y'
+      DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
+      DEVTOOLSETPHP_EXTRAFLAGS=' -fcode-hoisting'
+      source /opt/rh/devtoolset-9/enable
+      which gcc
+      which g++
+      unset CC
+      unset CXX
+      export CC="ccache /opt/rh/devtoolset-9/root/usr/bin/gcc"
+      export CXX="ccache /opt/rh/devtoolset-9/root/usr/bin/g++"
     elif [[ "$DEVTOOLSETEIGHT" = [yY] && -f /opt/rh/devtoolset-8/root/usr/bin/gcc && -f /opt/rh/devtoolset-8/root/usr/bin/g++ ]]; then
       GENERAL_DEVTOOLSETGCC='y'
       DEVTOOLSETPHP_FALLTHROUGH=' -Wimplicit-fallthrough=0'
