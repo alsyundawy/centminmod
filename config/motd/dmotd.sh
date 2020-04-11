@@ -160,6 +160,31 @@ ngxver_checker() {
   fi
 }
 
+phpver_checker() {
+  if [[ "$DMOTD_PHPCHECK" = [yY] && "$(which php-fpm >/dev/null 2>&1; echo $?)" = '0' ]]; then
+    if [ ! -f /usr/local/bin/get-php-ver ]; then
+        wget -q -4 https://github.com/centminmod/get-php-versions/raw/master/get-php-ver.sh -O /usr/local/bin/getphpver
+        chmod +x /usr/local/bin/getphpver
+    fi
+    if [ ! -f /usr/bin/jq ]; then
+      yum -q -y install jq
+    fi
+    LASTEST_PHPVERS=$(getphpver "$(php-config --version | awk -F '.' '{print $1$2}')")
+    CURRENT_PHPVERS=$(php-config --version)
+    if [[ "$CURRENT_PHPVERS" != "$LASTEST_PHPVERS" ]]; then
+      echo
+      cecho "===============================================================================" $boldgreen
+      cecho "* PHP Update May Be Available via centmin.sh menu option 5" $boldyellow
+      cecho "* see https://community.centminmod.com/forums/18/" $boldyellow
+      cecho "===============================================================================" $boldgreen
+      cecho "* Current PHP Version:        $CURRENT_PHPVERS" $boldyellow
+      cecho "* Latest PHP Branch Version:  $LASTEST_PHPVERS (github.com/php/php-src/releases)" $boldyellow
+      cecho "===============================================================================" $boldgreen
+      echo
+    fi
+  fi
+}
+
 gitenv_askupdate() {
   DT=$(date +"%d%m%y-%H%M%S")
     if [[ -d "${CMSCRIPT_GITDIR}/.git" ]]; then
@@ -244,6 +269,7 @@ starttime=$(TZ=UTC date +%s.%N)
 motd_output
 kernel_checks
 ngxver_checker
+phpver_checker
 gitenv_askupdate
 } 2>&1 | tee "${CENTMINLOGDIR}/cmm-login-git-checks_${DT}.log"
 

@@ -27,14 +27,14 @@ DT=$(date +"%d%m%y-%H%M%S")
 branchname='123.09beta01'
 SCRIPT_MAJORVER='1.2.3'
 SCRIPT_MINORVER='09'
-SCRIPT_INCREMENTVER='451'
+SCRIPT_INCREMENTVER='480'
 SCRIPT_VERSIONSHORT="${branchname}"
 SCRIPT_VERSION="${SCRIPT_VERSIONSHORT}.b${SCRIPT_INCREMENTVER}"
-SCRIPT_DATE='29/02/2020'
+SCRIPT_DATE='31/03/2020'
 SCRIPT_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_MODIFICATION_AUTHOR='eva2000 (centminmod.com)'
 SCRIPT_URL='https://centminmod.com'
-COPYRIGHT="Copyright 2011-2019 CentminMod.com"
+COPYRIGHT="Copyright 2011-2020 CentminMod.com"
 DISCLAIMER='This software is provided "as is" in the hope that it will be useful, but WITHOUT ANY WARRANTY, to the extent permitted by law; without even the implied warranty of MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.'
 
 #####################################################
@@ -400,7 +400,7 @@ MARIADB_JEMALLOC='n'
 #####################################################
 # CCACHE Configuration
 CCACHEINSTALL='y'
-CCACHE_VER="3.7.4"
+CCACHE_VER="3.7.9"
 CCACHESIZE='2.5G'
 
 #####################################################
@@ -593,7 +593,7 @@ NGINX_UPSTREAMCHECK='n'      # nginx upstream check https://github.com/yaoweibin
 NGINX_UPSTREAMCHECKVER='0.3.0'
 NGINX_OPENRESTY='y'          # Agentzh's openresty Nginx modules
 ORESTY_MEMCVER='0.18'        # openresty memc module https://github.com/openresty/memc-nginx-module
-ORESTY_SRCCACHEVER='0.31'    # openresty subrequest cache module https://github.com/openresty/srcache-nginx-module
+ORESTY_SRCCACHEVER='0.32rc1'    # openresty subrequest cache module https://github.com/openresty/srcache-nginx-module
 ORESTY_DEVELKITVER='0.3.0'  # openresty ngx_devel_kit module https://github.com/simpl/ngx_devel_kit
 ORESTY_SETMISCGIT='n'        # use git master instead of version specific
 ORESTY_SETMISC='y'           # openresty set-misc-nginx module https://github.com/openresty/echo-nginx-module
@@ -606,21 +606,21 @@ LUAJIT_GITINSTALL='y'        # opt to install luajit 2.1 from dev branch http://
 LUAJIT_GITINSTALLVER='2.1-agentzh'   # branch version = v2.1 will override ORESTY_LUAGITVER if LUAJIT_GITINSTALL='y'
 
 ORESTY_LUANGINX='n'             # enable or disable or ORESTY_LUA* nginx modules below
-ORESTY_LUANGINXVER='0.10.15'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
+ORESTY_LUANGINXVER='0.10.16rc5'  # openresty lua-nginx-module https://github.com/openresty/lua-nginx-module
 ORESTY_LUAGITVER='2.0.5'        # luagit http://luajit.org/
 ORESTY_LUAMEMCACHEDVER='0.14'   # openresty https://github.com/openresty/lua-resty-memcached
 ORESTY_LUAMYSQLVER='0.21'    # openresty https://github.com/openresty/lua-resty-mysql
-ORESTY_LUAREDISVER='0.27'       # openresty https://github.com/openresty/lua-resty-redis
+ORESTY_LUAREDISVER='0.28rc1'       # openresty https://github.com/openresty/lua-resty-redis
 ORESTY_LUADNSVER='0.21'         # openresty https://github.com/openresty/lua-resty-dns
 ORESTY_LUAUPLOADVER='0.10'      # openresty https://github.com/openresty/lua-resty-upload
 ORESTY_LUAWEBSOCKETVER='0.07'   # openresty https://github.com/openresty/lua-resty-websocket
 ORESTY_LUALOCKVER='0.08'        # openresty https://github.com/openresty/lua-resty-lock
-ORESTY_LUASTRINGVER='0.11rc1'      # openresty https://github.com/openresty/lua-resty-string
+ORESTY_LUASTRINGVER='0.12rc1'      # openresty https://github.com/openresty/lua-resty-string
 ORESTY_LUAREDISPARSERVER='0.13'    # openresty https://github.com/openresty/lua-redis-parser
 ORESTY_LUAUPSTREAMCHECKVER='0.06'  # openresty https://github.com/openresty/lua-resty-upstream-healthcheck
-ORESTY_LUALRUCACHEVER='0.09'       # openresty https://github.com/openresty/lua-resty-lrucache
-ORESTY_LUARESTYCOREVER='0.1.17'    # openresty https://github.com/openresty/lua-resty-core
-ORESTY_LUASTREAMVER='0.0.7'        # https://github.com/openresty/stream-lua-nginx-module
+ORESTY_LUALRUCACHEVER='0.10rc1'       # openresty https://github.com/openresty/lua-resty-lrucache
+ORESTY_LUARESTYCOREVER='0.1.18rc4'    # openresty https://github.com/openresty/lua-resty-core
+ORESTY_LUASTREAMVER='0.0.8rc3'        # https://github.com/openresty/stream-lua-nginx-module
 ORESTY_LUASTREAM='y'               # control https://github.com/openresty/stream-lua-nginx-module
 NGX_LUASTREAM_FORCED='y'           # control stream-lua-nginx enabling for nginx 1.17+
 ORESTY_LUAUPSTREAMVER='0.06'       # openresty https://github.com/openresty/lua-upstream-nginx-module
@@ -679,7 +679,7 @@ MONGODB_SASL='n'            # SASL not working yet leave = n
 PDOPGSQL_PHPVER='11'        # pdo-pgsql PHP extension version for postgresql
 PHP_LIBZIP='n'              # use newer libzip instead of PHP embedded zip
 PHP_ARGON='n'               # alias for PHP_LIBZIP, when PHP_ARGON='y' then PHP_LIBZIP='y'
-LIBZIP_VER='1.5.2'          # required for PHP 7.2 + with libsodium & argon2
+LIBZIP_VER='1.6.1'          # required for PHP 7.2 + with libsodium & argon2
 LIBSODIUM_VER='1.0.18'      # https://github.com/jedisct1/libsodium/releases
 LIBSODIUM_NATIVE='n'        # optimise for specific cpu not portable between different cpu modules
 LIBARGON_VER='20171227'     # https://github.com/P-H-C/phc-winner-argon2
@@ -751,9 +751,9 @@ VHOSTCTRL_AUTOPROTECTINC='y'
 NGINX_PRIORITIZECHACHA='n' # https://community.centminmod.com/posts/67042/
 DISABLE_TLSONEZERO_PROTOCOL='n' # disable TLS 1.0 protocol by default industry is moving to deprecate for security
 NOSOURCEOPENSSL='y'        # set to 'y' to disable OpenSSL source compile for system default YUM package setup
-OPENSSL_VERSION='1.1.1d'   # Use this version of OpenSSL http://openssl.org/
-OPENSSL_VERSIONFALLBACK='1.1.1d'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
-OPENSSL_VERSION_OLDOVERRIDE='1.1.1d' # override version if persist config OPENSSL_VERSION variable is out of date
+OPENSSL_VERSION='1.1.1f'   # Use this version of OpenSSL http://openssl.org/
+OPENSSL_VERSIONFALLBACK='1.1.1f'   # fallback if OPENSSL_VERSION uses openssl 1.1.x branch
+OPENSSL_VERSION_OLDOVERRIDE='1.1.1f' # override version if persist config OPENSSL_VERSION variable is out of date
 OPENSSL_THREADS='y'        # control whether openssl 1.1 branch uses threading or not
 OPENSSL_TLSONETHREE='y'    # whether OpenSSL 1.1.1 builds enable TLSv1.3
 OPENSSL_CUSTOMPATH='/opt/openssl'  # custom directory path for OpenSSL 1.0.2+
@@ -800,7 +800,7 @@ MAILPARSEPHP_VER='2.1.6'       # https://pecl.php.net/package/mailparse
 MAILPARSEPHP_COMPATVER='3.0.4' # For PHP 7
 MEMCACHED_INSTALL='y'          # Install Memcached
 LIBEVENT_VERSION='2.1.8'      # Use this version of Libevent
-MEMCACHED_VERSION='1.6.0'    # Use this version of Memcached server
+MEMCACHED_VERSION='1.6.3'    # Use this version of Memcached server
 MEMCACHED_TLS='n'             # TLS support https://github.com/memcached/memcached/wiki/ReleaseNotes1513
 MEMCACHE_VERSION='3.0.8'      # Use this version of Memcache
 MEMCACHE_COMPATVER='4.0.5.1'  # For PHP 7
@@ -1069,6 +1069,7 @@ source "inc/mysqlsecure.inc"
 source "inc/pcre.inc"
 source "inc/jemalloc.inc"
 source "inc/zlib.inc"
+source "inc/letsdebug.inc"
 source "inc/google_perftools.inc"
 source "inc/updater_submenu.inc"
 source "inc/centminfinish.inc"
